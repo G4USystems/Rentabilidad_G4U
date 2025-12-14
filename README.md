@@ -9,115 +9,138 @@ Sistema de integración con la API de Qonto para generación de reportes de Pér
 - 📈 **KPIs de Rentabilidad**: Métricas globales y por proyecto
 - 🏷️ **Categorización**: Sistema flexible de categorías de ingresos/gastos
 - 📁 **Gestión de Proyectos**: Asignación de transacciones a proyectos
-- 📄 **Exportación**: PDF, Excel, CSV y JSON
+- 📄 **Exportación**: CSV y JSON
 
-## Estructura del Proyecto
+## 🚀 Deploy en Vercel
 
-```
-Rentabilidad_G4U/
-├── app/
-│   ├── api/              # Endpoints REST
-│   ├── core/             # Configuración central
-│   ├── models/           # Modelos de datos
-│   ├── schemas/          # Esquemas Pydantic
-│   ├── services/         # Lógica de negocio
-│   ├── integrations/     # Integraciones externas (Qonto)
-│   └── reports/          # Generación de reportes
-├── alembic/              # Migraciones de BD
-├── tests/                # Tests unitarios e integración
-└── docs/                 # Documentación
-```
+### 1. Configurar Base de Datos
 
-## Instalación
+Necesitas una base de datos PostgreSQL externa. Opciones recomendadas:
 
-1. Clonar el repositorio:
-```bash
+| Servicio | Free Tier | Recomendación |
+|----------|-----------|---------------|
+| [Neon](https://neon.tech) | 512MB | ⭐ Recomendado |
+| [Supabase](https://supabase.com) | 500MB | Buena opción |
+| [Railway](https://railway.app) | $5/mes crédito | Fácil setup |
+
+### 2. Variables de Entorno en Vercel
+
+En tu dashboard de Vercel → Settings → Environment Variables:
+
+\`\`\`
+QONTO_API_KEY=tu_api_key_de_qonto
+QONTO_ORGANIZATION_SLUG=tu_organization_slug
+QONTO_IBAN=tu_iban
+DATABASE_URL=postgresql+asyncpg://user:pass@host/dbname
+\`\`\`
+
+### 3. Deploy
+
+\`\`\`bash
+# Opción 1: Conectar repo de GitHub en vercel.com
+
+# Opción 2: CLI
+npm i -g vercel
+vercel --prod
+\`\`\`
+
+### 4. Inicializar el Sistema
+
+Después del deploy, ejecuta en orden:
+
+\`\`\`bash
+# 1. Crear categorías predeterminadas
+curl -X POST https://tu-app.vercel.app/api/v1/sync/init
+
+# 2. Sincronizar datos de Qonto
+curl -X POST https://tu-app.vercel.app/api/v1/sync/all
+\`\`\`
+
+## 💻 Desarrollo Local
+
+\`\`\`bash
+# Clonar e instalar
 git clone <repository-url>
 cd Rentabilidad_G4U
-```
-
-2. Crear entorno virtual:
-```bash
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# o
-venv\Scripts\activate  # Windows
-```
-
-3. Instalar dependencias:
-```bash
+source venv/bin/activate
 pip install -r requirements.txt
-```
 
-4. Configurar variables de entorno:
-```bash
+# Configurar
 cp .env.example .env
-# Editar .env con tus credenciales de Qonto
-```
+# Editar .env con tus credenciales
 
-5. Ejecutar migraciones:
-```bash
-alembic upgrade head
-```
-
-6. Iniciar el servidor:
-```bash
+# Ejecutar
 uvicorn app.main:app --reload
-```
+\`\`\`
 
-## Configuración de Qonto
+## 📚 API Endpoints
 
-1. Obtén tu API Key desde el portal de Qonto
-2. Configura las siguientes variables en `.env`:
-   - `QONTO_API_KEY`: Tu clave de API
-   - `QONTO_ORGANIZATION_SLUG`: Slug de tu organización
-   - `QONTO_IBAN`: IBAN de la cuenta a monitorear
-
-## API Endpoints
-
-### Transacciones
-- `GET /api/v1/transactions` - Listar transacciones
-- `GET /api/v1/transactions/{id}` - Detalle de transacción
-- `POST /api/v1/transactions/sync` - Sincronizar con Qonto
+### Sincronización
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | \`/api/v1/sync/init\` | Inicializar categorías |
+| POST | \`/api/v1/sync/all\` | Sincronizar todo |
+| POST | \`/api/v1/sync/transactions\` | Solo transacciones |
 
 ### Reportes P&L
-- `GET /api/v1/reports/pl` - Generar reporte P&L
-- `GET /api/v1/reports/pl/summary` - Resumen de P&L
-- `POST /api/v1/reports/pl/export` - Exportar reporte
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | \`/api/v1/reports/pl\` | Generar reporte P&L |
+| GET | \`/api/v1/reports/pl/summary\` | Resumen rápido |
+| GET | \`/api/v1/reports/pl/monthly\` | P&L mensual |
+| GET | \`/api/v1/reports/pl/quarterly\` | P&L trimestral |
 
 ### KPIs
-- `GET /api/v1/kpis/global` - KPIs globales
-- `GET /api/v1/kpis/projects` - KPIs por proyecto
-- `GET /api/v1/kpis/trends` - Tendencias temporales
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | \`/api/v1/kpis/global\` | KPIs globales |
+| GET | \`/api/v1/kpis/projects\` | KPIs por proyecto |
+| GET | \`/api/v1/kpis/dashboard\` | Dashboard resumen |
+| GET | \`/api/v1/kpis/trends/{metric}\` | Tendencias |
 
-### Proyectos
-- `GET /api/v1/projects` - Listar proyectos
-- `POST /api/v1/projects` - Crear proyecto
-- `PUT /api/v1/projects/{id}` - Actualizar proyecto
+### Proyectos y Transacciones
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | \`/api/v1/projects\` | Listar proyectos |
+| GET | \`/api/v1/projects/summary\` | Con resumen financiero |
+| GET | \`/api/v1/transactions\` | Listar transacciones |
+| PATCH | \`/api/v1/transactions/{id}\` | Categorizar/asignar |
 
-### Categorías
-- `GET /api/v1/categories` - Listar categorías
-- `POST /api/v1/categories` - Crear categoría
+## 📖 Documentación Interactiva
 
-## Documentación API
+Una vez desplegado:
+- **Swagger UI**: \`https://tu-app.vercel.app/docs\`
+- **ReDoc**: \`https://tu-app.vercel.app/redoc\`
 
-Una vez iniciado el servidor, accede a:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## KPIs Disponibles
+## 📊 KPIs Disponibles
 
 ### Globales
-- **Margen Bruto**: (Ingresos - Costos Directos) / Ingresos
+- **Margen Bruto**: (Ingresos - COGS) / Ingresos
 - **Margen Neto**: Beneficio Neto / Ingresos
-- **EBITDA**: Beneficio antes de intereses, impuestos, depreciación y amortización
-- **Ratio de Gastos Operativos**: Gastos Operativos / Ingresos
-- **Burn Rate**: Tasa de consumo de efectivo mensual
+- **EBITDA**: Beneficio antes de intereses, impuestos y depreciación
+- **Burn Rate**: Consumo de efectivo mensual
 
 ### Por Proyecto
-- **ROI del Proyecto**: (Ingresos - Costos) / Costos
+- **ROI**: (Ingresos - Costos) / Costos
 - **Margen de Contribución**: Ingresos - Costos Variables
-- **Punto de Equilibrio**: Costos Fijos / Margen de Contribución Unitario
+- **Uso de Presupuesto**: % del presupuesto consumido
+
+## 📁 Estructura
+
+\`\`\`
+Rentabilidad_G4U/
+├── api/                  # Entry point Vercel
+├── app/
+│   ├── api/              # Endpoints REST
+│   ├── core/             # Configuración
+│   ├── models/           # SQLAlchemy models
+│   ├── schemas/          # Pydantic schemas
+│   ├── services/         # Lógica de negocio
+│   └── integrations/     # Cliente Qonto
+├── vercel.json           # Config Vercel
+└── requirements.txt
+\`\`\`
 
 ## Licencia
 

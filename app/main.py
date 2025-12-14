@@ -103,6 +103,11 @@ async def health_check():
     }
 
 
+# Vercel serverless handler
+from mangum import Mangum
+handler = Mangum(app, lifespan="off")
+
+
 if __name__ == "__main__":
     import uvicorn
 
