@@ -456,9 +456,31 @@ def api_data():
     try:
         airtable = Airtable()
 
-        transactions = airtable.get_all("Transactions")
-        categories = airtable.get_all("Categories")
-        projects = airtable.get_all("Projects")
+        # Try different table name variations
+        transactions = []
+        categories = []
+        projects = []
+
+        for table_name in ["Transactions", "transactions", "Transacciones"]:
+            try:
+                transactions = airtable.get_all(table_name)
+                break
+            except:
+                continue
+
+        for table_name in ["Categories", "categories", "Categorias"]:
+            try:
+                categories = airtable.get_all(table_name)
+                break
+            except:
+                continue
+
+        for table_name in ["Projects", "projects", "Proyectos"]:
+            try:
+                projects = airtable.get_all(table_name)
+                break
+            except:
+                continue
 
         return jsonify({
             "transactions": transactions,
@@ -466,7 +488,8 @@ def api_data():
             "projects": projects,
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/sync", methods=["POST"])
 def api_sync():
@@ -474,35 +497,55 @@ def api_sync():
         qonto = Qonto()
         airtable = Airtable()
 
+        # Find the correct table name
+        table_name = "Transactions"
+        for name in ["Transactions", "transactions", "Transacciones"]:
+            try:
+                airtable.get_all(name)
+                table_name = name
+                break
+            except:
+                continue
+
         # Get existing transaction IDs
-        existing = airtable.get_all("Transactions")
-        existing_ids = {t.get("qonto_id") for t in existing}
+        existing = airtable.get_all(table_name)
+        existing_ids = {t.get("qonto_id") for t in existing if t.get("qonto_id")}
 
         # Get from Qonto
         qonto_txs = qonto.get_transactions()
 
         synced = 0
+        errors = []
         for tx in qonto_txs:
             tx_id = tx.get("transaction_id")
             if tx_id in existing_ids:
                 continue
 
-            # Create in Airtable
-            airtable.create("Transactions", {
-                "qonto_id": tx_id,
-                "amount": tx.get("amount", 0),
-                "currency": tx.get("currency", "EUR"),
-                "side": tx.get("side", ""),
-                "counterparty_name": tx.get("label", ""),
-                "label": tx.get("note") or tx.get("reference", ""),
-                "settled_at": tx.get("settled_at", ""),
-                "status": tx.get("status", ""),
-            })
-            synced += 1
+            try:
+                # Create in Airtable
+                airtable.create(table_name, {
+                    "qonto_id": tx_id,
+                    "amount": float(tx.get("amount", 0)),
+                    "currency": tx.get("currency", "EUR"),
+                    "side": tx.get("side", ""),
+                    "counterparty_name": tx.get("label", ""),
+                    "label": tx.get("note") or tx.get("reference", ""),
+                    "settled_at": tx.get("settled_at", ""),
+                    "status": tx.get("status", ""),
+                })
+                synced += 1
+            except Exception as e:
+                errors.append(str(e))
+                if len(errors) >= 3:
+                    break
 
-        return jsonify({"synced": synced, "total": len(qonto_txs)})
+        result = {"synced": synced, "total": len(qonto_txs)}
+        if errors:
+            result["errors"] = errors[:3]
+        return jsonify(result)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/assign-project", methods=["POST"])
 def api_assign_project():
@@ -521,3 +564,58 @@ def api_assign_project():
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
+
+@app.route("/api/debug")
+def api_debug():
+    """Debug endpoint to check all connections."""
+    result = {
+        "env": {
+            "AIRTABLE_TOKEN": "SET" if os.getenv("AIRTABLE_TOKEN") else "MISSING",
+            "AIRTABLE_BASE_ID": os.getenv("AIRTABLE_BASE_ID", "MISSING"),
+            "QONTO_API_KEY": "SET" if os.getenv("QONTO_API_KEY") else "MISSING",
+            "QONTO_ORGANIZATION_SLUG": os.getenv("QONTO_ORGANIZATION_SLUG", "MISSING"),
+            "QONTO_IBAN": "SET" if os.getenv("QONTO_IBAN") else "MISSING",
+        },
+        "airtable": {"status": "unknown"},
+        "qonto": {"status": "unknown"},
+    }
+
+    # Test Airtable
+    try:
+        airtable = Airtable()
+        # Try to list tables by making requests
+        tables_found = []
+        for table in ["Transactions", "transactions", "Transacciones", "Categories", "categories", "Categorias", "Projects", "projects", "Proyectos"]:
+            try:
+                records = airtable.get_all(table)
+                tables_found.append({"name": table, "records": len(records)})
+            except Exception as e:
+                pass
+
+        result["airtable"] = {
+            "status": "ok" if tables_found else "no_tables",
+            "tables": tables_found,
+        }
+    except Exception as e:
+        result["airtable"] = {"status": "error", "error": str(e)}
+
+    # Test Qonto
+    try:
+        qonto = Qonto()
+        with httpx.Client(timeout=10) as client:
+            r = client.get(
+                f"{qonto.base_url}/organization",
+                headers=qonto.headers
+            )
+            if r.status_code == 200:
+                org = r.json().get("organization", {})
+                result["qonto"] = {
+                    "status": "ok",
+                    "organization": org.get("slug"),
+                }
+            else:
+                result["qonto"] = {"status": "error", "code": r.status_code, "response": r.text[:200]}
+    except Exception as e:
+        result["qonto"] = {"status": "error", "error": str(e)}
+
+    return jsonify(result)
