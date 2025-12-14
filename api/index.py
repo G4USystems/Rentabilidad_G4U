@@ -1,20 +1,110 @@
 """
-Vercel serverless entry point using Flask with web interface.
+Rentabilidad G4U - Simple P&L Dashboard
 """
-import sys
 import os
+import sys
 from pathlib import Path
-
-# Add parent directory to path
-root_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(root_dir))
-
+from datetime import datetime, date
 from flask import Flask, jsonify, request, render_template_string
+import httpx
+
+# Add parent to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 app = Flask(__name__)
 
-# HTML Template for web interface
-HTML_TEMPLATE = """
+# ==================== Airtable Client ====================
+
+class Airtable:
+    def __init__(self):
+        self.token = os.getenv("AIRTABLE_TOKEN", "")
+        self.base_id = os.getenv("AIRTABLE_BASE_ID", "")
+        self.base_url = f"https://api.airtable.com/v0/{self.base_id}"
+
+    @property
+    def headers(self):
+        return {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+
+    def get_all(self, table, formula=None):
+        records = []
+        params = {}
+        if formula:
+            params["filterByFormula"] = formula
+
+        offset = None
+        while True:
+            if offset:
+                params["offset"] = offset
+
+            with httpx.Client(timeout=30) as client:
+                r = client.get(f"{self.base_url}/{table}", headers=self.headers, params=params)
+                r.raise_for_status()
+                data = r.json()
+
+            for rec in data.get("records", []):
+                records.append({"id": rec["id"], **rec.get("fields", {})})
+
+            offset = data.get("offset")
+            if not offset:
+                break
+
+        return records
+
+    def create(self, table, fields):
+        with httpx.Client(timeout=30) as client:
+            r = client.post(f"{self.base_url}/{table}", headers=self.headers, json={"fields": fields})
+            r.raise_for_status()
+            return r.json()
+
+    def update(self, table, record_id, fields):
+        with httpx.Client(timeout=30) as client:
+            r = client.patch(f"{self.base_url}/{table}/{record_id}", headers=self.headers, json={"fields": fields})
+            r.raise_for_status()
+            return r.json()
+
+# ==================== Qonto Client ====================
+
+class Qonto:
+    def __init__(self):
+        self.org = os.getenv("QONTO_ORGANIZATION_SLUG", "")
+        self.key = os.getenv("QONTO_API_KEY", "")
+        self.iban = os.getenv("QONTO_IBAN", "")
+        self.base_url = "https://thirdparty.qonto.com/v2"
+
+    @property
+    def headers(self):
+        return {"Authorization": f"{self.org}:{self.key}"}
+
+    def get_transactions(self, status="completed"):
+        transactions = []
+        page = 1
+
+        while True:
+            with httpx.Client(timeout=30) as client:
+                r = client.get(
+                    f"{self.base_url}/transactions",
+                    headers=self.headers,
+                    params={"iban": self.iban, "status": status, "current_page": page, "per_page": 100}
+                )
+                r.raise_for_status()
+                data = r.json()
+
+            txs = data.get("transactions", [])
+            if not txs:
+                break
+
+            transactions.extend(txs)
+
+            meta = data.get("meta", {})
+            if page >= meta.get("total_pages", 1):
+                break
+            page += 1
+
+        return transactions
+
+# ==================== HTML Template ====================
+
+HTML = """
 <!DOCTYPE html>
 <html>
 <head>
@@ -22,326 +112,412 @@ HTML_TEMPLATE = """
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        h1 { color: #333; }
-        .card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 15px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .card h2 { margin-top: 0; color: #444; }
-        button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            margin: 5px;
-        }
-        button:hover { background: #0056b3; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        button.success { background: #28a745; }
-        button.danger { background: #dc3545; }
-        .result {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 15px;
-            margin-top: 15px;
-            white-space: pre-wrap;
-            font-family: monospace;
-            font-size: 13px;
-            max-height: 400px;
-            overflow: auto;
-        }
-        .status { padding: 5px 10px; border-radius: 4px; display: inline-block; margin: 5px 0; }
-        .status.ok { background: #d4edda; color: #155724; }
-        .status.error { background: #f8d7da; color: #721c24; }
-        .env-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .env-item { padding: 10px; background: #f8f9fa; border-radius: 4px; }
-        .loading { opacity: 0.6; pointer-events: none; }
-        input[type="date"] { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f0f2f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 20px; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h3 { font-size: 14px; color: #666; margin-bottom: 8px; }
+        .card .value { font-size: 28px; font-weight: 600; }
+        .card .value.positive { color: #22c55e; }
+        .card .value.negative { color: #ef4444; }
+
+        .section { background: white; border-radius: 12px; padding: 20px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .section h2 { margin-bottom: 15px; font-size: 18px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; font-size: 13px; color: #666; }
+
+        .amount { font-family: monospace; font-weight: 500; }
+        .amount.credit { color: #22c55e; }
+        .amount.debit { color: #ef4444; }
+
+        .btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .btn:hover { background: #2563eb; }
+        .btn.success { background: #22c55e; }
+        .btn.sm { padding: 6px 12px; font-size: 12px; }
+
+        select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+
+        .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .status.ok { background: #dcfce7; color: #166534; }
+        .status.error { background: #fee2e2; color: #991b1b; }
+
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; background: #e5e7eb; border-radius: 8px; cursor: pointer; }
+        .tab.active { background: #3b82f6; color: white; }
+
+        .hidden { display: none; }
+        .flex { display: flex; gap: 10px; align-items: center; }
+        .ml-auto { margin-left: auto; }
     </style>
 </head>
 <body>
-    <h1>Rentabilidad G4U</h1>
-    <p>Sistema de reportes P&L conectado a Qonto + Airtable</p>
+    <div class="container">
+        <h1>Rentabilidad G4U</h1>
+        <p class="subtitle">Dashboard financiero conectado a Qonto</p>
 
-    <div class="card">
-        <h2>Estado del Sistema</h2>
-        <div id="env-status">Cargando...</div>
-    </div>
-
-    <div class="card">
-        <h2>1. Sincronizacion</h2>
-        <p>Primero inicializa las categorias, luego sincroniza con Qonto.</p>
-        <button onclick="apiCall('/api/v1/sync/init', 'POST')">Inicializar Categorias</button>
-        <button onclick="apiCall('/api/v1/sync/accounts', 'POST')">Sync Cuentas</button>
-        <button onclick="apiCall('/api/v1/sync/transactions', 'POST')">Sync Transacciones</button>
-        <button onclick="apiCall('/api/v1/sync/all', 'POST')" class="success">Sync Todo</button>
-        <div id="sync-result" class="result" style="display:none;"></div>
-    </div>
-
-    <div class="card">
-        <h2>2. Datos</h2>
-        <button onclick="apiCall('/api/v1/categories')">Ver Categorias</button>
-        <button onclick="apiCall('/api/v1/transactions')">Ver Transacciones</button>
-        <button onclick="apiCall('/api/v1/projects')">Ver Proyectos</button>
-        <div id="data-result" class="result" style="display:none;"></div>
-    </div>
-
-    <div class="card">
-        <h2>3. Reportes P&L</h2>
-        <div style="margin: 10px 0;">
-            <label>Desde: <input type="date" id="start_date" value="2024-01-01"></label>
-            <label>Hasta: <input type="date" id="end_date" value="2024-12-31"></label>
+        <div id="status-bar" class="flex" style="margin-bottom: 20px;">
+            <span id="env-status">Verificando configuración...</span>
+            <div class="ml-auto">
+                <button class="btn" onclick="syncQonto()">Sincronizar Qonto</button>
+            </div>
         </div>
-        <button onclick="getPL()">Generar Reporte P&L</button>
-        <button onclick="apiCall('/api/v1/kpis/dashboard')">Dashboard KPIs</button>
-        <button onclick="apiCall('/api/v1/kpis/projects')">KPIs por Proyecto</button>
-        <div id="report-result" class="result" style="display:none;"></div>
+
+        <!-- KPIs -->
+        <div class="grid" id="kpis">
+            <div class="card"><h3>Ingresos</h3><div class="value positive" id="total-income">-</div></div>
+            <div class="card"><h3>Gastos</h3><div class="value negative" id="total-expenses">-</div></div>
+            <div class="card"><h3>Resultado Neto</h3><div class="value" id="net-result">-</div></div>
+            <div class="card"><h3>Margen</h3><div class="value" id="margin">-</div></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('transactions')">Transacciones</div>
+            <div class="tab" onclick="showTab('categories')">Por Categoría</div>
+            <div class="tab" onclick="showTab('projects')">Por Proyecto</div>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div id="tab-transactions" class="section">
+            <div class="flex" style="margin-bottom: 15px;">
+                <h2>Transacciones</h2>
+                <div class="ml-auto flex">
+                    <select id="filter-side" onchange="loadTransactions()">
+                        <option value="">Todos</option>
+                        <option value="credit">Ingresos</option>
+                        <option value="debit">Gastos</option>
+                    </select>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Descripción</th>
+                        <th>Monto</th>
+                        <th>Categoría</th>
+                        <th>Proyecto</th>
+                    </tr>
+                </thead>
+                <tbody id="transactions-body">
+                    <tr><td colspan="5" class="loading">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Categories Tab -->
+        <div id="tab-categories" class="section hidden">
+            <h2>Desglose por Categoría</h2>
+            <table>
+                <thead>
+                    <tr><th>Categoría</th><th>Ingresos</th><th>Gastos</th><th>Neto</th></tr>
+                </thead>
+                <tbody id="categories-body">
+                    <tr><td colspan="4" class="loading">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Projects Tab -->
+        <div id="tab-projects" class="section hidden">
+            <h2>Rentabilidad por Proyecto</h2>
+            <table>
+                <thead>
+                    <tr><th>Proyecto</th><th>Ingresos</th><th>Costos</th><th>Margen</th><th>ROI</th></tr>
+                </thead>
+                <tbody id="projects-body">
+                    <tr><td colspan="5" class="loading">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
-        // Check environment on load
-        fetch('/debug/env')
-            .then(r => r.json())
-            .then(data => {
-                let html = '<div class="env-grid">';
-                for (let [key, value] of Object.entries(data)) {
-                    const status = value === 'NOT SET' ? 'error' : 'ok';
-                    html += '<div class="env-item"><strong>' + key + '</strong><br><span class="status ' + status + '">' + value + '</span></div>';
+        let transactions = [];
+        let categories = [];
+        let projects = [];
+
+        // Format currency
+        function fmt(n) {
+            return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n || 0);
+        }
+
+        // Show tab
+        function showTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + name).classList.remove('hidden');
+        }
+
+        // Check environment
+        async function checkEnv() {
+            try {
+                const r = await fetch('/api/status');
+                const data = await r.json();
+                const allOk = Object.values(data).every(v => v === true || v === 'SET');
+                document.getElementById('env-status').innerHTML = allOk
+                    ? '<span class="status ok">Sistema configurado</span>'
+                    : '<span class="status error">Faltan variables de entorno</span>';
+            } catch(e) {
+                document.getElementById('env-status').innerHTML = '<span class="status error">Error de conexión</span>';
+            }
+        }
+
+        // Load data
+        async function loadData() {
+            try {
+                const r = await fetch('/api/data');
+                const data = await r.json();
+
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
                 }
-                html += '</div>';
-                document.getElementById('env-status').innerHTML = html;
-            })
-            .catch(e => {
-                document.getElementById('env-status').innerHTML = '<span class="status error">Error: ' + e + '</span>';
+
+                transactions = data.transactions || [];
+                categories = data.categories || [];
+                projects = data.projects || [];
+
+                updateKPIs();
+                loadTransactions();
+                loadCategories();
+                loadProjects();
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        // Update KPIs
+        function updateKPIs() {
+            let income = 0, expenses = 0;
+            transactions.forEach(t => {
+                const amt = parseFloat(t.amount) || 0;
+                if (t.side === 'credit') income += amt;
+                else expenses += amt;
             });
 
-        function apiCall(url, method = 'GET') {
-            const resultDiv = url.includes('sync') ? 'sync-result' :
-                              url.includes('report') || url.includes('kpi') ? 'report-result' : 'data-result';
-            const el = document.getElementById(resultDiv);
-            el.style.display = 'block';
-            el.textContent = 'Cargando...';
+            const net = income - expenses;
+            const margin = income > 0 ? (net / income * 100) : 0;
 
-            fetch(url, { method: method })
-                .then(r => r.json())
-                .then(data => {
-                    el.textContent = JSON.stringify(data, null, 2);
-                })
-                .catch(e => {
-                    el.textContent = 'Error: ' + e;
+            document.getElementById('total-income').textContent = fmt(income);
+            document.getElementById('total-expenses').textContent = fmt(expenses);
+            document.getElementById('net-result').textContent = fmt(net);
+            document.getElementById('net-result').className = 'value ' + (net >= 0 ? 'positive' : 'negative');
+            document.getElementById('margin').textContent = margin.toFixed(1) + '%';
+        }
+
+        // Load transactions table
+        function loadTransactions() {
+            const filter = document.getElementById('filter-side').value;
+            let filtered = transactions;
+            if (filter) filtered = transactions.filter(t => t.side === filter);
+
+            const projectsMap = {};
+            projects.forEach(p => projectsMap[p.id] = p.name);
+
+            const html = filtered.slice(0, 100).map(t => `
+                <tr>
+                    <td>${t.settled_at ? t.settled_at.split('T')[0] : '-'}</td>
+                    <td>${t.counterparty_name || t.label || '-'}</td>
+                    <td class="amount ${t.side}">${t.side === 'credit' ? '+' : '-'}${fmt(t.amount)}</td>
+                    <td>${t.category || '-'}</td>
+                    <td>
+                        <select onchange="assignProject('${t.id}', this.value)" style="width:120px">
+                            <option value="">Sin proyecto</option>
+                            ${projects.map(p => `<option value="${p.id}" ${t.project_id === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}
+                        </select>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('transactions-body').innerHTML = html || '<tr><td colspan="5">No hay transacciones</td></tr>';
+        }
+
+        // Load categories breakdown
+        function loadCategories() {
+            const byCategory = {};
+            transactions.forEach(t => {
+                const cat = t.category || 'Sin categoría';
+                if (!byCategory[cat]) byCategory[cat] = { income: 0, expense: 0 };
+                const amt = parseFloat(t.amount) || 0;
+                if (t.side === 'credit') byCategory[cat].income += amt;
+                else byCategory[cat].expense += amt;
+            });
+
+            const html = Object.entries(byCategory).map(([cat, v]) => `
+                <tr>
+                    <td>${cat}</td>
+                    <td class="amount credit">${fmt(v.income)}</td>
+                    <td class="amount debit">${fmt(v.expense)}</td>
+                    <td class="amount ${v.income - v.expense >= 0 ? 'credit' : 'debit'}">${fmt(v.income - v.expense)}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('categories-body').innerHTML = html || '<tr><td colspan="4">No hay datos</td></tr>';
+        }
+
+        // Load projects breakdown
+        function loadProjects() {
+            const byProject = {};
+            projects.forEach(p => byProject[p.id] = { name: p.name, income: 0, expense: 0 });
+
+            transactions.forEach(t => {
+                if (t.project_id && byProject[t.project_id]) {
+                    const amt = parseFloat(t.amount) || 0;
+                    if (t.side === 'credit') byProject[t.project_id].income += amt;
+                    else byProject[t.project_id].expense += amt;
+                }
+            });
+
+            const html = Object.values(byProject).map(p => {
+                const margin = p.income > 0 ? ((p.income - p.expense) / p.income * 100) : 0;
+                const roi = p.expense > 0 ? ((p.income - p.expense) / p.expense * 100) : 0;
+                return `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td class="amount credit">${fmt(p.income)}</td>
+                        <td class="amount debit">${fmt(p.expense)}</td>
+                        <td>${margin.toFixed(1)}%</td>
+                        <td>${roi.toFixed(1)}%</td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('projects-body').innerHTML = html || '<tr><td colspan="5">No hay proyectos</td></tr>';
+        }
+
+        // Assign project to transaction
+        async function assignProject(txId, projectId) {
+            try {
+                await fetch('/api/assign-project', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ transaction_id: txId, project_id: projectId })
                 });
+                // Update local data
+                const tx = transactions.find(t => t.id === txId);
+                if (tx) tx.project_id = projectId;
+                loadProjects();
+            } catch(e) {
+                alert('Error al asignar proyecto');
+            }
         }
 
-        function getPL() {
-            const start = document.getElementById('start_date').value;
-            const end = document.getElementById('end_date').value;
-            apiCall('/api/v1/reports/pl?start_date=' + start + '&end_date=' + end);
+        // Sync from Qonto
+        async function syncQonto() {
+            if (!confirm('¿Sincronizar transacciones desde Qonto?')) return;
+
+            try {
+                const r = await fetch('/api/sync', { method: 'POST' });
+                const data = await r.json();
+
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    alert(`Sincronizado: ${data.synced} transacciones`);
+                    loadData();
+                }
+            } catch(e) {
+                alert('Error de conexión');
+            }
         }
+
+        // Init
+        checkEnv();
+        loadData();
     </script>
 </body>
 </html>
 """
 
+# ==================== Routes ====================
+
 @app.route("/")
-def root():
-    return render_template_string(HTML_TEMPLATE)
+def index():
+    return render_template_string(HTML)
+
+@app.route("/api/status")
+def api_status():
+    return jsonify({
+        "airtable": bool(os.getenv("AIRTABLE_TOKEN") and os.getenv("AIRTABLE_BASE_ID")),
+        "qonto": bool(os.getenv("QONTO_API_KEY") and os.getenv("QONTO_ORGANIZATION_SLUG") and os.getenv("QONTO_IBAN")),
+    })
+
+@app.route("/api/data")
+def api_data():
+    try:
+        airtable = Airtable()
+
+        transactions = airtable.get_all("Transactions")
+        categories = airtable.get_all("Categories")
+        projects = airtable.get_all("Projects")
+
+        return jsonify({
+            "transactions": transactions,
+            "categories": categories,
+            "projects": projects,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/sync", methods=["POST"])
+def api_sync():
+    try:
+        qonto = Qonto()
+        airtable = Airtable()
+
+        # Get existing transaction IDs
+        existing = airtable.get_all("Transactions")
+        existing_ids = {t.get("qonto_id") for t in existing}
+
+        # Get from Qonto
+        qonto_txs = qonto.get_transactions()
+
+        synced = 0
+        for tx in qonto_txs:
+            tx_id = tx.get("transaction_id")
+            if tx_id in existing_ids:
+                continue
+
+            # Create in Airtable
+            airtable.create("Transactions", {
+                "qonto_id": tx_id,
+                "amount": tx.get("amount", 0),
+                "currency": tx.get("currency", "EUR"),
+                "side": tx.get("side", ""),
+                "counterparty_name": tx.get("label", ""),
+                "label": tx.get("note") or tx.get("reference", ""),
+                "settled_at": tx.get("settled_at", ""),
+                "status": tx.get("status", ""),
+            })
+            synced += 1
+
+        return jsonify({"synced": synced, "total": len(qonto_txs)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/assign-project", methods=["POST"])
+def api_assign_project():
+    try:
+        data = request.json
+        tx_id = data.get("transaction_id")
+        project_id = data.get("project_id")
+
+        airtable = Airtable()
+        airtable.update("Transactions", tx_id, {"project_id": project_id or None})
+
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "healthy"})
-
-@app.route("/debug/env")
-def debug_env():
-    return jsonify({
-        "STORAGE_TYPE": os.getenv("STORAGE_TYPE", "NOT SET"),
-        "AIRTABLE_BASE_ID": "SET" if os.getenv("AIRTABLE_BASE_ID") else "NOT SET",
-        "AIRTABLE_TOKEN": "SET" if os.getenv("AIRTABLE_TOKEN") else "NOT SET",
-        "QONTO_API_KEY": "SET" if os.getenv("QONTO_API_KEY") else "NOT SET",
-        "QONTO_ORGANIZATION_SLUG": os.getenv("QONTO_ORGANIZATION_SLUG", "NOT SET"),
-        "QONTO_IBAN": "SET" if os.getenv("QONTO_IBAN") else "NOT SET",
-    })
-
-# ==================== Sync Endpoints ====================
-
-@app.route("/api/v1/sync/init", methods=["POST"])
-def sync_init():
-    try:
-        from app.services.excel_sync_service import SyncService
-        import asyncio
-        service = SyncService()
-        loop = asyncio.new_event_loop()
-        result = loop.run_until_complete(service.initialize_categories())
-        loop.close()
-        return jsonify({
-            "status": "success",
-            "categories_created": result["created"],
-            "categories_existing": result["existing"],
-        })
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-@app.route("/api/v1/sync/accounts", methods=["POST"])
-def sync_accounts():
-    try:
-        from app.services.excel_sync_service import SyncService
-        import asyncio
-        service = SyncService()
-        loop = asyncio.new_event_loop()
-        accounts = loop.run_until_complete(service.sync_accounts())
-        loop.close()
-        return jsonify({
-            "status": "success",
-            "synced_count": len(accounts),
-            "accounts": accounts,
-        })
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-@app.route("/api/v1/sync/transactions", methods=["POST"])
-def sync_transactions():
-    try:
-        from app.services.excel_sync_service import SyncService
-        import asyncio
-        service = SyncService()
-        loop = asyncio.new_event_loop()
-        stats = loop.run_until_complete(service.sync_transactions())
-        loop.close()
-        return jsonify({"status": "success", **stats})
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-@app.route("/api/v1/sync/all", methods=["POST"])
-def sync_all():
-    try:
-        from app.services.excel_sync_service import SyncService
-        import asyncio
-        service = SyncService()
-        loop = asyncio.new_event_loop()
-        result = loop.run_until_complete(service.sync_all())
-        loop.close()
-        return jsonify({"status": "success", **result})
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-# ==================== Data Endpoints ====================
-
-@app.route("/api/v1/categories")
-def list_categories():
-    try:
-        from app.storage.excel_storage import get_storage
-        storage = get_storage()
-        data = storage.get_categories()
-        if hasattr(data, 'to_dict'):
-            data = data.to_dict('records')
-        return jsonify({"categories": data, "count": len(data)})
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-@app.route("/api/v1/transactions")
-def list_transactions():
-    try:
-        from app.storage.excel_storage import get_storage
-        storage = get_storage()
-        data = storage.get_transactions()
-        if hasattr(data, 'to_dict'):
-            data = data.to_dict('records')
-        return jsonify({"items": data, "total": len(data)})
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-@app.route("/api/v1/projects")
-def list_projects():
-    try:
-        from app.storage.excel_storage import get_storage
-        storage = get_storage()
-        data = storage.get_projects()
-        if hasattr(data, 'to_dict'):
-            data = data.to_dict('records')
-        return jsonify({"projects": data, "count": len(data)})
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-# ==================== Report Endpoints ====================
-
-@app.route("/api/v1/reports/pl")
-def pl_report():
-    try:
-        from datetime import date
-        from app.services.excel_financial_service import ExcelFinancialService
-
-        start = request.args.get('start_date', '2024-01-01')
-        end = request.args.get('end_date', '2024-12-31')
-
-        start_date = date.fromisoformat(start)
-        end_date = date.fromisoformat(end)
-
-        service = ExcelFinancialService()
-        result = service.calculate_pl_summary(start_date, end_date)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-@app.route("/api/v1/kpis/dashboard")
-def dashboard():
-    try:
-        from app.services.excel_financial_service import ExcelFinancialService
-        service = ExcelFinancialService()
-        result = service.get_dashboard_kpis()
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
-@app.route("/api/v1/kpis/projects")
-def projects_kpis():
-    try:
-        from app.storage.excel_storage import get_storage
-        from app.services.excel_financial_service import ExcelFinancialService
-
-        storage = get_storage()
-        service = ExcelFinancialService()
-
-        data = storage.get_projects()
-        if hasattr(data, 'to_dict'):
-            projects = data.to_dict('records')
-        else:
-            projects = data if data else []
-
-        if not projects:
-            return jsonify({"projects": [], "totals": {"total_income": 0, "total_expenses": 0, "total_profit": 0}})
-
-        project_kpis = []
-        total_income = 0
-        total_expenses = 0
-
-        for project in projects:
-            kpi = service.calculate_project_kpis(project.get('id'))
-            if kpi:
-                project_kpis.append(kpi)
-                total_income += kpi['total_income']
-                total_expenses += kpi['total_expenses']
-
-        return jsonify({
-            "projects": project_kpis,
-            "totals": {
-                "total_income": round(total_income, 2),
-                "total_expenses": round(total_expenses, 2),
-                "total_profit": round(total_income - total_expenses, 2),
-            },
-        })
-    except Exception as e:
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+    return jsonify({"status": "ok"})
