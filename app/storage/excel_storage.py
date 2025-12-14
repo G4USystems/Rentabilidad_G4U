@@ -397,9 +397,12 @@ class GoogleSheetsStorage:
 
 def get_storage():
     """Get the appropriate storage backend based on environment."""
-    use_google_sheets = os.getenv("USE_GOOGLE_SHEETS", "false").lower() == "true"
+    storage_type = os.getenv("STORAGE_TYPE", "excel").lower()
 
-    if use_google_sheets:
+    if storage_type == "airtable":
+        from app.storage.airtable_storage import AirtableStorage
+        return AirtableStorage()
+    elif storage_type == "google_sheets":
         return GoogleSheetsStorage()
     else:
         return ExcelStorage()
