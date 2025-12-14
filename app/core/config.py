@@ -22,8 +22,12 @@ class Settings(BaseSettings):
     qonto_iban: str = ""
     qonto_api_base_url: str = "https://thirdparty.qonto.com/v2"
 
-    # Database
+    # Database (Supabase)
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/rentabilidad_g4u"
+
+    # Supabase specific (optional, for direct access)
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
