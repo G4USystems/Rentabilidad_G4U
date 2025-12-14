@@ -1,8 +1,8 @@
-"""Financial calculations using Excel/Sheets storage."""
+"""Financial calculations using any storage backend (Excel/Sheets/Airtable)."""
 
 from datetime import date
 from decimal import Decimal
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 import logging
 
 import pandas as pd
@@ -10,6 +10,19 @@ import pandas as pd
 from app.storage.excel_storage import get_storage
 
 logger = logging.getLogger(__name__)
+
+
+def _to_dataframe(data: Union[pd.DataFrame, List[Dict], None]) -> pd.DataFrame:
+    """Convert list of dicts or DataFrame to DataFrame."""
+    if data is None:
+        return pd.DataFrame()
+    if isinstance(data, pd.DataFrame):
+        return data
+    if isinstance(data, list):
+        if not data:
+            return pd.DataFrame()
+        return pd.DataFrame(data)
+    return pd.DataFrame()
 
 
 # Category types that count as income
@@ -39,25 +52,28 @@ class ExcelFinancialService:
         self,
         start_date: date,
         end_date: date,
-        project_id: Optional[int] = None,
+        project_id: Optional[Union[int, str]] = None,
     ) -> pd.DataFrame:
         """Get transactions merged with category info."""
-        tx_df = self.storage.get_transactions(
+        tx_data = self.storage.get_transactions(
             start_date=start_date,
             end_date=end_date,
             project_id=project_id,
         )
+        tx_df = _to_dataframe(tx_data)
 
         if tx_df.empty:
             return tx_df
 
         # Filter out excluded
-        tx_df = tx_df[tx_df['is_excluded'] != True]
+        if 'is_excluded' in tx_df.columns:
+            tx_df = tx_df[tx_df['is_excluded'] != True]
 
         # Get categories
-        cat_df = self.storage.get_categories(active_only=False)
+        cat_data = self.storage.get_categories(active_only=False)
+        cat_df = _to_dataframe(cat_data)
 
-        if not cat_df.empty:
+        if not cat_df.empty and 'id' in cat_df.columns:
             tx_df = tx_df.merge(
                 cat_df[['id', 'name', 'type']],
                 left_on='category_id',
@@ -73,7 +89,7 @@ class ExcelFinancialService:
         self,
         start_date: date,
         end_date: date,
-        project_id: Optional[int] = None,
+        project_id: Optional[Union[int, str]] = None,
     ) -> float:
         """Get total revenue for period."""
         df = self._get_transactions_with_categories(start_date, end_date, project_id)
@@ -93,7 +109,7 @@ class ExcelFinancialService:
         self,
         start_date: date,
         end_date: date,
-        project_id: Optional[int] = None,
+        project_id: Optional[Union[int, str]] = None,
     ) -> float:
         """Get total expenses for period."""
         df = self._get_transactions_with_categories(start_date, end_date, project_id)
@@ -111,7 +127,7 @@ class ExcelFinancialService:
         start_date: date,
         end_date: date,
         category_type: str,
-        project_id: Optional[int] = None,
+        project_id: Optional[Union[int, str]] = None,
     ) -> float:
         """Get expenses for a specific category type."""
         df = self._get_transactions_with_categories(start_date, end_date, project_id)
@@ -131,7 +147,7 @@ class ExcelFinancialService:
         start_date: date,
         end_date: date,
         side: Optional[str] = None,
-        project_id: Optional[int] = None,
+        project_id: Optional[Union[int, str]] = None,
     ) -> List[Dict[str, Any]]:
         """Get amount breakdown by category."""
         df = self._get_transactions_with_categories(start_date, end_date, project_id)
@@ -157,7 +173,7 @@ class ExcelFinancialService:
         self,
         start_date: date,
         end_date: date,
-        project_id: Optional[int] = None,
+        project_id: Optional[Union[int, str]] = None,
     ) -> Dict[str, Any]:
         """Calculate complete P&L summary."""
         df = self._get_transactions_with_categories(start_date, end_date, project_id)
@@ -248,14 +264,15 @@ class ExcelFinancialService:
             "total_transactions": 0, "income_transactions": 0, "expense_transactions": 0,
         }
 
-    def calculate_project_kpis(self, project_id: int) -> Optional[Dict[str, Any]]:
+    def calculate_project_kpis(self, project_id: Union[int, str]) -> Optional[Dict[str, Any]]:
         """Calculate KPIs for a specific project."""
         project = self.storage.get_project(project_id)
         if not project:
             return None
 
         # Get all project transactions
-        tx_df = self.storage.get_transactions(project_id=project_id)
+        tx_data = self.storage.get_transactions(project_id=project_id)
+        tx_df = _to_dataframe(tx_data)
 
         if tx_df.empty:
             total_income = 0

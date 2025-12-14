@@ -1,20 +1,32 @@
 """
-Simplified API endpoints using Excel/Google Sheets storage.
+Simplified API endpoints using any storage backend (Excel/Sheets/Airtable).
 
-This is an alternative to the database-backed API.
+Works with multiple storage backends through the unified storage interface.
 """
 
 from datetime import date
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+import pandas as pd
 
-from app.services.excel_sync_service import ExcelSyncService
+from app.services.excel_sync_service import SyncService
 from app.services.excel_financial_service import ExcelFinancialService
 from app.storage.excel_storage import get_storage
 
 router = APIRouter()
+
+
+def _to_list(data: Union[pd.DataFrame, List, None]) -> List:
+    """Convert DataFrame or list to list."""
+    if data is None:
+        return []
+    if isinstance(data, pd.DataFrame):
+        return data.to_dict('records') if not data.empty else []
+    if isinstance(data, list):
+        return data
+    return []
 
 
 # ==================== Schemas ====================
@@ -29,8 +41,8 @@ class ProjectCreate(BaseModel):
 
 
 class TransactionUpdate(BaseModel):
-    category_id: Optional[int] = None
-    project_id: Optional[int] = None
+    category_id: Optional[str] = None
+    project_id: Optional[str] = None
     note: Optional[str] = None
     is_excluded: Optional[bool] = None
 
@@ -40,7 +52,7 @@ class TransactionUpdate(BaseModel):
 @router.post("/sync/init")
 async def initialize_system():
     """Initialize the system with default categories."""
-    service = ExcelSyncService()
+    service = SyncService()
     result = await service.initialize_categories()
 
     return {
@@ -55,7 +67,7 @@ async def initialize_system():
 async def sync_accounts():
     """Sync bank accounts from Qonto."""
     try:
-        service = ExcelSyncService()
+        service = SyncService()
         accounts = await service.sync_accounts()
 
         return {
@@ -74,7 +86,7 @@ async def sync_transactions(
 ):
     """Sync transactions from Qonto."""
     try:
-        service = ExcelSyncService()
+        service = SyncService()
         stats = await service.sync_transactions(from_date, to_date)
 
         return {
@@ -89,7 +101,7 @@ async def sync_transactions(
 async def sync_all():
     """Sync all data from Qonto (accounts and transactions)."""
     try:
-        service = ExcelSyncService()
+        service = SyncService()
         result = await service.sync_all()
 
         return {
@@ -114,23 +126,23 @@ async def list_transactions(
 ):
     """List transactions with filters."""
     storage = get_storage()
-    df = storage.get_transactions(
+    data = storage.get_transactions(
         start_date=start_date,
         end_date=end_date,
         category_id=category_id,
         project_id=project_id,
         side=side,
     )
-
-    total = len(df)
+    items = _to_list(data)
+    total = len(items)
 
     # Pagination
     start_idx = (page - 1) * page_size
     end_idx = start_idx + page_size
-    df_page = df.iloc[start_idx:end_idx]
+    page_items = items[start_idx:end_idx]
 
     return {
-        "items": df_page.to_dict('records'),
+        "items": page_items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -139,7 +151,7 @@ async def list_transactions(
 
 
 @router.patch("/transactions/{transaction_id}")
-async def update_transaction(transaction_id: int, update: TransactionUpdate):
+async def update_transaction(transaction_id: str, update: TransactionUpdate):
     """Update a transaction (categorize, assign project, etc.)."""
     storage = get_storage()
 
@@ -153,7 +165,7 @@ async def update_transaction(transaction_id: int, update: TransactionUpdate):
 
 
 @router.post("/transactions/bulk/categorize")
-async def bulk_categorize(transaction_ids: List[int], category_id: int):
+async def bulk_categorize(transaction_ids: List[str], category_id: str):
     """Assign category to multiple transactions."""
     storage = get_storage()
     updated = 0
@@ -166,7 +178,7 @@ async def bulk_categorize(transaction_ids: List[int], category_id: int):
 
 
 @router.post("/transactions/bulk/assign-project")
-async def bulk_assign_project(transaction_ids: List[int], project_id: int):
+async def bulk_assign_project(transaction_ids: List[str], project_id: str):
     """Assign project to multiple transactions."""
     storage = get_storage()
     updated = 0
@@ -184,9 +196,9 @@ async def bulk_assign_project(transaction_ids: List[int], project_id: int):
 async def list_categories(active_only: bool = True):
     """List all categories."""
     storage = get_storage()
-    df = storage.get_categories(active_only=active_only)
+    data = storage.get_categories(active_only=active_only)
 
-    return {"categories": df.to_dict('records')}
+    return {"categories": _to_list(data)}
 
 
 # ==================== Project Endpoints ====================
@@ -195,9 +207,9 @@ async def list_categories(active_only: bool = True):
 async def list_projects(active_only: bool = True):
     """List all projects."""
     storage = get_storage()
-    df = storage.get_projects(active_only=active_only)
+    data = storage.get_projects(active_only=active_only)
 
-    return {"projects": df.to_dict('records')}
+    return {"projects": _to_list(data)}
 
 
 @router.post("/projects")
@@ -220,7 +232,7 @@ async def create_project(project: ProjectCreate):
 
 
 @router.get("/projects/{project_id}")
-async def get_project(project_id: int):
+async def get_project(project_id: str):
     """Get project with KPIs."""
     service = ExcelFinancialService()
     kpis = service.calculate_project_kpis(project_id)
@@ -237,7 +249,7 @@ async def get_project(project_id: int):
 async def get_pl_report(
     start_date: date,
     end_date: date,
-    project_id: Optional[int] = None,
+    project_id: Optional[str] = None,
 ):
     """Generate P&L report."""
     if start_date > end_date:
@@ -251,7 +263,7 @@ async def get_pl_report(
 async def get_monthly_pl(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
-    project_id: Optional[int] = None,
+    project_id: Optional[str] = None,
 ):
     """Get P&L for a specific month."""
     from calendar import monthrange
@@ -267,7 +279,7 @@ async def get_monthly_pl(
 @router.get("/reports/pl/yearly")
 async def get_yearly_pl(
     year: int = Query(..., ge=2000, le=2100),
-    project_id: Optional[int] = None,
+    project_id: Optional[str] = None,
 ):
     """Get P&L for a full year."""
     start_date = date(year, 1, 1)
@@ -292,17 +304,18 @@ async def get_all_projects_kpis():
     storage = get_storage()
     service = ExcelFinancialService()
 
-    projects_df = storage.get_projects()
+    projects_data = storage.get_projects()
+    projects = _to_list(projects_data)
 
-    if projects_df.empty:
+    if not projects:
         return {"projects": [], "totals": {}}
 
     project_kpis = []
     total_income = 0
     total_expenses = 0
 
-    for _, project in projects_df.iterrows():
-        kpi = service.calculate_project_kpis(int(project['id']))
+    for project in projects:
+        kpi = service.calculate_project_kpis(project['id'])
         if kpi:
             project_kpis.append(kpi)
             total_income += kpi['total_income']
