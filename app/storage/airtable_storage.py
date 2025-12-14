@@ -25,8 +25,11 @@ class AirtableStorage:
         self.base_id = os.getenv("AIRTABLE_BASE_ID", "")
         self.base_url = f"https://api.airtable.com/v0/{self.base_id}"
 
-        if not self.token or not self.base_id:
-            raise ValueError("AIRTABLE_TOKEN and AIRTABLE_BASE_ID are required")
+        # Log warning instead of raising error (helps debugging on Vercel)
+        if not self.token:
+            logger.warning("AIRTABLE_TOKEN not set")
+        if not self.base_id:
+            logger.warning("AIRTABLE_BASE_ID not set")
 
     @property
     def headers(self) -> Dict[str, str]:
