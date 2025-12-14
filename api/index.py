@@ -1,5 +1,5 @@
 """
-Vercel serverless entry point - minimal version for debugging.
+Vercel serverless entry point using Flask.
 """
 import sys
 import os
@@ -9,94 +9,140 @@ from pathlib import Path
 root_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(root_dir))
 
-# Minimal FastAPI app
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from flask import Flask, jsonify, request
 
-app = FastAPI(title="Rentabilidad G4U")
+app = Flask(__name__)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/")
-async def root():
-    return {
+@app.route("/")
+def root():
+    return jsonify({
         "name": "Rentabilidad G4U",
         "status": "running",
         "storage_type": os.getenv("STORAGE_TYPE", "not_set"),
-        "airtable_base": os.getenv("AIRTABLE_BASE_ID", "not_set")[:10] + "..." if os.getenv("AIRTABLE_BASE_ID") else "not_set",
-    }
+    })
 
-@app.get("/health")
-async def health():
-    return {"status": "healthy"}
+@app.route("/health")
+def health():
+    return jsonify({"status": "healthy"})
 
-@app.get("/debug/env")
-async def debug_env():
-    """Check environment variables (safe)."""
-    return {
+@app.route("/debug/env")
+def debug_env():
+    return jsonify({
         "STORAGE_TYPE": os.getenv("STORAGE_TYPE", "NOT SET"),
         "AIRTABLE_BASE_ID": "SET" if os.getenv("AIRTABLE_BASE_ID") else "NOT SET",
         "AIRTABLE_TOKEN": "SET" if os.getenv("AIRTABLE_TOKEN") else "NOT SET",
         "QONTO_API_KEY": "SET" if os.getenv("QONTO_API_KEY") else "NOT SET",
-        "QONTO_ORGANIZATION_SLUG": os.getenv("QONTO_ORGANIZATION_SLUG", "NOT SET"),
-    }
+    })
 
-@app.get("/debug/import")
-async def debug_import():
-    """Test imports step by step."""
-    results = {}
-
+# API routes
+@app.route("/api/v1/sync/init", methods=["POST"])
+def sync_init():
     try:
-        import pandas
-        results["pandas"] = "OK"
+        from app.services.excel_sync_service import SyncService
+        import asyncio
+        service = SyncService()
+        loop = asyncio.new_event_loop()
+        result = loop.run_until_complete(service.initialize_categories())
+        loop.close()
+        return jsonify({
+            "status": "success",
+            "categories_created": result["created"],
+            "categories_existing": result["existing"],
+        })
     except Exception as e:
-        results["pandas"] = str(e)
+        return jsonify({"error": str(e)}), 500
 
+@app.route("/api/v1/sync/accounts", methods=["POST"])
+def sync_accounts():
     try:
-        import httpx
-        results["httpx"] = "OK"
+        from app.services.excel_sync_service import SyncService
+        import asyncio
+        service = SyncService()
+        loop = asyncio.new_event_loop()
+        accounts = loop.run_until_complete(service.sync_accounts())
+        loop.close()
+        return jsonify({
+            "status": "success",
+            "synced_count": len(accounts),
+            "accounts": accounts,
+        })
     except Exception as e:
-        results["httpx"] = str(e)
+        return jsonify({"error": str(e)}), 500
 
+@app.route("/api/v1/sync/transactions", methods=["POST"])
+def sync_transactions():
     try:
-        from app.storage.excel_storage import get_storage
-        results["get_storage"] = "OK"
+        from app.services.excel_sync_service import SyncService
+        import asyncio
+        service = SyncService()
+        loop = asyncio.new_event_loop()
+        stats = loop.run_until_complete(service.sync_transactions())
+        loop.close()
+        return jsonify({"status": "success", **stats})
     except Exception as e:
-        results["get_storage"] = str(e)
+        return jsonify({"error": str(e)}), 500
 
+@app.route("/api/v1/sync/all", methods=["POST"])
+def sync_all():
+    try:
+        from app.services.excel_sync_service import SyncService
+        import asyncio
+        service = SyncService()
+        loop = asyncio.new_event_loop()
+        result = loop.run_until_complete(service.sync_all())
+        loop.close()
+        return jsonify({"status": "success", **result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/v1/categories")
+def list_categories():
     try:
         from app.storage.excel_storage import get_storage
         storage = get_storage()
-        results["storage_init"] = f"OK - {type(storage).__name__}"
+        data = storage.get_categories()
+        if hasattr(data, 'to_dict'):
+            data = data.to_dict('records')
+        return jsonify({"categories": data})
     except Exception as e:
-        results["storage_init"] = str(e)
+        return jsonify({"error": str(e)}), 500
 
+@app.route("/api/v1/transactions")
+def list_transactions():
     try:
-        from app.api.excel_api import router
-        results["api_router"] = "OK"
+        from app.storage.excel_storage import get_storage
+        storage = get_storage()
+        data = storage.get_transactions()
+        if hasattr(data, 'to_dict'):
+            data = data.to_dict('records')
+        return jsonify({"items": data, "total": len(data)})
     except Exception as e:
-        results["api_router"] = str(e)
+        return jsonify({"error": str(e)}), 500
 
-    return results
+@app.route("/api/v1/reports/pl")
+def pl_report():
+    try:
+        from datetime import date
+        from app.services.excel_financial_service import ExcelFinancialService
 
-# Try to mount API routes
-import_error = None
-try:
-    from app.api.excel_api import router as api_router
-    app.include_router(api_router, prefix="/api/v1")
-except Exception as e:
-    import_error = str(e)
+        start = request.args.get('start_date', '2024-01-01')
+        end = request.args.get('end_date', '2024-12-31')
 
-    @app.get("/api/v1/{path:path}")
-    async def api_fallback(path: str):
-        return {"error": import_error, "path": path}
+        start_date = date.fromisoformat(start)
+        end_date = date.fromisoformat(end)
 
-# Mangum handler for Vercel
-from mangum import Mangum
-handler = Mangum(app, lifespan="off")
+        service = ExcelFinancialService()
+        result = service.calculate_pl_summary(start_date, end_date)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/v1/kpis/dashboard")
+def dashboard():
+    try:
+        from app.services.excel_financial_service import ExcelFinancialService
+        service = ExcelFinancialService()
+        result = service.get_dashboard_kpis()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
