@@ -519,6 +519,39 @@ def api_sync():
         qonto = Qonto()
         airtable = Airtable()
 
+        # Debug: Check slug retrieval
+        slug = qonto.get_bank_account_id()
+
+        result = {
+            "debug_slug": slug,
+            "debug_iban": qonto.iban,
+            "debug_org": qonto.org,
+        }
+
+        if not slug:
+            result["error"] = "Could not retrieve bank account slug"
+            return jsonify(result)
+
+        # Debug: Try to fetch transactions directly with verbose output
+        with httpx.Client(timeout=30) as client:
+            params = {"slug": slug, "status": "completed", "page": 1, "per_page": 10}
+            r = client.get(
+                f"{qonto.base_url}/transactions",
+                headers=qonto.headers,
+                params=params
+            )
+            result["debug_api_status"] = r.status_code
+            result["debug_api_url"] = str(r.url)
+
+            if r.status_code == 200:
+                data = r.json()
+                result["debug_meta"] = data.get("meta", {})
+                result["debug_tx_count"] = len(data.get("transactions", []))
+            else:
+                result["debug_api_error"] = r.text[:500]
+                result["error"] = f"Qonto API returned {r.status_code}"
+                return jsonify(result)
+
         # Find the correct table name
         table_name = "Transactions"
         for name in ["Transactions", "transactions", "Transacciones"]:
@@ -536,14 +569,12 @@ def api_sync():
         # Get from Qonto
         qonto_txs = qonto.get_transactions()
 
-        result = {
-            "table_name": table_name,
-            "existing_count": len(existing),
-            "qonto_count": len(qonto_txs),
-        }
+        result["table_name"] = table_name
+        result["existing_count"] = len(existing)
+        result["qonto_count"] = len(qonto_txs)
 
         if not qonto_txs:
-            result["error"] = "No transactions returned from Qonto"
+            result["error"] = "No transactions returned from Qonto get_transactions()"
             return jsonify(result)
 
         synced = 0
