@@ -830,7 +830,7 @@ def api_schema_check():
                 "fields": ["Name", "Client", "Status"],
                 "description": "Proyectos para tracking de rentabilidad"
             },
-            "Categories": {
+            "P&L Categories": {
                 "fields": ["Name", "Type"],
                 "description": "Categorias de ingresos y gastos"
             }
@@ -1207,15 +1207,15 @@ def api_delete_project(project_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ==================== Categories CRUD ====================
+# ==================== Categories CRUD (using P&L Categories table) ====================
 
 @app.route("/api/categories")
 def api_categories():
-    """Get all categories."""
+    """Get all categories from P&L Categories table."""
     try:
         airtable = Airtable()
         try:
-            records = airtable.get_all("Categories")
+            records = airtable.get_all("P&L Categories")
             categories = []
             for r in records:
                 categories.append({
@@ -1226,14 +1226,14 @@ def api_categories():
                 })
             return jsonify({"categories": categories})
         except Exception:
-            return jsonify({"categories": [], "note": "Create 'Categories' table in Airtable with Name, Type (Income/Expense), Parent fields"})
+            return jsonify({"categories": [], "note": "Create 'P&L Categories' table in Airtable with Name, Type (Income/Expense) fields"})
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/category", methods=["POST"])
 def api_create_category():
-    """Create a category."""
+    """Create a category in P&L Categories table."""
     try:
         data = request.json
         airtable = Airtable()
@@ -1243,7 +1243,7 @@ def api_create_category():
             "Parent": data.get("parent", "")
         }
         record = {k: v for k, v in record.items() if v}
-        result = airtable.create("Categories", record)
+        result = airtable.create("P&L Categories", record)
         return jsonify({"ok": True, "id": result.get("id")})
     except Exception as e:
         import traceback
@@ -1251,7 +1251,7 @@ def api_create_category():
 
 @app.route("/api/category/<category_id>", methods=["PUT"])
 def api_update_category(category_id):
-    """Update a category."""
+    """Update a category in P&L Categories table."""
     try:
         data = request.json
         airtable = Airtable()
@@ -1261,7 +1261,7 @@ def api_update_category(category_id):
             "Parent": data.get("parent", "")
         }
         record = {k: v for k, v in record.items() if v is not None}
-        airtable.update("Categories", category_id, record)
+        airtable.update("P&L Categories", category_id, record)
         return jsonify({"ok": True})
     except Exception as e:
         import traceback
@@ -1269,10 +1269,10 @@ def api_update_category(category_id):
 
 @app.route("/api/category/<category_id>", methods=["DELETE"])
 def api_delete_category(category_id):
-    """Delete a category."""
+    """Delete a category from P&L Categories table."""
     try:
         airtable = Airtable()
-        airtable.delete_batch("Categories", [category_id])
+        airtable.delete_batch("P&L Categories", [category_id])
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
