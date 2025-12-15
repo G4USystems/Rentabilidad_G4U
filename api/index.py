@@ -541,7 +541,6 @@ def api_sync():
     try:
         qonto = Qonto()
         airtable = Airtable()
-        result = {}
 
         # Get bank account slug
         slug = qonto.get_bank_account_id()
@@ -550,129 +549,92 @@ def api_sync():
 
         # Fetch transactions from Qonto
         qonto_txs = qonto.get_all_transactions(slug)
-        result["qonto_count"] = len(qonto_txs)
-
         if not qonto_txs:
             return jsonify({"error": "Qonto returned 0 transactions"})
 
-        # Find table
-        table_name = "Transactions"
+        # Find table - try to get schema by fetching one record
+        table_name = None
+        table_fields = []
         for name in ["Transactions", "transactions", "Transacciones"]:
             try:
-                airtable.get_all(name)
-                table_name = name
-                break
+                with httpx.Client(timeout=30) as client:
+                    r = client.get(
+                        f"{airtable.base_url}/{name}",
+                        headers=airtable.headers,
+                        params={"maxRecords": 1}
+                    )
+                    if r.status_code == 200:
+                        table_name = name
+                        data = r.json()
+                        if data.get("records"):
+                            table_fields = list(data["records"][0].get("fields", {}).keys())
+                        break
             except:
                 continue
 
-        # Get existing records and detect field names
+        if not table_name:
+            return jsonify({
+                "error": "No se encontro tabla. Crea una tabla llamada 'Transactions' en Airtable.",
+                "qonto_count": len(qonto_txs)
+            })
+
+        # Get existing records
         existing = airtable.get_all(table_name)
-        existing_qonto_ids = set()
-        available_fields = set()
-
+        existing_ids = set()
         for rec in existing:
-            if rec.get("qonto_id"):
-                existing_qonto_ids.add(rec.get("qonto_id"))
-            if rec.get("transaction_id"):
-                existing_qonto_ids.add(rec.get("transaction_id"))
-            if rec.get("Name"):
-                existing_qonto_ids.add(rec.get("Name"))
-            available_fields.update(rec.keys())
+            for key in ["Name", "qonto_id", "transaction_id", "id"]:
+                if rec.get(key):
+                    existing_ids.add(str(rec.get(key)))
 
-        result["existing_count"] = len(existing)
-        result["fields"] = list(available_fields)[:10]
+        # Determine which field to use for ID
+        id_field = "Name"  # Default
+        if "qonto_id" in table_fields:
+            id_field = "qonto_id"
+        elif "transaction_id" in table_fields:
+            id_field = "transaction_id"
 
-        # Build field mapping based on what exists
-        def build_record(tx):
-            tx_id = tx.get("transaction_id", "")
-            amount = float(tx.get("amount", 0))
-            side = tx.get("side", "")
-            label = tx.get("label", "")
-            date = tx.get("settled_at", "")
-
-            record = {}
-            # Try common field name variations
-            if "qonto_id" in available_fields:
-                record["qonto_id"] = tx_id
-            elif "transaction_id" in available_fields:
-                record["transaction_id"] = tx_id
-            elif "Name" in available_fields:
-                record["Name"] = tx_id
-            else:
-                record["Name"] = tx_id  # Default Airtable field
-
-            if "amount" in available_fields:
-                record["amount"] = amount
-            elif "Amount" in available_fields:
-                record["Amount"] = amount
-            elif "Monto" in available_fields:
-                record["Monto"] = amount
-
-            if "side" in available_fields:
-                record["side"] = side
-            elif "Side" in available_fields:
-                record["Side"] = side
-            elif "Tipo" in available_fields:
-                record["Tipo"] = side
-
-            if "counterparty_name" in available_fields:
-                record["counterparty_name"] = label
-            elif "label" in available_fields:
-                record["label"] = label
-            elif "Label" in available_fields:
-                record["Label"] = label
-            elif "Descripcion" in available_fields:
-                record["Descripcion"] = label
-
-            if "settled_at" in available_fields:
-                record["settled_at"] = date
-            elif "date" in available_fields:
-                record["date"] = date
-            elif "Date" in available_fields:
-                record["Date"] = date
-            elif "Fecha" in available_fields:
-                record["Fecha"] = date
-
-            return record, tx_id
-
-        # Sync
         synced = 0
         skipped = 0
         errors = []
 
         for tx in qonto_txs:
-            record, tx_id = build_record(tx)
-
-            if tx_id in existing_qonto_ids:
+            tx_id = tx.get("transaction_id", "")
+            if tx_id in existing_ids:
                 skipped += 1
                 continue
+
+            # Build minimal record
+            record = {id_field: tx_id}
+
+            # Add other fields if they exist
+            if "amount" in table_fields or "Amount" in table_fields:
+                record["amount" if "amount" in table_fields else "Amount"] = float(tx.get("amount", 0))
+            if "side" in table_fields or "Side" in table_fields:
+                record["side" if "side" in table_fields else "Side"] = tx.get("side", "")
+            if "label" in table_fields or "Label" in table_fields:
+                record["label" if "label" in table_fields else "Label"] = tx.get("label", "")
+            if "settled_at" in table_fields or "Fecha" in table_fields:
+                record["settled_at" if "settled_at" in table_fields else "Fecha"] = tx.get("settled_at", "")
 
             try:
                 airtable.create(table_name, record)
                 synced += 1
-                existing_qonto_ids.add(tx_id)
+                existing_ids.add(tx_id)
             except Exception as e:
-                err_msg = str(e)
-                if "UNKNOWN_FIELD_NAME" in err_msg or "422" in err_msg:
-                    # Try with just Name field
-                    try:
-                        airtable.create(table_name, {"Name": tx_id})
-                        synced += 1
-                        existing_qonto_ids.add(tx_id)
-                    except Exception as e2:
-                        errors.append(str(e2)[:80])
-                        if len(errors) >= 3:
-                            break
-                else:
-                    errors.append(err_msg[:80])
-                    if len(errors) >= 3:
-                        break
+                errors.append(str(e)[:100])
+                if len(errors) >= 3:
+                    break
 
-        result["synced"] = synced
-        result["skipped"] = skipped
-        if errors:
-            result["errors"] = errors
-        return jsonify(result)
+        return jsonify({
+            "qonto_count": len(qonto_txs),
+            "synced": synced,
+            "skipped": skipped,
+            "existing_count": len(existing),
+            "table_name": table_name,
+            "table_fields": table_fields[:8],
+            "id_field_used": id_field,
+            "errors": errors if errors else None
+        })
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
