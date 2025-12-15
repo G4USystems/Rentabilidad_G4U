@@ -489,48 +489,85 @@ def api_data():
     try:
         airtable = Airtable()
 
-        # Try different table name variations
         transactions = []
         categories = []
         projects = []
-        errors = []
 
-        # Try to get transactions
-        tx_found = False
-        for table_name in ["Transactions", "transactions", "Transacciones"]:
+        # Step 1: Discover tables from Airtable metadata API
+        table_map = {}  # maps purpose -> table name
+        with httpx.Client(timeout=30) as client:
+            r = client.get(
+                f"https://api.airtable.com/v0/meta/bases/{airtable.base_id}/tables",
+                headers=airtable.headers
+            )
+            if r.status_code == 200:
+                tables = r.json().get("tables", [])
+                for t in tables:
+                    name = t.get("name", "")
+                    name_lower = name.lower()
+                    if "trans" in name_lower or "movimiento" in name_lower:
+                        table_map["transactions"] = name
+                    elif "categ" in name_lower:
+                        table_map["categories"] = name
+                    elif "project" in name_lower or "proyecto" in name_lower:
+                        table_map["projects"] = name
+
+                # If no transactions table found, use first table
+                if "transactions" not in table_map and tables:
+                    table_map["transactions"] = tables[0].get("name")
+
+        # Step 2: Load data from discovered tables
+        if "transactions" in table_map:
             try:
-                transactions = airtable.get_all(table_name)
-                tx_found = True
-                break
+                raw_records = airtable.get_all(table_map["transactions"])
+                # Normalize field names for frontend
+                for r in raw_records:
+                    # Try to find amount
+                    amt = r.get("Amount") or r.get("amount") or r.get("Monto") or r.get("monto") or 0
+                    # Try to find side/type
+                    side = r.get("Type") or r.get("type") or r.get("Side") or r.get("side") or r.get("Tipo") or ""
+                    # Try to find label/description
+                    label = r.get("Description") or r.get("description") or r.get("Label") or r.get("label") or r.get("Name") or r.get("name") or ""
+                    # Try to find date
+                    date = r.get("Date") or r.get("date") or r.get("Fecha") or r.get("fecha") or r.get("settled_at") or ""
+                    # Try to find counterparty
+                    counterparty = r.get("Counterparty") or r.get("counterparty") or r.get("Contraparte") or label
+
+                    transactions.append({
+                        "id": r.get("id"),
+                        "amount": float(amt) if amt else 0,
+                        "side": side.lower() if isinstance(side, str) else "debit",
+                        "label": label,
+                        "counterparty_name": counterparty,
+                        "settled_at": date,
+                        "category": r.get("Category") or r.get("category") or r.get("Categoria") or "",
+                        "project_id": r.get("Project") or r.get("project") or r.get("Proyecto") or ""
+                    })
             except Exception as e:
-                continue
+                pass
 
-        if not tx_found:
-            errors.append("No se encontro tabla de transacciones. Crea una tabla 'Transactions' en Airtable con campos: qonto_id, amount, currency, side, counterparty_name, label, settled_at, status")
-
-        # Try to get categories
-        for table_name in ["Categories", "categories", "Categorias"]:
+        if "categories" in table_map:
             try:
-                categories = airtable.get_all(table_name)
-                break
+                categories = airtable.get_all(table_map["categories"])
             except:
-                continue
+                pass
 
-        # Try to get projects
-        for table_name in ["Projects", "projects", "Proyectos"]:
+        if "projects" in table_map:
             try:
-                projects = airtable.get_all(table_name)
-                break
+                raw_projects = airtable.get_all(table_map["projects"])
+                for p in raw_projects:
+                    projects.append({
+                        "id": p.get("id"),
+                        "name": p.get("Name") or p.get("name") or p.get("Nombre") or p.get("id")
+                    })
             except:
-                continue
-
-        if errors:
-            return jsonify({"error": errors[0], "transactions": [], "categories": [], "projects": []})
+                pass
 
         return jsonify({
             "transactions": transactions,
             "categories": categories,
             "projects": projects,
+            "tables_found": table_map
         })
     except Exception as e:
         import traceback
@@ -551,9 +588,65 @@ def api_sync():
         if not qonto_txs:
             return jsonify({"error": "Qonto returned 0 transactions"})
 
-        # Get existing records from Transactions table
-        existing = airtable.get_all("Transactions")
-        existing_ids = {r.get("Qonto Transaction ID") for r in existing if r.get("Qonto Transaction ID")}
+        # Step 1: Discover the actual table schema from Airtable metadata API
+        table_info = None
+        table_name = None
+        fields_map = {}
+
+        with httpx.Client(timeout=30) as client:
+            r = client.get(
+                f"https://api.airtable.com/v0/meta/bases/{airtable.base_id}/tables",
+                headers=airtable.headers
+            )
+            if r.status_code == 200:
+                tables = r.json().get("tables", [])
+                # Find a transactions-like table
+                for t in tables:
+                    name_lower = t.get("name", "").lower()
+                    if "trans" in name_lower or "movimiento" in name_lower or "operacion" in name_lower:
+                        table_info = t
+                        table_name = t.get("name")
+                        break
+                # If no match, use the first table
+                if not table_info and tables:
+                    table_info = tables[0]
+                    table_name = tables[0].get("name")
+
+        if not table_name:
+            return jsonify({"error": "No tables found in Airtable base. Please create a table first."})
+
+        # Step 2: Map Airtable field names to our data
+        # Get actual field names from the table
+        actual_fields = {f.get("name"): f.get("type") for f in table_info.get("fields", [])}
+
+        # Try to find matching fields (case-insensitive)
+        def find_field(candidates):
+            for c in candidates:
+                for f in actual_fields:
+                    if c.lower() == f.lower():
+                        return f
+            return None
+
+        # Map our data to actual field names
+        id_field = find_field(["Qonto Transaction ID", "qonto_id", "transaction_id", "ID", "id", "Name"])
+        amount_field = find_field(["Amount", "amount", "Monto", "monto", "Importe", "importe"])
+        desc_field = find_field(["Description", "description", "Descripcion", "descripcion", "Label", "label", "Name", "name"])
+        type_field = find_field(["Type", "type", "Tipo", "tipo", "Side", "side"])
+        date_field = find_field(["Date", "date", "Fecha", "fecha", "settled_at"])
+        counterparty_field = find_field(["Counterparty", "counterparty", "Contraparte", "contraparte"])
+
+        # Get existing records to check for duplicates
+        existing = []
+        existing_ids = set()
+        try:
+            existing = airtable.get_all(table_name)
+            # Check multiple possible ID fields for existing records
+            for r in existing:
+                for key in ["Qonto Transaction ID", "qonto_id", "transaction_id", "ID", "id", "Name", "name"]:
+                    if r.get(key):
+                        existing_ids.add(str(r.get(key)))
+        except Exception as e:
+            pass  # Table might be empty or field names different
 
         synced = 0
         skipped = 0
@@ -566,22 +659,38 @@ def api_sync():
                 continue
 
             try:
-                record = {
-                    "Qonto Transaction ID": tx_id,
-                    "Amount": float(tx.get("amount", 0)),
-                    "Description": tx.get("label", ""),
-                    "Counterparty": tx.get("label", ""),
-                    "Type": tx.get("side", ""),
-                    "Date": tx.get("settled_at", "").split("T")[0] if tx.get("settled_at") else None
-                }
-                # Remove None values
-                record = {k: v for k, v in record.items() if v is not None}
-                airtable.create("Transactions", record)
+                # Build record using discovered field names
+                record = {}
+
+                if id_field:
+                    record[id_field] = tx_id
+                if amount_field:
+                    record[amount_field] = float(tx.get("amount", 0))
+                if desc_field:
+                    record[desc_field] = tx.get("label", "") or tx.get("reference", "") or tx_id
+                if type_field:
+                    record[type_field] = tx.get("side", "")
+                if date_field:
+                    settled = tx.get("settled_at", "")
+                    if settled:
+                        record[date_field] = settled.split("T")[0]
+                if counterparty_field:
+                    record[counterparty_field] = tx.get("label", "")
+
+                # If no fields matched, use Name field (exists in every Airtable table)
+                if not record:
+                    record["Name"] = f"{tx_id} - {tx.get('label', '')} - {tx.get('amount', 0)}"
+
+                # Remove empty values
+                record = {k: v for k, v in record.items() if v is not None and v != ""}
+
+                airtable.create(table_name, record)
                 synced += 1
                 existing_ids.add(tx_id)
             except Exception as e:
-                errors.append(str(e)[:100])
-                if len(errors) >= 3:
+                error_msg = str(e)
+                errors.append(error_msg[:150])
+                if len(errors) >= 5:
                     break
 
         return jsonify({
@@ -589,6 +698,14 @@ def api_sync():
             "synced": synced,
             "skipped": skipped,
             "existing_count": len(existing),
+            "table_name": table_name,
+            "fields_found": {
+                "id": id_field,
+                "amount": amount_field,
+                "description": desc_field,
+                "type": type_field,
+                "date": date_field
+            },
             "errors": errors if errors else None
         })
     except Exception as e:
