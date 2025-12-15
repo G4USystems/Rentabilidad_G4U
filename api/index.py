@@ -887,3 +887,56 @@ def api_debug_qonto():
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/diagnostics")
+def api_diagnostics():
+    """Analyze transactions for issues like duplicates, missing types, etc."""
+    try:
+        airtable = Airtable()
+        records = airtable.get_all("Transactions")
+
+        # Analyze the data
+        total = len(records)
+        by_type = {}
+        by_qonto_id = {}
+        income_total = 0
+        expense_total = 0
+        no_type_total = 0
+
+        for r in records:
+            # Count by Type
+            tx_type = r.get("Type", "")
+            by_type[tx_type or "(empty)"] = by_type.get(tx_type or "(empty)", 0) + 1
+
+            # Check for duplicates by Qonto Transaction ID
+            qonto_id = r.get("Qonto Transaction ID", "")
+            if qonto_id:
+                by_qonto_id[qonto_id] = by_qonto_id.get(qonto_id, 0) + 1
+
+            # Calculate totals
+            amt = float(r.get("Amount", 0) or 0)
+            if tx_type == "Income":
+                income_total += amt
+            elif tx_type == "Expense":
+                expense_total += amt
+            else:
+                no_type_total += amt
+
+        # Find duplicates
+        duplicates = {k: v for k, v in by_qonto_id.items() if v > 1}
+
+        return jsonify({
+            "total_records": total,
+            "by_type": by_type,
+            "duplicates_count": len(duplicates),
+            "duplicates": duplicates if len(duplicates) < 20 else f"{len(duplicates)} duplicates found",
+            "totals": {
+                "income": income_total,
+                "expense": expense_total,
+                "no_type": no_type_total
+            },
+            "net": income_total - expense_total
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
