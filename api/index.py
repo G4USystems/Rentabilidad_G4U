@@ -71,6 +71,15 @@ class Airtable:
             r.raise_for_status()
             return r.json()
 
+    def delete_batch(self, table, record_ids):
+        """Delete up to 10 records at once."""
+        with httpx.Client(timeout=30) as client:
+            # Airtable expects records[] query params
+            params = "&".join([f"records[]={rid}" for rid in record_ids])
+            r = client.delete(f"{self.base_url}/{table}?{params}", headers=self.headers)
+            r.raise_for_status()
+            return r.json()
+
 # ==================== Qonto Client ====================
 
 class Qonto:
@@ -936,6 +945,55 @@ def api_diagnostics():
                 "no_type": no_type_total
             },
             "net": income_total - expense_total
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/cleanup-duplicates", methods=["POST"])
+def api_cleanup_duplicates():
+    """Remove duplicate transactions, keeping only the first occurrence of each Qonto Transaction ID."""
+    try:
+        airtable = Airtable()
+        records = airtable.get_all("Transactions")
+
+        # Group records by Qonto Transaction ID
+        by_qonto_id = {}
+        for r in records:
+            qonto_id = r.get("Qonto Transaction ID", "")
+            if qonto_id:
+                if qonto_id not in by_qonto_id:
+                    by_qonto_id[qonto_id] = []
+                by_qonto_id[qonto_id].append(r.get("id"))
+
+        # Find records to delete (all but the first for each Qonto ID)
+        to_delete = []
+        for qonto_id, record_ids in by_qonto_id.items():
+            if len(record_ids) > 1:
+                # Keep the first, delete the rest
+                to_delete.extend(record_ids[1:])
+
+        if not to_delete:
+            return jsonify({"message": "No duplicates found", "deleted": 0})
+
+        # Delete in batches of 10
+        deleted = 0
+        errors = []
+        for i in range(0, len(to_delete), 10):
+            batch = to_delete[i:i+10]
+            try:
+                airtable.delete_batch("Transactions", batch)
+                deleted += len(batch)
+            except Exception as e:
+                errors.append(str(e)[:100])
+                if len(errors) >= 3:
+                    break
+
+        return jsonify({
+            "deleted": deleted,
+            "total_duplicates": len(to_delete),
+            "remaining": len(to_delete) - deleted,
+            "errors": errors if errors else None
         })
     except Exception as e:
         import traceback
