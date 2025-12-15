@@ -578,7 +578,13 @@ def api_data():
 
         if "categories" in table_map:
             try:
-                categories = airtable.get_all(table_map["categories"])
+                raw_categories = airtable.get_all(table_map["categories"])
+                for c in raw_categories:
+                    categories.append({
+                        "id": c.get("id"),
+                        "name": c.get("Name") or c.get("name") or "",
+                        "type": c.get("Type") or c.get("type") or "Expense"
+                    })
             except:
                 pass
 
@@ -760,7 +766,8 @@ def api_assign_project():
         project_id = data.get("project_id")
 
         airtable = Airtable()
-        airtable.update("Transactions", tx_id, {"project_id": project_id or None})
+        # Use "Project" field name to match schema
+        airtable.update("Transactions", tx_id, {"Project": project_id or ""})
 
         return jsonify({"ok": True})
     except Exception as e:
