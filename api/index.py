@@ -619,3 +619,50 @@ def api_debug():
         result["qonto"] = {"status": "error", "error": str(e)}
 
     return jsonify(result)
+
+@app.route("/api/debug/qonto")
+def api_debug_qonto():
+    """Debug Qonto API - see raw transactions and bank accounts."""
+    try:
+        qonto = Qonto()
+        results = {"iban_configured": qonto.iban}
+
+        with httpx.Client(timeout=30) as client:
+            # Get organization with bank accounts
+            r = client.get(f"{qonto.base_url}/organization", headers=qonto.headers)
+            if r.status_code == 200:
+                org = r.json().get("organization", {})
+                bank_accounts = org.get("bank_accounts", [])
+                results["bank_accounts"] = [
+                    {"iban": ba.get("iban"), "name": ba.get("name"), "balance": ba.get("balance")}
+                    for ba in bank_accounts
+                ]
+                results["iban_valid"] = any(ba.get("iban") == qonto.iban for ba in bank_accounts)
+
+                if not results["iban_valid"] and bank_accounts:
+                    results["suggestion"] = f"El IBAN configurado no coincide. IBANs disponibles: {[ba.get('iban') for ba in bank_accounts]}"
+            else:
+                results["org_error"] = r.text[:300]
+
+            # Get transactions
+            for status in ["completed", "pending"]:
+                r = client.get(
+                    f"{qonto.base_url}/transactions",
+                    headers=qonto.headers,
+                    params={"iban": qonto.iban, "status": status, "per_page": 5}
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    txs = data.get("transactions", [])
+                    meta = data.get("meta", {})
+                    results[f"tx_{status}"] = {
+                        "total": meta.get("total_count", len(txs)),
+                        "sample": [{"id": t.get("transaction_id"), "amount": t.get("amount"), "side": t.get("side"), "label": t.get("label")} for t in txs[:3]]
+                    }
+                else:
+                    results[f"tx_{status}"] = {"error": r.status_code, "msg": r.text[:200]}
+
+        return jsonify(results)
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
