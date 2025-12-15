@@ -1,271 +1,774 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Rentabilidad G4U</title>
+    <title>G4U - Dashboard Financiero</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
+        :root {
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: system-ui, sans-serif; background: #f0f2f5; color: #333; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        h1 { margin-bottom: 10px; }
-        .subtitle { color: #666; margin-bottom: 20px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
-        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .card h3 { font-size: 14px; color: #666; margin-bottom: 8px; }
-        .card .value { font-size: 28px; font-weight: 600; }
-        .card .value.positive { color: #22c55e; }
-        .card .value.negative { color: #ef4444; }
-        .section { background: white; border-radius: 12px; padding: 20px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .section h2 { margin-bottom: 15px; font-size: 18px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+        /* Layout */
+        .app { display: flex; min-height: 100vh; }
+        .sidebar { width: 240px; background: var(--card); border-right: 1px solid var(--border); padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; }
+        .main { flex: 1; margin-left: 240px; padding: 24px; }
+
+        /* Sidebar */
+        .logo { padding: 0 20px 20px; font-size: 20px; font-weight: 700; color: var(--primary); }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: var(--bg); color: var(--text); }
+        .nav-item.active { background: #eff6ff; color: var(--primary); border-left-color: var(--primary); font-weight: 500; }
+        .nav-item svg { width: 20px; height: 20px; margin-right: 12px; }
+        .nav-section { padding: 16px 20px 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header h1 { font-size: 24px; font-weight: 600; }
+        .header-actions { display: flex; gap: 12px; align-items: center; }
+
+        /* Cards */
+        .card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); }
+        .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .card-body { padding: 20px; }
+
+        /* KPI Grid */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .kpi { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+        .kpi-label { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+        .kpi-value { font-size: 28px; font-weight: 600; }
+        .kpi-value.positive { color: var(--success); }
+        .kpi-value.negative { color: var(--danger); }
+        .kpi-change { font-size: 12px; margin-top: 8px; }
+        .kpi-change.up { color: var(--success); }
+        .kpi-change.down { color: var(--danger); }
+
+        /* Filters */
+        .filters { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
+        .filter-group { display: flex; align-items: center; gap: 8px; }
+        .filter-group label { font-size: 13px; color: var(--text-muted); }
+        select, input[type="date"], input[type="text"], input[type="number"] {
+            padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card);
+        }
+        select:focus, input:focus { outline: none; border-color: var(--primary); }
+
+        /* Buttons */
+        .btn { padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-outline:hover { background: var(--bg); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+        /* Tables */
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; font-weight: 600; font-size: 13px; color: #666; }
-        .amount { font-family: monospace; font-weight: 500; }
-        .amount.credit { color: #22c55e; }
-        .amount.debit { color: #ef4444; }
-        .btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; }
-        .btn:hover { background: #2563eb; }
-        select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        th { text-align: left; padding: 12px 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: var(--bg); border-bottom: 1px solid var(--border); }
+        td { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+        tr:hover { background: #fafafa; }
+        .amount { font-family: 'SF Mono', Monaco, monospace; font-weight: 500; }
+        .amount.positive { color: var(--success); }
+        .amount.negative { color: var(--danger); }
+
+        /* P&L Statement */
+        .pl-section { margin-bottom: 16px; }
+        .pl-section-header { padding: 12px 16px; background: var(--bg); font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+        .pl-row { display: flex; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid #f1f5f9; }
+        .pl-row:hover { background: #fafafa; }
+        .pl-row.indent { padding-left: 32px; }
+        .pl-row.total { font-weight: 600; background: var(--bg); }
+        .pl-row.grand-total { font-weight: 700; background: #f0f9ff; border-top: 2px solid var(--primary); }
+        .pl-label { color: var(--text); }
+        .pl-amount { font-family: 'SF Mono', Monaco, monospace; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 4px; background: var(--bg); padding: 4px; border-radius: 10px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 500; color: var(--text-muted); transition: all 0.2s; }
+        .tab:hover { color: var(--text); }
+        .tab.active { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        /* Views */
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* Status */
+        .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
         .status.ok { background: #dcfce7; color: #166534; }
+        .status.pending { background: #fef3c7; color: #92400e; }
         .status.error { background: #fee2e2; color: #991b1b; }
-        .loading { text-align: center; padding: 40px; color: #666; }
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab { padding: 10px 20px; background: #e5e7eb; border-radius: 8px; cursor: pointer; }
-        .tab.active { background: #3b82f6; color: white; }
-        .hidden { display: none; }
-        .flex { display: flex; gap: 10px; align-items: center; }
-        .ml-auto { margin-left: auto; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--card); border-radius: 16px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { font-size: 18px; }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted); }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
+
+        /* Form */
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        /* Project cards */
+        .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+        .project-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+        .project-name { font-weight: 600; font-size: 16px; margin-bottom: 12px; }
+        .project-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .project-stat { }
+        .project-stat-label { font-size: 12px; color: var(--text-muted); }
+        .project-stat-value { font-size: 18px; font-weight: 600; }
+        .project-bar { height: 8px; background: var(--bg); border-radius: 4px; margin-top: 16px; overflow: hidden; }
+        .project-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+        .project-bar-fill.positive { background: var(--success); }
+        .project-bar-fill.negative { background: var(--danger); }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+            .kpi-grid { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+        }
+
+        .hidden { display: none !important; }
+        .text-muted { color: var(--text-muted); }
+        .text-sm { font-size: 13px; }
+        .mt-4 { margin-top: 16px; }
+        .mb-4 { margin-bottom: 16px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Rentabilidad G4U</h1>
-        <p class="subtitle">Dashboard financiero conectado a Qonto</p>
-        <div id="status-bar" class="flex" style="margin-bottom: 20px;">
-            <span id="env-status">Verificando...</span>
-            <div class="ml-auto">
-                <button class="btn" onclick="syncQonto()">Sincronizar Qonto</button>
-            </div>
-        </div>
-        <div class="grid" id="kpis">
-            <div class="card"><h3>Ingresos</h3><div class="value positive" id="total-income">-</div></div>
-            <div class="card"><h3>Gastos</h3><div class="value negative" id="total-expenses">-</div></div>
-            <div class="card"><h3>Resultado Neto</h3><div class="value" id="net-result">-</div></div>
-            <div class="card"><h3>Margen</h3><div class="value" id="margin">-</div></div>
-        </div>
-        <div class="tabs">
-            <div class="tab active" id="tab-btn-tx">Transacciones</div>
-            <div class="tab" id="tab-btn-cat">Por Categoria</div>
-            <div class="tab" id="tab-btn-proj">Por Proyecto</div>
-        </div>
-        <div id="tab-transactions" class="section">
-            <div class="flex" style="margin-bottom: 15px;">
-                <h2>Transacciones</h2>
-                <div class="ml-auto flex">
-                    <select id="filter-side">
-                        <option value="">Todos</option>
-                        <option value="credit">Ingresos</option>
-                        <option value="debit">Gastos</option>
-                    </select>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">G4U Finance</div>
+            <nav>
+                <div class="nav-item active" data-view="dashboard">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Dashboard
+                </div>
+                <div class="nav-item" data-view="pl">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Estado P&L
+                </div>
+                <div class="nav-item" data-view="transactions">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    Transacciones
+                </div>
+                <div class="nav-item" data-view="projects">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    Proyectos
+                </div>
+                <div class="nav-section">Configuracion</div>
+                <div class="nav-item" data-view="settings">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Ajustes
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="view active">
+                <div class="header">
+                    <h1>Dashboard</h1>
+                    <div class="header-actions">
+                        <span id="status-indicator"></span>
+                        <button class="btn btn-outline" onclick="syncQonto()">Sync Qonto</button>
+                        <button class="btn btn-primary" onclick="openModal('add-transaction')">+ Nuevo</button>
+                    </div>
+                </div>
+
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Periodo:</label>
+                        <select id="filter-period" onchange="applyFilters()">
+                            <option value="all">Todo el tiempo</option>
+                            <option value="month">Este mes</option>
+                            <option value="quarter">Este trimestre</option>
+                            <option value="year">Este anio</option>
+                            <option value="custom">Personalizado</option>
+                        </select>
+                    </div>
+                    <div class="filter-group hidden" id="custom-dates">
+                        <input type="date" id="filter-from" onchange="applyFilters()">
+                        <span>a</span>
+                        <input type="date" id="filter-to" onchange="applyFilters()">
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi">
+                        <div class="kpi-label">Ingresos</div>
+                        <div class="kpi-value positive" id="kpi-income">-</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-label">Gastos</div>
+                        <div class="kpi-value negative" id="kpi-expenses">-</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-label">Resultado Neto</div>
+                        <div class="kpi-value" id="kpi-net">-</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-label">Margen</div>
+                        <div class="kpi-value" id="kpi-margin">-</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        Transacciones Recientes
+                        <a href="#" onclick="showView('transactions'); return false;" class="text-sm" style="color: var(--primary);">Ver todas</a>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <table>
+                            <thead>
+                                <tr><th>Fecha</th><th>Descripcion</th><th>Categoria</th><th style="text-align:right">Monto</th></tr>
+                            </thead>
+                            <tbody id="recent-transactions">
+                                <tr><td colspan="4" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-            <table>
-                <thead>
-                    <tr><th>Fecha</th><th>Descripcion</th><th>Monto</th><th>Categoria</th></tr>
-                </thead>
-                <tbody id="transactions-body">
-                    <tr><td colspan="4" class="loading">Cargando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div id="tab-categories" class="section hidden">
-            <h2>Desglose por Categoria</h2>
-            <table>
-                <thead>
-                    <tr><th>Categoria</th><th>Ingresos</th><th>Gastos</th><th>Neto</th></tr>
-                </thead>
-                <tbody id="categories-body">
-                    <tr><td colspan="4" class="loading">Cargando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div id="tab-projects" class="section hidden">
-            <h2>Rentabilidad por Proyecto</h2>
-            <table>
-                <thead>
-                    <tr><th>Proyecto</th><th>Ingresos</th><th>Costos</th><th>Margen</th><th>ROI</th></tr>
-                </thead>
-                <tbody id="projects-body">
-                    <tr><td colspan="5" class="loading">Cargando...</td></tr>
-                </tbody>
-            </table>
+
+            <!-- P&L View -->
+            <div id="view-pl" class="view">
+                <div class="header">
+                    <h1>Estado de Resultados (P&L)</h1>
+                    <div class="header-actions">
+                        <select id="pl-period" onchange="renderPL()">
+                            <option value="all">Todo el tiempo</option>
+                            <option value="month">Este mes</option>
+                            <option value="quarter">Este trimestre</option>
+                            <option value="year">Este anio</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body" style="padding:0;" id="pl-statement">
+                        <div style="padding:40px;text-align:center;color:var(--text-muted);">Cargando...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions View -->
+            <div id="view-transactions" class="view">
+                <div class="header">
+                    <h1>Transacciones</h1>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="openModal('add-transaction')">+ Nueva Transaccion</button>
+                    </div>
+                </div>
+
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Tipo:</label>
+                        <select id="tx-filter-type" onchange="renderTransactions()">
+                            <option value="">Todos</option>
+                            <option value="credit">Ingresos</option>
+                            <option value="debit">Gastos</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Buscar:</label>
+                        <input type="text" id="tx-search" placeholder="Descripcion..." onkeyup="renderTransactions()">
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body" style="padding:0;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Descripcion</th>
+                                    <th>Categoria</th>
+                                    <th>Proyecto</th>
+                                    <th style="text-align:right">Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-table">
+                                <tr><td colspan="5" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Projects View -->
+            <div id="view-projects" class="view">
+                <div class="header">
+                    <h1>Rentabilidad por Proyecto</h1>
+                </div>
+
+                <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="kpi">
+                        <div class="kpi-label">Proyectos Activos</div>
+                        <div class="kpi-value" id="projects-count">-</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-label">Ingresos Totales</div>
+                        <div class="kpi-value positive" id="projects-income">-</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-label">Margen Promedio</div>
+                        <div class="kpi-value" id="projects-margin">-</div>
+                    </div>
+                </div>
+
+                <div class="project-grid" id="projects-grid">
+                    <div style="padding:40px;text-align:center;color:var(--text-muted);">Cargando proyectos...</div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="view-settings" class="view">
+                <div class="header">
+                    <h1>Ajustes</h1>
+                </div>
+                <div class="card">
+                    <div class="card-header">Conexiones</div>
+                    <div class="card-body">
+                        <p class="mb-4">Estado de las integraciones:</p>
+                        <div style="display:flex;gap:16px;">
+                            <div><strong>Qonto:</strong> <span id="status-qonto">-</span></div>
+                            <div><strong>Airtable:</strong> <span id="status-airtable">-</span></div>
+                        </div>
+                        <div class="mt-4">
+                            <button class="btn btn-outline" onclick="syncQonto()">Sincronizar Qonto</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Transaction Modal -->
+    <div class="modal-overlay" id="modal-add-transaction">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Nueva Transaccion</h3>
+                <button class="modal-close" onclick="closeModal('add-transaction')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="new-tx-type">
+                            <option value="Expense">Gasto</option>
+                            <option value="Income">Ingreso</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="new-tx-date">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Monto (EUR)</label>
+                    <input type="number" step="0.01" id="new-tx-amount" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label>Descripcion</label>
+                    <input type="text" id="new-tx-description" placeholder="Descripcion del movimiento">
+                </div>
+                <div class="form-group">
+                    <label>Contraparte</label>
+                    <input type="text" id="new-tx-counterparty" placeholder="Nombre del cliente/proveedor">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('add-transaction')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveTransaction()">Guardar</button>
+            </div>
         </div>
     </div>
+
     <script>
-        console.log("G4U v6 loading");
+        // State
         var transactions = [];
         var categories = [];
         var projects = [];
+        var filteredTransactions = [];
 
+        // Utilities
         function fmt(n) {
-            return new Intl.NumberFormat("es-ES", {style:"currency",currency:"EUR"}).format(n||0);
+            return new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR'}).format(n || 0);
         }
 
-        function showTab(name) {
-            document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active");});
-            document.getElementById("tab-transactions").classList.add("hidden");
-            document.getElementById("tab-categories").classList.add("hidden");
-            document.getElementById("tab-projects").classList.add("hidden");
-            document.getElementById("tab-"+name).classList.remove("hidden");
+        function formatDate(d) {
+            if (!d) return '-';
+            return d.split('T')[0];
         }
 
-        document.getElementById("tab-btn-tx").onclick = function(){
-            this.classList.add("active");
-            document.getElementById("tab-btn-cat").classList.remove("active");
-            document.getElementById("tab-btn-proj").classList.remove("active");
-            showTab("transactions");
-        };
-        document.getElementById("tab-btn-cat").onclick = function(){
-            this.classList.add("active");
-            document.getElementById("tab-btn-tx").classList.remove("active");
-            document.getElementById("tab-btn-proj").classList.remove("active");
-            showTab("categories");
-        };
-        document.getElementById("tab-btn-proj").onclick = function(){
-            this.classList.add("active");
-            document.getElementById("tab-btn-tx").classList.remove("active");
-            document.getElementById("tab-btn-cat").classList.remove("active");
-            showTab("projects");
-        };
-
-        function checkEnv() {
-            fetch("/api/status").then(function(r){return r.json();}).then(function(data){
-                var ok = data.airtable && data.qonto;
-                document.getElementById("env-status").innerHTML = ok ? "<span class='status ok'>OK</span>" : "<span class='status error'>Config error</span>";
-            }).catch(function(e){
-                document.getElementById("env-status").innerHTML = "<span class='status error'>Error</span>";
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+                var view = this.getAttribute('data-view');
+                if (view) showView(view);
             });
+        });
+
+        function showView(name) {
+            document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
+            document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+            document.querySelector('.nav-item[data-view="'+name+'"]').classList.add('active');
+            document.getElementById('view-'+name).classList.add('active');
         }
 
+        // Modal
+        function openModal(name) {
+            document.getElementById('modal-'+name).classList.add('active');
+            if (name === 'add-transaction') {
+                document.getElementById('new-tx-date').value = new Date().toISOString().split('T')[0];
+            }
+        }
+        function closeModal(name) {
+            document.getElementById('modal-'+name).classList.remove('active');
+        }
+
+        // Data Loading
         function loadData() {
-            fetch("/api/data").then(function(r){return r.json();}).then(function(data){
-                if(data.error){
-                    document.getElementById("transactions-body").innerHTML = "<tr><td colspan='4' style='color:red'>"+data.error+"</td></tr>";
+            fetch('/api/data').then(function(r) { return r.json(); }).then(function(data) {
+                if (data.error) {
+                    console.error(data.error);
                     return;
                 }
                 transactions = data.transactions || [];
                 categories = data.categories || [];
                 projects = data.projects || [];
-                updateKPIs();
-                loadTransactions();
-                loadCategories();
-                loadProjects();
-            }).catch(function(e){
-                console.error(e);
-                document.getElementById("transactions-body").innerHTML = "<tr><td colspan='4' style='color:red'>Error</td></tr>";
+
+                // Sort transactions by date descending
+                transactions.sort(function(a, b) {
+                    return (b.settled_at || '').localeCompare(a.settled_at || '');
+                });
+
+                applyFilters();
+                renderAll();
+            }).catch(function(e) {
+                console.error('Error loading data:', e);
             });
         }
 
-        function updateKPIs() {
-            var income = 0, expenses = 0;
-            for(var i=0; i<transactions.length; i++){
-                var t = transactions[i];
-                var amt = parseFloat(t.amount) || 0;
-                if(t.side === "credit") income += amt;
-                else expenses += amt;
+        function checkStatus() {
+            fetch('/api/status').then(function(r) { return r.json(); }).then(function(data) {
+                var ok = data.airtable && data.qonto;
+                document.getElementById('status-indicator').innerHTML = ok
+                    ? '<span class="status ok">Conectado</span>'
+                    : '<span class="status error">Desconectado</span>';
+                document.getElementById('status-qonto').innerHTML = data.qonto ? '<span class="status ok">OK</span>' : '<span class="status error">Error</span>';
+                document.getElementById('status-airtable').innerHTML = data.airtable ? '<span class="status ok">OK</span>' : '<span class="status error">Error</span>';
+            });
+        }
+
+        // Filtering
+        function applyFilters() {
+            var period = document.getElementById('filter-period').value;
+            var customDates = document.getElementById('custom-dates');
+
+            if (period === 'custom') {
+                customDates.classList.remove('hidden');
+            } else {
+                customDates.classList.add('hidden');
             }
+
+            var now = new Date();
+            var from = null, to = null;
+
+            if (period === 'month') {
+                from = new Date(now.getFullYear(), now.getMonth(), 1);
+                to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            } else if (period === 'quarter') {
+                var q = Math.floor(now.getMonth() / 3);
+                from = new Date(now.getFullYear(), q * 3, 1);
+                to = new Date(now.getFullYear(), (q + 1) * 3, 0);
+            } else if (period === 'year') {
+                from = new Date(now.getFullYear(), 0, 1);
+                to = new Date(now.getFullYear(), 11, 31);
+            } else if (period === 'custom') {
+                var fromVal = document.getElementById('filter-from').value;
+                var toVal = document.getElementById('filter-to').value;
+                if (fromVal) from = new Date(fromVal);
+                if (toVal) to = new Date(toVal);
+            }
+
+            filteredTransactions = transactions.filter(function(t) {
+                if (!t.settled_at) return true;
+                var d = new Date(t.settled_at);
+                if (from && d < from) return false;
+                if (to && d > to) return false;
+                return true;
+            });
+
+            renderKPIs();
+            renderRecentTransactions();
+        }
+
+        // Rendering
+        function renderAll() {
+            renderKPIs();
+            renderRecentTransactions();
+            renderTransactions();
+            renderPL();
+            renderProjects();
+        }
+
+        function renderKPIs() {
+            var income = 0, expenses = 0;
+            filteredTransactions.forEach(function(t) {
+                var amt = parseFloat(t.amount) || 0;
+                if (t.side === 'credit') income += amt;
+                else expenses += amt;
+            });
             var net = income - expenses;
             var margin = income > 0 ? (net / income * 100) : 0;
-            document.getElementById("total-income").textContent = fmt(income);
-            document.getElementById("total-expenses").textContent = fmt(expenses);
-            document.getElementById("net-result").textContent = fmt(net);
-            document.getElementById("net-result").className = "value " + (net >= 0 ? "positive" : "negative");
-            document.getElementById("margin").textContent = margin.toFixed(1) + " pct";
+
+            document.getElementById('kpi-income').textContent = fmt(income);
+            document.getElementById('kpi-expenses').textContent = fmt(expenses);
+            document.getElementById('kpi-net').textContent = fmt(net);
+            document.getElementById('kpi-net').className = 'kpi-value ' + (net >= 0 ? 'positive' : 'negative');
+            document.getElementById('kpi-margin').textContent = margin.toFixed(1) + '%';
+            document.getElementById('kpi-margin').className = 'kpi-value ' + (margin >= 0 ? 'positive' : 'negative');
         }
 
-        function loadTransactions() {
-            var filter = document.getElementById("filter-side").value;
-            var filtered = [];
-            for(var i=0; i<transactions.length; i++){
-                if(!filter || transactions[i].side === filter) filtered.push(transactions[i]);
-            }
-            var html = "";
-            for(var i=0; i<filtered.length; i++){
-                var t = filtered[i];
-                var dateStr = t.settled_at ? t.settled_at.split("T")[0] : "-";
-                var name = t.counterparty_name || t.label || "-";
-                var sign = t.side === "credit" ? "+" : "-";
-                var cls = t.side === "credit" ? "credit" : "debit";
-                html += "<tr><td>"+dateStr+"</td><td>"+name+"</td><td class='amount "+cls+"'>"+sign+fmt(t.amount)+"</td><td>"+(t.category||"-")+"</td></tr>";
-            }
-            document.getElementById("transactions-body").innerHTML = html || "<tr><td colspan='4'>No hay transacciones</td></tr>";
+        function renderRecentTransactions() {
+            var html = '';
+            var recent = filteredTransactions.slice(0, 10);
+            recent.forEach(function(t) {
+                var cls = t.side === 'credit' ? 'positive' : 'negative';
+                var sign = t.side === 'credit' ? '+' : '-';
+                html += '<tr>';
+                html += '<td>' + formatDate(t.settled_at) + '</td>';
+                html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
+                html += '<td>' + (t.category || '-') + '</td>';
+                html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
+                html += '</tr>';
+            });
+            document.getElementById('recent-transactions').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
-        document.getElementById("filter-side").onchange = loadTransactions;
+        function renderTransactions() {
+            var filterType = document.getElementById('tx-filter-type').value;
+            var search = (document.getElementById('tx-search').value || '').toLowerCase();
 
-        function loadCategories() {
+            var filtered = transactions.filter(function(t) {
+                if (filterType && t.side !== filterType) return false;
+                if (search) {
+                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '')).toLowerCase();
+                    if (text.indexOf(search) === -1) return false;
+                }
+                return true;
+            });
+
+            var html = '';
+            filtered.forEach(function(t) {
+                var cls = t.side === 'credit' ? 'positive' : 'negative';
+                var sign = t.side === 'credit' ? '+' : '-';
+                var projectName = '-';
+                if (t.project_id) {
+                    var proj = projects.find(function(p) { return p.id === t.project_id; });
+                    if (proj) projectName = proj.name;
+                }
+                html += '<tr>';
+                html += '<td>' + formatDate(t.settled_at) + '</td>';
+                html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
+                html += '<td>' + (t.category || '-') + '</td>';
+                html += '<td>' + projectName + '</td>';
+                html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
+                html += '</tr>';
+            });
+            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
+        }
+
+        function renderPL() {
+            // Group by Income/Expense
+            var income = 0, expenses = 0;
             var byCategory = {};
-            for(var i=0; i<transactions.length; i++){
-                var t = transactions[i];
-                var cat = t.category || "Sin categoria";
-                if(!byCategory[cat]) byCategory[cat] = {income:0,expense:0};
-                var amt = parseFloat(t.amount) || 0;
-                if(t.side === "credit") byCategory[cat].income += amt;
-                else byCategory[cat].expense += amt;
-            }
-            var html = "";
-            for(var cat in byCategory){
-                var v = byCategory[cat];
-                var netCls = (v.income - v.expense) >= 0 ? "credit" : "debit";
-                html += "<tr><td>"+cat+"</td><td class='amount credit'>"+fmt(v.income)+"</td><td class='amount debit'>"+fmt(v.expense)+"</td><td class='amount "+netCls+"'>"+fmt(v.income-v.expense)+"</td></tr>";
-            }
-            document.getElementById("categories-body").innerHTML = html || "<tr><td colspan='4'>No hay datos</td></tr>";
-        }
 
-        function loadProjects() {
-            var byProject = {};
-            for(var i=0; i<projects.length; i++){
-                var p = projects[i];
-                byProject[p.id] = {name:p.name,income:0,expense:0};
-            }
-            for(var i=0; i<transactions.length; i++){
-                var t = transactions[i];
-                if(t.project_id && byProject[t.project_id]){
-                    var amt = parseFloat(t.amount) || 0;
-                    if(t.side === "credit") byProject[t.project_id].income += amt;
-                    else byProject[t.project_id].expense += amt;
+            filteredTransactions.forEach(function(t) {
+                var amt = parseFloat(t.amount) || 0;
+                var cat = t.category || 'Sin categoria';
+                if (!byCategory[cat]) byCategory[cat] = {income: 0, expense: 0};
+                if (t.side === 'credit') {
+                    income += amt;
+                    byCategory[cat].income += amt;
+                } else {
+                    expenses += amt;
+                    byCategory[cat].expense += amt;
+                }
+            });
+
+            var html = '';
+
+            // Revenue Section
+            html += '<div class="pl-section">';
+            html += '<div class="pl-section-header"><span>INGRESOS</span><span></span></div>';
+            for (var cat in byCategory) {
+                if (byCategory[cat].income > 0) {
+                    html += '<div class="pl-row indent"><span class="pl-label">' + cat + '</span><span class="pl-amount positive">' + fmt(byCategory[cat].income) + '</span></div>';
                 }
             }
-            var html = "";
-            for(var id in byProject){
-                var p = byProject[id];
-                var margin = p.income > 0 ? ((p.income-p.expense)/p.income*100) : 0;
-                var roi = p.expense > 0 ? ((p.income-p.expense)/p.expense*100) : 0;
-                html += "<tr><td>"+p.name+"</td><td class='amount credit'>"+fmt(p.income)+"</td><td class='amount debit'>"+fmt(p.expense)+"</td><td>"+margin.toFixed(1)+"</td><td>"+roi.toFixed(1)+"</td></tr>";
+            html += '<div class="pl-row total"><span>Total Ingresos</span><span class="pl-amount positive">' + fmt(income) + '</span></div>';
+            html += '</div>';
+
+            // Expenses Section
+            html += '<div class="pl-section">';
+            html += '<div class="pl-section-header"><span>GASTOS</span><span></span></div>';
+            for (var cat in byCategory) {
+                if (byCategory[cat].expense > 0) {
+                    html += '<div class="pl-row indent"><span class="pl-label">' + cat + '</span><span class="pl-amount negative">' + fmt(byCategory[cat].expense) + '</span></div>';
+                }
             }
-            document.getElementById("projects-body").innerHTML = html || "<tr><td colspan='5'>No hay proyectos</td></tr>";
+            html += '<div class="pl-row total"><span>Total Gastos</span><span class="pl-amount negative">' + fmt(expenses) + '</span></div>';
+            html += '</div>';
+
+            // Net Result
+            var net = income - expenses;
+            var netCls = net >= 0 ? 'positive' : 'negative';
+            html += '<div class="pl-section">';
+            html += '<div class="pl-row grand-total"><span>RESULTADO NETO</span><span class="pl-amount ' + netCls + '">' + fmt(net) + '</span></div>';
+            html += '</div>';
+
+            document.getElementById('pl-statement').innerHTML = html;
         }
 
-        function syncQonto(){
-            if(!confirm("Sincronizar desde Qonto?")) return;
-            fetch("/api/sync",{method:"POST"}).then(function(r){return r.json();}).then(function(data){
-                console.log("Sync result:", data);
-                var msg = "Qonto: "+(data.qonto_count||0)+" tx\nSincronizadas: "+(data.synced||0)+"\nSaltadas: "+(data.skipped||0);
-                if(data.table_name) msg += "\nTabla: "+data.table_name;
-                if(data.existing_count !== undefined) msg += "\nExistentes: "+data.existing_count;
-                if(data.error) msg += "\n\nError: "+data.error;
-                if(data.errors && data.errors.length > 0) msg += "\n\nErrores:\n"+data.errors.join("\n");
+        function renderProjects() {
+            var byProject = {};
+            var totalIncome = 0;
+
+            projects.forEach(function(p) {
+                byProject[p.id] = {name: p.name, income: 0, expense: 0};
+            });
+
+            // Also add "Sin proyecto" for unassigned
+            byProject['_none'] = {name: 'Sin asignar', income: 0, expense: 0};
+
+            transactions.forEach(function(t) {
+                var amt = parseFloat(t.amount) || 0;
+                var pid = t.project_id || '_none';
+                if (!byProject[pid]) return;
+                if (t.side === 'credit') {
+                    byProject[pid].income += amt;
+                    totalIncome += amt;
+                } else {
+                    byProject[pid].expense += amt;
+                }
+            });
+
+            var projectList = Object.keys(byProject).map(function(id) {
+                var p = byProject[id];
+                p.id = id;
+                p.net = p.income - p.expense;
+                p.margin = p.income > 0 ? (p.net / p.income * 100) : 0;
+                return p;
+            }).filter(function(p) {
+                return p.income > 0 || p.expense > 0;
+            }).sort(function(a, b) {
+                return b.income - a.income;
+            });
+
+            // KPIs
+            document.getElementById('projects-count').textContent = projectList.filter(function(p) { return p.id !== '_none'; }).length;
+            document.getElementById('projects-income').textContent = fmt(totalIncome);
+
+            var avgMargin = 0;
+            if (projectList.length > 0) {
+                avgMargin = projectList.reduce(function(sum, p) { return sum + p.margin; }, 0) / projectList.length;
+            }
+            document.getElementById('projects-margin').textContent = avgMargin.toFixed(1) + '%';
+            document.getElementById('projects-margin').className = 'kpi-value ' + (avgMargin >= 0 ? 'positive' : 'negative');
+
+            // Project cards
+            var html = '';
+            projectList.forEach(function(p) {
+                var barWidth = p.income > 0 ? Math.min(100, (p.net / p.income) * 100 + 50) : 50;
+                var barCls = p.net >= 0 ? 'positive' : 'negative';
+                html += '<div class="project-card">';
+                html += '<div class="project-name">' + p.name + '</div>';
+                html += '<div class="project-stats">';
+                html += '<div class="project-stat"><div class="project-stat-label">Ingresos</div><div class="project-stat-value positive">' + fmt(p.income) + '</div></div>';
+                html += '<div class="project-stat"><div class="project-stat-label">Costos</div><div class="project-stat-value negative">' + fmt(p.expense) + '</div></div>';
+                html += '<div class="project-stat"><div class="project-stat-label">Neto</div><div class="project-stat-value ' + (p.net >= 0 ? 'positive' : 'negative') + '">' + fmt(p.net) + '</div></div>';
+                html += '<div class="project-stat"><div class="project-stat-label">Margen</div><div class="project-stat-value">' + p.margin.toFixed(1) + '%</div></div>';
+                html += '</div>';
+                html += '<div class="project-bar"><div class="project-bar-fill ' + barCls + '" style="width:' + barWidth + '%"></div></div>';
+                html += '</div>';
+            });
+
+            document.getElementById('projects-grid').innerHTML = html || '<div style="padding:40px;text-align:center;color:var(--text-muted);">No hay proyectos con transacciones</div>';
+        }
+
+        // Actions
+        function syncQonto() {
+            if (!confirm('Sincronizar transacciones desde Qonto?')) return;
+            fetch('/api/sync', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {
+                var msg = 'Qonto: ' + (data.qonto_count || 0) + ' transacciones\n';
+                msg += 'Sincronizadas: ' + (data.synced || 0) + '\n';
+                msg += 'Existentes: ' + (data.skipped || 0);
+                if (data.error) msg += '\n\nError: ' + data.error;
                 alert(msg);
                 loadData();
-            }).catch(function(e){
-                alert("Error: "+e.message);
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
             });
         }
 
-        console.log("G4U init");
-        checkEnv();
+        function saveTransaction() {
+            var data = {
+                type: document.getElementById('new-tx-type').value,
+                date: document.getElementById('new-tx-date').value,
+                amount: parseFloat(document.getElementById('new-tx-amount').value) || 0,
+                description: document.getElementById('new-tx-description').value,
+                counterparty: document.getElementById('new-tx-counterparty').value
+            };
+
+            if (!data.amount || !data.date) {
+                alert('Por favor completa monto y fecha');
+                return;
+            }
+
+            fetch('/api/transaction', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('add-transaction');
+                    loadData();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        // Init
+        console.log('G4U Finance Dashboard v2');
+        checkStatus();
         loadData();
     </script>
 </body>

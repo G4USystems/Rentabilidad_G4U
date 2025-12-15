@@ -759,6 +759,35 @@ def api_assign_project():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/transaction", methods=["POST"])
+def api_create_transaction():
+    """Create a manual transaction."""
+    try:
+        data = request.json
+        airtable = Airtable()
+
+        # Generate a unique ID for manual transactions
+        import uuid
+        manual_id = f"MANUAL-{uuid.uuid4().hex[:8].upper()}"
+
+        record = {
+            "Qonto Transaction ID": manual_id,
+            "Type": data.get("type", "Expense"),
+            "Amount": float(data.get("amount", 0)),
+            "Date": data.get("date"),
+            "Description": data.get("description", ""),
+            "Counterparty": data.get("counterparty", "")
+        }
+
+        # Remove empty values
+        record = {k: v for k, v in record.items() if v is not None and v != ""}
+
+        result = airtable.create("Transactions", record)
+        return jsonify({"ok": True, "id": result.get("id")})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
