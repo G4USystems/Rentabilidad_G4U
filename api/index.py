@@ -347,7 +347,7 @@ HTML = """
                 html += "<td>" + name + "</td>";
                 html += "<td class='amount " + cls + "'>" + sign + fmt(t.amount) + "</td>";
                 html += "<td>" + (t.category || "-") + "</td>";
-                html += "<td><select onchange=\"assignProject('" + t.id + "', this.value)\" style='width:120px'>";
+                html += "<td><select onchange='assignProject(this.dataset.id, this.value)' data-id='" + t.id + "' style='width:120px'>";
                 html += "<option value=''>Sin proyecto</option>";
                 for (var j = 0; j < projects.length; j++) {
                     var p = projects[j];
