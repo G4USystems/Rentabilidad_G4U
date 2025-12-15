@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime, date
+from urllib.parse import quote
 from flask import Flask, jsonify, request, render_template_string
 import httpx
 
@@ -33,12 +34,14 @@ class Airtable:
             params["filterByFormula"] = formula
 
         offset = None
+        # URL-encode table name for special characters like & in "P&L Categories"
+        encoded_table = quote(table, safe='')
         while True:
             if offset:
                 params["offset"] = offset
 
             with httpx.Client(timeout=30) as client:
-                r = client.get(f"{self.base_url}/{table}", headers=self.headers, params=params)
+                r = client.get(f"{self.base_url}/{encoded_table}", headers=self.headers, params=params)
                 r.raise_for_status()
                 data = r.json()
 
@@ -52,31 +55,35 @@ class Airtable:
         return records
 
     def create(self, table, fields):
+        encoded_table = quote(table, safe='')
         with httpx.Client(timeout=30) as client:
-            r = client.post(f"{self.base_url}/{table}", headers=self.headers, json={"fields": fields})
+            r = client.post(f"{self.base_url}/{encoded_table}", headers=self.headers, json={"fields": fields})
             r.raise_for_status()
             return r.json()
 
     def create_batch(self, table, records_list):
         """Create up to 10 records at once."""
+        encoded_table = quote(table, safe='')
         with httpx.Client(timeout=30) as client:
             payload = {"records": [{"fields": f} for f in records_list]}
-            r = client.post(f"{self.base_url}/{table}", headers=self.headers, json=payload)
+            r = client.post(f"{self.base_url}/{encoded_table}", headers=self.headers, json=payload)
             r.raise_for_status()
             return r.json()
 
     def update(self, table, record_id, fields):
+        encoded_table = quote(table, safe='')
         with httpx.Client(timeout=30) as client:
-            r = client.patch(f"{self.base_url}/{table}/{record_id}", headers=self.headers, json={"fields": fields})
+            r = client.patch(f"{self.base_url}/{encoded_table}/{record_id}", headers=self.headers, json={"fields": fields})
             r.raise_for_status()
             return r.json()
 
     def delete_batch(self, table, record_ids):
         """Delete up to 10 records at once."""
+        encoded_table = quote(table, safe='')
         with httpx.Client(timeout=30) as client:
             # Airtable expects records[] query params
             params = "&".join([f"records[]={rid}" for rid in record_ids])
-            r = client.delete(f"{self.base_url}/{table}?{params}", headers=self.headers)
+            r = client.delete(f"{self.base_url}/{encoded_table}?{params}", headers=self.headers)
             r.raise_for_status()
             return r.json()
 
