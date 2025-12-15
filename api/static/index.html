@@ -252,8 +252,12 @@
         function syncQonto(){
             if(!confirm("Sincronizar desde Qonto?")) return;
             fetch("/api/sync",{method:"POST"}).then(function(r){return r.json();}).then(function(data){
+                console.log("Sync result:", data);
                 var msg = "Qonto: "+(data.qonto_count||0)+" tx\nSincronizadas: "+(data.synced||0)+"\nSaltadas: "+(data.skipped||0);
-                if(data.error) msg += "\nError: "+data.error;
+                if(data.table_name) msg += "\nTabla: "+data.table_name;
+                if(data.existing_count !== undefined) msg += "\nExistentes: "+data.existing_count;
+                if(data.error) msg += "\n\nError: "+data.error;
+                if(data.errors && data.errors.length > 0) msg += "\n\nErrores:\n"+data.errors.join("\n");
                 alert(msg);
                 loadData();
             }).catch(function(e){
