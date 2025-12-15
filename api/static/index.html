@@ -46,7 +46,7 @@
         <div id="status-bar" class="flex" style="margin-bottom: 20px;">
             <span id="env-status">Verificando...</span>
             <div class="ml-auto">
-                <button class="btn" id="sync-btn">Sincronizar Qonto</button>
+                <button class="btn" onclick="syncQonto()">Sincronizar Qonto</button>
             </div>
         </div>
         <div class="grid" id="kpis">
@@ -249,7 +249,7 @@
             document.getElementById("projects-body").innerHTML = html || "<tr><td colspan='5'>No hay proyectos</td></tr>";
         }
 
-        document.getElementById("sync-btn").onclick = function(){
+        function syncQonto(){
             if(!confirm("Sincronizar desde Qonto?")) return;
             fetch("/api/sync",{method:"POST"}).then(function(r){return r.json();}).then(function(data){
                 var msg = "Qonto: "+(data.qonto_count||0)+" tx\nSincronizadas: "+(data.synced||0)+"\nSaltadas: "+(data.skipped||0);
@@ -259,7 +259,7 @@
             }).catch(function(e){
                 alert("Error: "+e.message);
             });
-        };
+        }
 
         console.log("G4U init");
         checkEnv();
