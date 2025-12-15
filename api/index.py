@@ -551,40 +551,9 @@ def api_sync():
         if not qonto_txs:
             return jsonify({"error": "Qonto returned 0 transactions"})
 
-        # Get all tables from Airtable using metadata API
-        tables_info = []
-        table_name = None
-        first_field = "Name"
-
-        with httpx.Client(timeout=30) as client:
-            r = client.get(
-                f"https://api.airtable.com/v0/meta/bases/{airtable.base_id}/tables",
-                headers=airtable.headers
-            )
-            if r.status_code == 200:
-                for t in r.json().get("tables", []):
-                    tname = t.get("name")
-                    fields = [f.get("name") for f in t.get("fields", [])]
-                    tables_info.append({"name": tname, "fields": fields[:5]})
-                    # Use first table found
-                    if not table_name:
-                        table_name = tname
-                        if fields:
-                            first_field = fields[0]
-
-        if not table_name:
-            return jsonify({
-                "error": "No tables found in Airtable base",
-                "qonto_count": len(qonto_txs)
-            })
-
-        # Get existing records
-        existing = airtable.get_all(table_name)
-        existing_values = set()
-        for r in existing:
-            for v in r.values():
-                if v and isinstance(v, str):
-                    existing_values.add(v)
+        # Get existing records from Transactions table
+        existing = airtable.get_all("Transactions")
+        existing_ids = {r.get("Qonto Transaction ID") for r in existing if r.get("Qonto Transaction ID")}
 
         synced = 0
         skipped = 0
@@ -592,14 +561,24 @@ def api_sync():
 
         for tx in qonto_txs:
             tx_id = tx.get("transaction_id", "")
-            if tx_id in existing_values:
+            if tx_id in existing_ids:
                 skipped += 1
                 continue
 
             try:
-                airtable.create(table_name, {first_field: tx_id})
+                record = {
+                    "Qonto Transaction ID": tx_id,
+                    "Amount": float(tx.get("amount", 0)),
+                    "Description": tx.get("label", ""),
+                    "Counterparty": tx.get("label", ""),
+                    "Type": tx.get("side", ""),
+                    "Date": tx.get("settled_at", "").split("T")[0] if tx.get("settled_at") else None
+                }
+                # Remove None values
+                record = {k: v for k, v in record.items() if v is not None}
+                airtable.create("Transactions", record)
                 synced += 1
-                existing_values.add(tx_id)
+                existing_ids.add(tx_id)
             except Exception as e:
                 errors.append(str(e)[:100])
                 if len(errors) >= 3:
@@ -610,9 +589,6 @@ def api_sync():
             "synced": synced,
             "skipped": skipped,
             "existing_count": len(existing),
-            "table_used": table_name,
-            "field_used": first_field,
-            "tables_found": tables_info,
             "errors": errors if errors else None
         })
     except Exception as e:
