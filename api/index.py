@@ -57,6 +57,14 @@ class Airtable:
             r.raise_for_status()
             return r.json()
 
+    def create_batch(self, table, records_list):
+        """Create up to 10 records at once."""
+        with httpx.Client(timeout=30) as client:
+            payload = {"records": [{"fields": f} for f in records_list]}
+            r = client.post(f"{self.base_url}/{table}", headers=self.headers, json=payload)
+            r.raise_for_status()
+            return r.json()
+
     def update(self, table, record_id, fields):
         with httpx.Client(timeout=30) as client:
             r = client.patch(f"{self.base_url}/{table}/{record_id}", headers=self.headers, json={"fields": fields})
@@ -658,50 +666,55 @@ def api_sync():
         skipped = 0
         errors = []
 
+        # Build all records first
+        records_to_create = []
         for tx in qonto_txs:
             tx_id = tx.get("transaction_id", "")
             if tx_id in existing_ids:
                 skipped += 1
                 continue
 
+            # Build record using discovered field names
+            record = {}
+
+            if id_field:
+                record[id_field] = tx_id
+            if amount_field:
+                record[amount_field] = float(tx.get("amount", 0))
+            if desc_field:
+                record[desc_field] = tx.get("label", "") or tx.get("reference", "") or tx_id
+            if type_field:
+                # Map Qonto's credit/debit to Airtable's Income/Expense
+                side = tx.get("side", "")
+                if side == "credit":
+                    record[type_field] = "Income"
+                elif side == "debit":
+                    record[type_field] = "Expense"
+            if date_field:
+                settled = tx.get("settled_at", "")
+                if settled:
+                    record[date_field] = settled.split("T")[0]
+            if counterparty_field:
+                record[counterparty_field] = tx.get("label", "")
+
+            # If no fields matched, use Name field (exists in every Airtable table)
+            if not record:
+                record["Name"] = f"{tx_id} - {tx.get('label', '')} - {tx.get('amount', 0)}"
+
+            # Remove empty values
+            record = {k: v for k, v in record.items() if v is not None and v != ""}
+            records_to_create.append(record)
+
+        # Batch create in groups of 10 (Airtable limit)
+        for i in range(0, len(records_to_create), 10):
+            batch = records_to_create[i:i+10]
             try:
-                # Build record using discovered field names
-                record = {}
-
-                if id_field:
-                    record[id_field] = tx_id
-                if amount_field:
-                    record[amount_field] = float(tx.get("amount", 0))
-                if desc_field:
-                    record[desc_field] = tx.get("label", "") or tx.get("reference", "") or tx_id
-                if type_field:
-                    # Map Qonto's credit/debit to Airtable's Income/Expense
-                    side = tx.get("side", "")
-                    if side == "credit":
-                        record[type_field] = "Income"
-                    elif side == "debit":
-                        record[type_field] = "Expense"
-                if date_field:
-                    settled = tx.get("settled_at", "")
-                    if settled:
-                        record[date_field] = settled.split("T")[0]
-                if counterparty_field:
-                    record[counterparty_field] = tx.get("label", "")
-
-                # If no fields matched, use Name field (exists in every Airtable table)
-                if not record:
-                    record["Name"] = f"{tx_id} - {tx.get('label', '')} - {tx.get('amount', 0)}"
-
-                # Remove empty values
-                record = {k: v for k, v in record.items() if v is not None and v != ""}
-
-                airtable.create(table_name, record)
-                synced += 1
-                existing_ids.add(tx_id)
+                airtable.create_batch(table_name, batch)
+                synced += len(batch)
             except Exception as e:
                 error_msg = str(e)
                 errors.append(error_msg[:150])
-                if len(errors) >= 5:
+                if len(errors) >= 3:
                     break
 
         return jsonify({

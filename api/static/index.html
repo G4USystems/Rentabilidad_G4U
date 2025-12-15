@@ -192,8 +192,7 @@
                 if(!filter || transactions[i].side === filter) filtered.push(transactions[i]);
             }
             var html = "";
-            var max = Math.min(filtered.length, 100);
-            for(var i=0; i<max; i++){
+            for(var i=0; i<filtered.length; i++){
                 var t = filtered[i];
                 var dateStr = t.settled_at ? t.settled_at.split("T")[0] : "-";
                 var name = t.counterparty_name || t.label || "-";
