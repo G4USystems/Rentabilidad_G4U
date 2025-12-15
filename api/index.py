@@ -524,8 +524,14 @@ def api_data():
                 for r in raw_records:
                     # Try to find amount
                     amt = r.get("Amount") or r.get("amount") or r.get("Monto") or r.get("monto") or 0
-                    # Try to find side/type
-                    side = r.get("Type") or r.get("type") or r.get("Side") or r.get("side") or r.get("Tipo") or ""
+                    # Try to find side/type and map Income/Expense to credit/debit
+                    raw_side = r.get("Type") or r.get("type") or r.get("Side") or r.get("side") or r.get("Tipo") or ""
+                    if raw_side == "Income":
+                        side = "credit"
+                    elif raw_side == "Expense":
+                        side = "debit"
+                    else:
+                        side = raw_side
                     # Try to find label/description
                     label = r.get("Description") or r.get("description") or r.get("Label") or r.get("label") or r.get("Name") or r.get("name") or ""
                     # Try to find date
@@ -669,7 +675,12 @@ def api_sync():
                 if desc_field:
                     record[desc_field] = tx.get("label", "") or tx.get("reference", "") or tx_id
                 if type_field:
-                    record[type_field] = tx.get("side", "")
+                    # Map Qonto's credit/debit to Airtable's Income/Expense
+                    side = tx.get("side", "")
+                    if side == "credit":
+                        record[type_field] = "Income"
+                    elif side == "debit":
+                        record[type_field] = "Expense"
                 if date_field:
                     settled = tx.get("settled_at", "")
                     if settled:
