@@ -441,14 +441,31 @@ HTML = """
                 const r = await fetch('/api/sync', { method: 'POST' });
                 const data = await r.json();
 
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                } else {
-                    alert(`Sincronizado: ${data.synced} transacciones`);
-                    loadData();
+                // Show full response for debugging
+                console.log('Sync response:', data);
+
+                let msg = `Qonto: ${data.qonto_count || 0} transacciones\n`;
+                msg += `Sincronizadas: ${data.synced || 0}\n`;
+                msg += `Saltadas: ${data.skipped || 0}\n`;
+                msg += `En Airtable: ${data.existing_count || 0}\n`;
+
+                if (data.debug_api_status) {
+                    msg += `\nAPI Status: ${data.debug_api_status}`;
                 }
+                if (data.debug_tx_count !== undefined) {
+                    msg += `\nAPI Test: ${data.debug_tx_count} tx`;
+                }
+                if (data.errors && data.errors.length > 0) {
+                    msg += `\n\nErrores:\n${data.errors.join('\n')}`;
+                }
+                if (data.error) {
+                    msg += `\n\nError: ${data.error}`;
+                }
+
+                alert(msg);
+                loadData();
             } catch(e) {
-                alert('Error de conexión');
+                alert('Error de conexión: ' + e.message);
             }
         }
 
