@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rentabilidad G4U</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f0f2f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h3 { font-size: 14px; color: #666; margin-bottom: 8px; }
+        .card .value { font-size: 28px; font-weight: 600; }
+        .card .value.positive { color: #22c55e; }
+        .card .value.negative { color: #ef4444; }
+        .section { background: white; border-radius: 12px; padding: 20px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .section h2 { margin-bottom: 15px; font-size: 18px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; font-size: 13px; color: #666; }
+        .amount { font-family: monospace; font-weight: 500; }
+        .amount.credit { color: #22c55e; }
+        .amount.debit { color: #ef4444; }
+        .btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .btn:hover { background: #2563eb; }
+        select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .status.ok { background: #dcfce7; color: #166534; }
+        .status.error { background: #fee2e2; color: #991b1b; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; background: #e5e7eb; border-radius: 8px; cursor: pointer; }
+        .tab.active { background: #3b82f6; color: white; }
+        .hidden { display: none; }
+        .flex { display: flex; gap: 10px; align-items: center; }
+        .ml-auto { margin-left: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Rentabilidad G4U</h1>
+        <p class="subtitle">Dashboard financiero conectado a Qonto</p>
+        <div id="status-bar" class="flex" style="margin-bottom: 20px;">
+            <span id="env-status">Verificando...</span>
+            <div class="ml-auto">
+                <button class="btn" id="sync-btn">Sincronizar Qonto</button>
+            </div>
+        </div>
+        <div class="grid" id="kpis">
+            <div class="card"><h3>Ingresos</h3><div class="value positive" id="total-income">-</div></div>
+            <div class="card"><h3>Gastos</h3><div class="value negative" id="total-expenses">-</div></div>
+            <div class="card"><h3>Resultado Neto</h3><div class="value" id="net-result">-</div></div>
+            <div class="card"><h3>Margen</h3><div class="value" id="margin">-</div></div>
+        </div>
+        <div class="tabs">
+            <div class="tab active" id="tab-btn-tx">Transacciones</div>
+            <div class="tab" id="tab-btn-cat">Por Categoria</div>
+            <div class="tab" id="tab-btn-proj">Por Proyecto</div>
+        </div>
+        <div id="tab-transactions" class="section">
+            <div class="flex" style="margin-bottom: 15px;">
+                <h2>Transacciones</h2>
+                <div class="ml-auto flex">
+                    <select id="filter-side">
+                        <option value="">Todos</option>
+                        <option value="credit">Ingresos</option>
+                        <option value="debit">Gastos</option>
+                    </select>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Fecha</th><th>Descripcion</th><th>Monto</th><th>Categoria</th></tr>
+                </thead>
+                <tbody id="transactions-body">
+                    <tr><td colspan="4" class="loading">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="tab-categories" class="section hidden">
+            <h2>Desglose por Categoria</h2>
+            <table>
+                <thead>
+                    <tr><th>Categoria</th><th>Ingresos</th><th>Gastos</th><th>Neto</th></tr>
+                </thead>
+                <tbody id="categories-body">
+                    <tr><td colspan="4" class="loading">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="tab-projects" class="section hidden">
+            <h2>Rentabilidad por Proyecto</h2>
+            <table>
+                <thead>
+                    <tr><th>Proyecto</th><th>Ingresos</th><th>Costos</th><th>Margen</th><th>ROI</th></tr>
+                </thead>
+                <tbody id="projects-body">
+                    <tr><td colspan="5" class="loading">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        console.log("G4U v6 loading");
+        var transactions = [];
+        var categories = [];
+        var projects = [];
+
+        function fmt(n) {
+            return new Intl.NumberFormat("es-ES", {style:"currency",currency:"EUR"}).format(n||0);
+        }
+
+        function showTab(name) {
+            document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active");});
+            document.getElementById("tab-transactions").classList.add("hidden");
+            document.getElementById("tab-categories").classList.add("hidden");
+            document.getElementById("tab-projects").classList.add("hidden");
+            document.getElementById("tab-"+name).classList.remove("hidden");
+        }
+
+        document.getElementById("tab-btn-tx").onclick = function(){
+            this.classList.add("active");
+            document.getElementById("tab-btn-cat").classList.remove("active");
+            document.getElementById("tab-btn-proj").classList.remove("active");
+            showTab("transactions");
+        };
+        document.getElementById("tab-btn-cat").onclick = function(){
+            this.classList.add("active");
+            document.getElementById("tab-btn-tx").classList.remove("active");
+            document.getElementById("tab-btn-proj").classList.remove("active");
+            showTab("categories");
+        };
+        document.getElementById("tab-btn-proj").onclick = function(){
+            this.classList.add("active");
+            document.getElementById("tab-btn-tx").classList.remove("active");
+            document.getElementById("tab-btn-cat").classList.remove("active");
+            showTab("projects");
+        };
+
+        function checkEnv() {
+            fetch("/api/status").then(function(r){return r.json();}).then(function(data){
+                var ok = data.airtable && data.qonto;
+                document.getElementById("env-status").innerHTML = ok ? "<span class='status ok'>OK</span>" : "<span class='status error'>Config error</span>";
+            }).catch(function(e){
+                document.getElementById("env-status").innerHTML = "<span class='status error'>Error</span>";
+            });
+        }
+
+        function loadData() {
+            fetch("/api/data").then(function(r){return r.json();}).then(function(data){
+                if(data.error){
+                    document.getElementById("transactions-body").innerHTML = "<tr><td colspan='4' style='color:red'>"+data.error+"</td></tr>";
+                    return;
+                }
+                transactions = data.transactions || [];
+                categories = data.categories || [];
+                projects = data.projects || [];
+                updateKPIs();
+                loadTransactions();
+                loadCategories();
+                loadProjects();
+            }).catch(function(e){
+                console.error(e);
+                document.getElementById("transactions-body").innerHTML = "<tr><td colspan='4' style='color:red'>Error</td></tr>";
+            });
+        }
+
+        function updateKPIs() {
+            var income = 0, expenses = 0;
+            for(var i=0; i<transactions.length; i++){
+                var t = transactions[i];
+                var amt = parseFloat(t.amount) || 0;
+                if(t.side === "credit") income += amt;
+                else expenses += amt;
+            }
+            var net = income - expenses;
+            var margin = income > 0 ? (net / income * 100) : 0;
+            document.getElementById("total-income").textContent = fmt(income);
+            document.getElementById("total-expenses").textContent = fmt(expenses);
+            document.getElementById("net-result").textContent = fmt(net);
+            document.getElementById("net-result").className = "value " + (net >= 0 ? "positive" : "negative");
+            document.getElementById("margin").textContent = margin.toFixed(1) + " pct";
+        }
+
+        function loadTransactions() {
+            var filter = document.getElementById("filter-side").value;
+            var filtered = [];
+            for(var i=0; i<transactions.length; i++){
+                if(!filter || transactions[i].side === filter) filtered.push(transactions[i]);
+            }
+            var html = "";
+            var max = Math.min(filtered.length, 100);
+            for(var i=0; i<max; i++){
+                var t = filtered[i];
+                var dateStr = t.settled_at ? t.settled_at.split("T")[0] : "-";
+                var name = t.counterparty_name || t.label || "-";
+                var sign = t.side === "credit" ? "+" : "-";
+                var cls = t.side === "credit" ? "credit" : "debit";
+                html += "<tr><td>"+dateStr+"</td><td>"+name+"</td><td class='amount "+cls+"'>"+sign+fmt(t.amount)+"</td><td>"+(t.category||"-")+"</td></tr>";
+            }
+            document.getElementById("transactions-body").innerHTML = html || "<tr><td colspan='4'>No hay transacciones</td></tr>";
+        }
+
+        document.getElementById("filter-side").onchange = loadTransactions;
+
+        function loadCategories() {
+            var byCategory = {};
+            for(var i=0; i<transactions.length; i++){
+                var t = transactions[i];
+                var cat = t.category || "Sin categoria";
+                if(!byCategory[cat]) byCategory[cat] = {income:0,expense:0};
+                var amt = parseFloat(t.amount) || 0;
+                if(t.side === "credit") byCategory[cat].income += amt;
+                else byCategory[cat].expense += amt;
+            }
+            var html = "";
+            for(var cat in byCategory){
+                var v = byCategory[cat];
+                var netCls = (v.income - v.expense) >= 0 ? "credit" : "debit";
+                html += "<tr><td>"+cat+"</td><td class='amount credit'>"+fmt(v.income)+"</td><td class='amount debit'>"+fmt(v.expense)+"</td><td class='amount "+netCls+"'>"+fmt(v.income-v.expense)+"</td></tr>";
+            }
+            document.getElementById("categories-body").innerHTML = html || "<tr><td colspan='4'>No hay datos</td></tr>";
+        }
+
+        function loadProjects() {
+            var byProject = {};
+            for(var i=0; i<projects.length; i++){
+                var p = projects[i];
+                byProject[p.id] = {name:p.name,income:0,expense:0};
+            }
+            for(var i=0; i<transactions.length; i++){
+                var t = transactions[i];
+                if(t.project_id && byProject[t.project_id]){
+                    var amt = parseFloat(t.amount) || 0;
+                    if(t.side === "credit") byProject[t.project_id].income += amt;
+                    else byProject[t.project_id].expense += amt;
+                }
+            }
+            var html = "";
+            for(var id in byProject){
+                var p = byProject[id];
+                var margin = p.income > 0 ? ((p.income-p.expense)/p.income*100) : 0;
+                var roi = p.expense > 0 ? ((p.income-p.expense)/p.expense*100) : 0;
+                html += "<tr><td>"+p.name+"</td><td class='amount credit'>"+fmt(p.income)+"</td><td class='amount debit'>"+fmt(p.expense)+"</td><td>"+margin.toFixed(1)+"</td><td>"+roi.toFixed(1)+"</td></tr>";
+            }
+            document.getElementById("projects-body").innerHTML = html || "<tr><td colspan='5'>No hay proyectos</td></tr>";
+        }
+
+        document.getElementById("sync-btn").onclick = function(){
+            if(!confirm("Sincronizar desde Qonto?")) return;
+            fetch("/api/sync",{method:"POST"}).then(function(r){return r.json();}).then(function(data){
+                var msg = "Qonto: "+(data.qonto_count||0)+" tx\nSincronizadas: "+(data.synced||0)+"\nSaltadas: "+(data.skipped||0);
+                if(data.error) msg += "\nError: "+data.error;
+                alert(msg);
+                loadData();
+            }).catch(function(e){
+                alert("Error: "+e.message);
+            });
+        };
+
+        console.log("G4U init");
+        checkEnv();
+        loadData();
+    </script>
+</body>
+</html>
