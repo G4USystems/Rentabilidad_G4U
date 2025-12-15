@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Rentabilidad G4U - Simple P&L Dashboard
 """
@@ -467,7 +468,7 @@ HTML = """
 @app.route("/")
 def index():
     from flask import Response
-    return Response(HTML, mimetype='text/html')
+    return Response(HTML, mimetype='text/html; charset=utf-8')
 
 @app.route("/api/ping")
 def api_ping():
