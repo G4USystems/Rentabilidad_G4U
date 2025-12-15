@@ -273,22 +273,31 @@ HTML = """
 
         // Check environment
         async function checkEnv() {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+
             try {
-                const r = await fetch('/api/status');
+                const r = await fetch('/api/status', { signal: controller.signal });
+                clearTimeout(timeout);
                 const data = await r.json();
                 const allOk = Object.values(data).every(v => v === true || v === 'SET');
                 document.getElementById('env-status').innerHTML = allOk
                     ? '<span class="status ok">Sistema configurado</span>'
                     : '<span class="status error">Faltan variables de entorno</span>';
             } catch(e) {
-                document.getElementById('env-status').innerHTML = '<span class="status error">Error de conexión</span>';
+                clearTimeout(timeout);
+                document.getElementById('env-status').innerHTML = '<span class="status error">Error: ' + e.message + '</span>';
             }
         }
 
         // Load data
         async function loadData() {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+
             try {
-                const r = await fetch('/api/data');
+                const r = await fetch('/api/data', { signal: controller.signal });
+                clearTimeout(timeout);
                 const data = await r.json();
 
                 if (data.error) {
@@ -306,9 +315,10 @@ HTML = """
                 loadCategories();
                 loadProjects();
             } catch(e) {
+                clearTimeout(timeout);
                 console.error(e);
                 document.getElementById('transactions-body').innerHTML =
-                    `<tr><td colspan="5" style="color:red">Error de conexión: ${e.message}</td></tr>`;
+                    `<tr><td colspan="5" style="color:red">Error: ${e.message}</td></tr>`;
             }
         }
 
@@ -477,6 +487,11 @@ HTML = """
 @app.route("/")
 def index():
     return render_template_string(HTML)
+
+@app.route("/api/ping")
+def api_ping():
+    """Simple ping to verify server is running."""
+    return jsonify({"ok": True, "time": datetime.now().isoformat()})
 
 @app.route("/api/status")
 def api_status():
