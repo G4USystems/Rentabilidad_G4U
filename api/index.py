@@ -142,7 +142,7 @@ HTML = """
         .section { background: white; border-radius: 12px; padding: 20px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .section h2 { margin-bottom: 15px; font-size: 18px; }
 
-        table { width: 100%; border-collapse: collapse; }
+        table { width: 100vw; max-width: 100vw; border-collapse: collapse; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; font-weight: 600; font-size: 13px; color: #666; }
 
@@ -324,7 +324,7 @@ HTML = """
             document.getElementById("total-expenses").textContent = fmt(expenses);
             document.getElementById("net-result").textContent = fmt(net);
             document.getElementById("net-result").className = "value " + (net >= 0 ? "positive" : "negative");
-            document.getElementById("margin").textContent = margin.toFixed(1) + "%";
+            document.getElementById("margin").textContent = margin.toFixed(1) + " pct";
         }
 
         function loadTransactions() {
@@ -407,8 +407,8 @@ HTML = """
                 html += "<td>" + p.name + "</td>";
                 html += "<td class='amount credit'>" + fmt(p.income) + "</td>";
                 html += "<td class='amount debit'>" + fmt(p.expense) + "</td>";
-                html += "<td>" + margin.toFixed(1) + "%</td>";
-                html += "<td>" + roi.toFixed(1) + "%</td>";
+                html += "<td>" + margin.toFixed(1) + " pct</td>";
+                html += "<td>" + roi.toFixed(1) + " pct</td>";
                 html += "</tr>";
             }
             document.getElementById("projects-body").innerHTML = html || "<tr><td colspan='5'>No hay proyectos</td></tr>";
