@@ -87,24 +87,15 @@ class Qonto:
                         return ba.get("slug")  # bank_account_id is the slug
         return None
 
-    def get_transactions(self, status="completed"):
+    def get_all_transactions(self, slug):
+        """Fetch all transactions for a given bank account slug."""
         transactions = []
         page = 1
 
-        # Get the bank account slug (required for transactions endpoint)
-        slug = self.get_bank_account_id()
-        if not slug:
-            return []  # Can't fetch without valid slug
-
-        while True:
-            with httpx.Client(timeout=30) as client:
-                params = {"slug": slug, "status": status, "page": page, "per_page": 100}
-
-                r = client.get(
-                    f"{self.base_url}/transactions",
-                    headers=self.headers,
-                    params=params
-                )
+        with httpx.Client(timeout=60) as client:
+            while True:
+                params = {"slug": slug, "status": "completed", "page": page, "per_page": 100}
+                r = client.get(f"{self.base_url}/transactions", headers=self.headers, params=params)
 
                 if r.status_code != 200:
                     break
@@ -118,7 +109,8 @@ class Qonto:
                 transactions.extend(txs)
 
                 meta = data.get("meta", {})
-                if page >= meta.get("total_pages", 1):
+                total_pages = meta.get("total_pages", 1)
+                if page >= total_pages:
                     break
                 page += 1
 
@@ -535,41 +527,21 @@ def api_sync():
     try:
         qonto = Qonto()
         airtable = Airtable()
+        result = {}
 
-        # Debug: Check slug retrieval
+        # Step 1: Get bank account slug
         slug = qonto.get_bank_account_id()
-
-        result = {
-            "debug_slug": slug,
-            "debug_iban": qonto.iban,
-            "debug_org": qonto.org,
-        }
-
         if not slug:
-            result["error"] = "Could not retrieve bank account slug"
-            return jsonify(result)
+            return jsonify({"error": "Could not get bank account slug", "iban": qonto.iban})
 
-        # Debug: Try to fetch transactions directly with verbose output
-        with httpx.Client(timeout=30) as client:
-            params = {"slug": slug, "status": "completed", "page": 1, "per_page": 10}
-            r = client.get(
-                f"{qonto.base_url}/transactions",
-                headers=qonto.headers,
-                params=params
-            )
-            result["debug_api_status"] = r.status_code
-            result["debug_api_url"] = str(r.url)
+        # Step 2: Fetch ALL transactions from Qonto
+        qonto_txs = qonto.get_all_transactions(slug)
+        result["qonto_count"] = len(qonto_txs)
 
-            if r.status_code == 200:
-                data = r.json()
-                result["debug_meta"] = data.get("meta", {})
-                result["debug_tx_count"] = len(data.get("transactions", []))
-            else:
-                result["debug_api_error"] = r.text[:500]
-                result["error"] = f"Qonto API returned {r.status_code}"
-                return jsonify(result)
+        if not qonto_txs:
+            return jsonify({"error": "Qonto returned 0 transactions", "slug": slug})
 
-        # Find the correct table name
+        # Step 3: Find Airtable table and get existing IDs
         table_name = "Transactions"
         for name in ["Transactions", "transactions", "Transacciones"]:
             try:
@@ -579,21 +551,12 @@ def api_sync():
             except:
                 continue
 
-        # Get existing transaction IDs
         existing = airtable.get_all(table_name)
         existing_ids = {t.get("qonto_id") for t in existing if t.get("qonto_id")}
-
-        # Get from Qonto
-        qonto_txs = qonto.get_transactions()
-
-        result["table_name"] = table_name
         result["existing_count"] = len(existing)
-        result["qonto_count"] = len(qonto_txs)
+        result["table_name"] = table_name
 
-        if not qonto_txs:
-            result["error"] = "No transactions returned from Qonto get_transactions()"
-            return jsonify(result)
-
+        # Step 4: Sync new transactions
         synced = 0
         skipped = 0
         errors = []
@@ -605,7 +568,6 @@ def api_sync():
                 continue
 
             try:
-                # Create in Airtable
                 airtable.create(table_name, {
                     "qonto_id": tx_id,
                     "amount": float(tx.get("amount", 0)),
@@ -618,8 +580,8 @@ def api_sync():
                 })
                 synced += 1
             except Exception as e:
-                errors.append(f"{tx_id}: {str(e)}")
-                if len(errors) >= 5:
+                errors.append(str(e)[:100])
+                if len(errors) >= 3:
                     break
 
         result["synced"] = synced
