@@ -292,7 +292,8 @@ HTML = """
                 const data = await r.json();
 
                 if (data.error) {
-                    alert('Error: ' + data.error);
+                    document.getElementById('transactions-body').innerHTML =
+                        `<tr><td colspan="5" style="color:red">${data.error}</td></tr>`;
                     return;
                 }
 
@@ -306,6 +307,8 @@ HTML = """
                 loadProjects();
             } catch(e) {
                 console.error(e);
+                document.getElementById('transactions-body').innerHTML =
+                    `<tr><td colspan="5" style="color:red">Error de conexión: ${e.message}</td></tr>`;
             }
         }
 
@@ -491,14 +494,22 @@ def api_data():
         transactions = []
         categories = []
         projects = []
+        errors = []
 
+        # Try to get transactions
+        tx_found = False
         for table_name in ["Transactions", "transactions", "Transacciones"]:
             try:
                 transactions = airtable.get_all(table_name)
+                tx_found = True
                 break
-            except:
+            except Exception as e:
                 continue
 
+        if not tx_found:
+            errors.append("No se encontró tabla de transacciones. Crea una tabla 'Transactions' en Airtable con campos: qonto_id, amount, currency, side, counterparty_name, label, settled_at, status")
+
+        # Try to get categories
         for table_name in ["Categories", "categories", "Categorias"]:
             try:
                 categories = airtable.get_all(table_name)
@@ -506,12 +517,16 @@ def api_data():
             except:
                 continue
 
+        # Try to get projects
         for table_name in ["Projects", "projects", "Proyectos"]:
             try:
                 projects = airtable.get_all(table_name)
                 break
             except:
                 continue
+
+        if errors:
+            return jsonify({"error": errors[0], "transactions": [], "categories": [], "projects": []})
 
         return jsonify({
             "transactions": transactions,
