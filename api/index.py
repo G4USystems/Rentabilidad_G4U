@@ -73,7 +73,19 @@ class Qonto:
 
     @property
     def headers(self):
+        # Qonto API uses format: organization_slug:secret_key
         return {"Authorization": f"{self.org}:{self.key}"}
+
+    def get_bank_account_id(self):
+        """Get the bank_account_id for the configured IBAN."""
+        with httpx.Client(timeout=30) as client:
+            r = client.get(f"{self.base_url}/organization", headers=self.headers)
+            if r.status_code == 200:
+                org = r.json().get("organization", {})
+                for ba in org.get("bank_accounts", []):
+                    if ba.get("iban") == self.iban:
+                        return ba.get("slug")  # bank_account_id is the slug
+        return None
 
     def get_transactions(self, status="completed"):
         transactions = []
@@ -81,24 +93,29 @@ class Qonto:
 
         while True:
             with httpx.Client(timeout=30) as client:
+                params = {"iban": self.iban, "status": status, "current_page": page, "per_page": 100}
+
                 r = client.get(
                     f"{self.base_url}/transactions",
                     headers=self.headers,
-                    params={"iban": self.iban, "status": status, "current_page": page, "per_page": 100}
+                    params=params
                 )
-                r.raise_for_status()
+
+                if r.status_code != 200:
+                    break
+
                 data = r.json()
+                txs = data.get("transactions", [])
 
-            txs = data.get("transactions", [])
-            if not txs:
-                break
+                if not txs:
+                    break
 
-            transactions.extend(txs)
+                transactions.extend(txs)
 
-            meta = data.get("meta", {})
-            if page >= meta.get("total_pages", 1):
-                break
-            page += 1
+                meta = data.get("meta", {})
+                if page >= meta.get("total_pages", 1):
+                    break
+                page += 1
 
         return transactions
 
@@ -634,22 +651,40 @@ def api_debug_qonto():
                 org = r.json().get("organization", {})
                 bank_accounts = org.get("bank_accounts", [])
                 results["bank_accounts"] = [
-                    {"iban": ba.get("iban"), "name": ba.get("name"), "balance": ba.get("balance")}
+                    {"iban": ba.get("iban"), "slug": ba.get("slug"), "name": ba.get("name"), "balance": ba.get("balance")}
                     for ba in bank_accounts
                 ]
-                results["iban_valid"] = any(ba.get("iban") == qonto.iban for ba in bank_accounts)
 
-                if not results["iban_valid"] and bank_accounts:
+                # Find the matching account
+                matching_account = None
+                for ba in bank_accounts:
+                    if ba.get("iban") == qonto.iban:
+                        matching_account = ba
+                        break
+
+                results["iban_valid"] = matching_account is not None
+                if matching_account:
+                    results["bank_account_slug"] = matching_account.get("slug")
+                elif bank_accounts:
                     results["suggestion"] = f"El IBAN configurado no coincide. IBANs disponibles: {[ba.get('iban') for ba in bank_accounts]}"
             else:
-                results["org_error"] = r.text[:300]
+                results["org_error"] = {"status": r.status_code, "response": r.text[:300]}
 
-            # Get transactions
+            # Get transactions using slug if available
+            slug = qonto.get_bank_account_id()
+            results["using_slug"] = slug
+
             for status in ["completed", "pending"]:
+                params = {"status": status, "per_page": 5}
+                if slug:
+                    params["slug"] = slug
+                else:
+                    params["iban"] = qonto.iban
+
                 r = client.get(
                     f"{qonto.base_url}/transactions",
                     headers=qonto.headers,
-                    params={"iban": qonto.iban, "status": status, "per_page": 5}
+                    params=params
                 )
                 if r.status_code == 200:
                     data = r.json()
