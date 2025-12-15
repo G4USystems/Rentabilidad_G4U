@@ -153,6 +153,7 @@
         .text-sm { font-size: 13px; }
         .mt-4 { margin-top: 16px; }
         .mb-4 { margin-bottom: 16px; }
+        .settings-section.hidden { display: none; }
     </style>
 </head>
 <body>
@@ -350,53 +351,108 @@
                     <h1>Ajustes</h1>
                 </div>
 
-                <!-- Connections Card -->
-                <div class="card mb-4">
-                    <div class="card-header">Conexiones</div>
-                    <div class="card-body">
-                        <p class="mb-4">Estado de las integraciones:</p>
-                        <div style="display:flex;gap:16px;">
-                            <div><strong>Qonto:</strong> <span id="status-qonto">-</span></div>
-                            <div><strong>Airtable:</strong> <span id="status-airtable">-</span></div>
-                        </div>
-                        <div class="mt-4">
-                            <button class="btn btn-outline" onclick="syncQonto()">Sincronizar Qonto</button>
+                <!-- Tabs for Settings sections -->
+                <div class="tabs mb-4">
+                    <div class="tab active" onclick="showSettingsTab('connections', event)">Conexiones</div>
+                    <div class="tab" onclick="showSettingsTab('team', event)">Equipo</div>
+                    <div class="tab" onclick="showSettingsTab('projects', event)">Proyectos</div>
+                    <div class="tab" onclick="showSettingsTab('categories', event)">Categorias</div>
+                    <div class="tab" onclick="showSettingsTab('salaries', event)">Salarios</div>
+                </div>
+
+                <!-- Connections Section -->
+                <div id="settings-connections" class="settings-section">
+                    <div class="card">
+                        <div class="card-header">Conexiones</div>
+                        <div class="card-body">
+                            <p class="mb-4">Estado de las integraciones:</p>
+                            <div style="display:flex;gap:16px;">
+                                <div><strong>Qonto:</strong> <span id="status-qonto">-</span></div>
+                                <div><strong>Airtable:</strong> <span id="status-airtable">-</span></div>
+                            </div>
+                            <div class="mt-4">
+                                <button class="btn btn-outline" onclick="syncQonto()">Sincronizar Qonto</button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Team Members Card -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        Equipo
-                        <button class="btn btn-sm btn-primary" onclick="openModal('add-member')">+ Nuevo Miembro</button>
-                    </div>
-                    <div class="card-body" style="padding:0;">
-                        <table>
-                            <thead>
-                                <tr><th>Nombre</th><th>Rol</th><th style="text-align:right">Salario Mensual</th></tr>
-                            </thead>
-                            <tbody id="team-members-table">
-                                <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                            </tbody>
-                        </table>
+                <!-- Team Members Section -->
+                <div id="settings-team" class="settings-section hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            Equipo
+                            <button class="btn btn-sm btn-primary" onclick="openModal('add-member')">+ Nuevo Miembro</button>
+                        </div>
+                        <div class="card-body" style="padding:0;">
+                            <table>
+                                <thead>
+                                    <tr><th>Nombre</th><th>Rol</th><th style="text-align:right">Salario Mensual</th><th style="width:100px;"></th></tr>
+                                </thead>
+                                <tbody id="team-members-table">
+                                    <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Salary Allocations Card -->
-                <div class="card">
-                    <div class="card-header">
-                        Asignacion de Salarios por Proyecto
-                        <div style="display:flex;gap:12px;align-items:center;">
-                            <select id="allocation-month" onchange="loadSalaryAllocations()" style="width:150px;">
-                            </select>
-                            <button class="btn btn-sm btn-primary" onclick="openModal('add-allocation')">+ Asignar</button>
+                <!-- Projects Section -->
+                <div id="settings-projects" class="settings-section hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            Proyectos
+                            <button class="btn btn-sm btn-primary" onclick="openModal('add-project')">+ Nuevo Proyecto</button>
+                        </div>
+                        <div class="card-body" style="padding:0;">
+                            <table>
+                                <thead>
+                                    <tr><th>Nombre</th><th>Cliente</th><th>Estado</th><th style="width:100px;"></th></tr>
+                                </thead>
+                                <tbody id="projects-table">
+                                    <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                    <div class="card-body">
-                        <p class="text-sm text-muted mb-4">Las asignaciones se guardan por mes. Cambiar un mes no afecta meses anteriores.</p>
-                        <div id="allocations-container">
-                            <div class="text-muted" style="text-align:center;padding:20px;">Selecciona un mes y agrega asignaciones</div>
+                </div>
+
+                <!-- Categories Section -->
+                <div id="settings-categories" class="settings-section hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            Categorias
+                            <button class="btn btn-sm btn-primary" onclick="openModal('add-category')">+ Nueva Categoria</button>
+                        </div>
+                        <div class="card-body" style="padding:0;">
+                            <table>
+                                <thead>
+                                    <tr><th>Nombre</th><th>Tipo</th><th style="width:100px;"></th></tr>
+                                </thead>
+                                <tbody id="categories-table">
+                                    <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Salary Allocations Section -->
+                <div id="settings-salaries" class="settings-section hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            Asignacion de Salarios por Proyecto
+                            <div style="display:flex;gap:12px;align-items:center;">
+                                <select id="allocation-month" onchange="loadSalaryAllocations()" style="width:150px;">
+                                </select>
+                                <button class="btn btn-sm btn-primary" onclick="openModal('add-allocation')">+ Asignar</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-sm text-muted mb-4">Las asignaciones se guardan por mes. Cambiar un mes no afecta meses anteriores.</p>
+                            <div id="allocations-container">
+                                <div class="text-muted" style="text-align:center;padding:20px;">Selecciona un mes y agrega asignaciones</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -510,6 +566,155 @@
         </div>
     </div>
 
+    <!-- Edit Team Member Modal -->
+    <div class="modal-overlay" id="modal-edit-member">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Editar Miembro</h3>
+                <button class="modal-close" onclick="closeModal('edit-member')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-member-id">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="edit-member-name" placeholder="Nombre completo">
+                </div>
+                <div class="form-group">
+                    <label>Rol</label>
+                    <input type="text" id="edit-member-role" placeholder="Ej: Desarrollador, Disenador...">
+                </div>
+                <div class="form-group">
+                    <label>Salario Mensual (EUR)</label>
+                    <input type="number" step="0.01" id="edit-member-salary" placeholder="0.00">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('edit-member')">Cancelar</button>
+                <button class="btn btn-primary" onclick="updateTeamMember()">Actualizar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Project Modal -->
+    <div class="modal-overlay" id="modal-add-project">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Nuevo Proyecto</h3>
+                <button class="modal-close" onclick="closeModal('add-project')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre del Proyecto</label>
+                    <input type="text" id="new-project-name" placeholder="Nombre del proyecto">
+                </div>
+                <div class="form-group">
+                    <label>Cliente</label>
+                    <input type="text" id="new-project-client" placeholder="Nombre del cliente">
+                </div>
+                <div class="form-group">
+                    <label>Estado</label>
+                    <select id="new-project-status">
+                        <option value="Active">Activo</option>
+                        <option value="Completed">Completado</option>
+                        <option value="On Hold">En Pausa</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('add-project')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveProject()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Project Modal -->
+    <div class="modal-overlay" id="modal-edit-project">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Editar Proyecto</h3>
+                <button class="modal-close" onclick="closeModal('edit-project')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-project-id">
+                <div class="form-group">
+                    <label>Nombre del Proyecto</label>
+                    <input type="text" id="edit-project-name" placeholder="Nombre del proyecto">
+                </div>
+                <div class="form-group">
+                    <label>Cliente</label>
+                    <input type="text" id="edit-project-client" placeholder="Nombre del cliente">
+                </div>
+                <div class="form-group">
+                    <label>Estado</label>
+                    <select id="edit-project-status">
+                        <option value="Active">Activo</option>
+                        <option value="Completed">Completado</option>
+                        <option value="On Hold">En Pausa</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('edit-project')">Cancelar</button>
+                <button class="btn btn-primary" onclick="updateProject()">Actualizar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Category Modal -->
+    <div class="modal-overlay" id="modal-add-category">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Nueva Categoria</h3>
+                <button class="modal-close" onclick="closeModal('add-category')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre de la Categoria</label>
+                    <input type="text" id="new-category-name" placeholder="Nombre de la categoria">
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="new-category-type">
+                        <option value="Expense">Gasto</option>
+                        <option value="Income">Ingreso</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('add-category')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveCategory()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Category Modal -->
+    <div class="modal-overlay" id="modal-edit-category">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Editar Categoria</h3>
+                <button class="modal-close" onclick="closeModal('edit-category')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-category-id">
+                <div class="form-group">
+                    <label>Nombre de la Categoria</label>
+                    <input type="text" id="edit-category-name" placeholder="Nombre de la categoria">
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="edit-category-type">
+                        <option value="Expense">Gasto</option>
+                        <option value="Income">Ingreso</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('edit-category')">Cancelar</button>
+                <button class="btn btn-primary" onclick="updateCategory()">Actualizar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // State
         var transactions = [];
@@ -542,6 +747,14 @@
             document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
             document.querySelector('.nav-item[data-view="'+name+'"]').classList.add('active');
             document.getElementById('view-'+name).classList.add('active');
+        }
+
+        // Settings tabs
+        function showSettingsTab(name, event) {
+            document.querySelectorAll('#view-settings .tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.settings-section').forEach(function(s) { s.classList.add('hidden'); });
+            if (event && event.target) event.target.classList.add('active');
+            document.getElementById('settings-' + name).classList.remove('hidden');
         }
 
         // Modal
@@ -692,16 +905,26 @@
             filtered.forEach(function(t) {
                 var cls = t.side === 'credit' ? 'positive' : 'negative';
                 var sign = t.side === 'credit' ? '+' : '-';
-                var projectName = '-';
-                if (t.project_id) {
-                    var proj = projects.find(function(p) { return p.id === t.project_id; });
-                    if (proj) projectName = proj.name;
-                }
+
+                // Build category dropdown
+                var catOptions = '<option value="">Sin categoria</option>';
+                categories.forEach(function(c) {
+                    var sel = (t.category === c.name) ? ' selected' : '';
+                    catOptions += '<option value="' + c.name + '"' + sel + '>' + c.name + '</option>';
+                });
+
+                // Build project dropdown
+                var projOptions = '<option value="">Sin proyecto</option>';
+                projects.forEach(function(p) {
+                    var sel = (t.project_id === p.id) ? ' selected' : '';
+                    projOptions += '<option value="' + p.id + '"' + sel + '>' + p.name + '</option>';
+                });
+
                 html += '<tr>';
                 html += '<td>' + formatDate(t.settled_at) + '</td>';
                 html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
-                html += '<td>' + (t.category || '-') + '</td>';
-                html += '<td>' + projectName + '</td>';
+                html += '<td><select onchange="updateTransactionCategory(\'' + t.id + '\', this.value)" style="width:130px;padding:4px 8px;">' + catOptions + '</select></td>';
+                html += '<td><select onchange="updateTransactionProject(\'' + t.id + '\', this.value)" style="width:130px;padding:4px 8px;">' + projOptions + '</select></td>';
                 html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
                 html += '</tr>';
             });
@@ -915,9 +1138,11 @@
                 html += '<td>' + (m.name || '-') + '</td>';
                 html += '<td>' + (m.role || '-') + '</td>';
                 html += '<td style="text-align:right" class="amount">' + fmt(m.salary) + '</td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="editTeamMember(\'' + m.id + '\')">Editar</button> ';
+                html += '<button class="btn btn-sm btn-outline" onclick="deleteTeamMember(\'' + m.id + '\')" style="color:var(--danger);">X</button></td>';
                 html += '</tr>';
             });
-            document.getElementById('team-members-table').innerHTML = html || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">No hay miembros. Crea la tabla "Team Members" en Airtable con campos: Name, Role, Salary</td></tr>';
+            document.getElementById('team-members-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay miembros. Crea la tabla "Team Members" en Airtable con campos: Name, Role, Salary</td></tr>';
         }
 
         function saveTeamMember() {
@@ -949,6 +1174,280 @@
             }).catch(function(e) {
                 alert('Error: ' + e.message);
             });
+        }
+
+        function editTeamMember(id) {
+            var member = teamMembers.find(function(m) { return m.id === id; });
+            if (!member) return;
+            document.getElementById('edit-member-id').value = id;
+            document.getElementById('edit-member-name').value = member.name || '';
+            document.getElementById('edit-member-role').value = member.role || '';
+            document.getElementById('edit-member-salary').value = member.salary || '';
+            openModal('edit-member');
+        }
+
+        function updateTeamMember() {
+            var id = document.getElementById('edit-member-id').value;
+            var data = {
+                name: document.getElementById('edit-member-name').value,
+                role: document.getElementById('edit-member-role').value,
+                salary: parseFloat(document.getElementById('edit-member-salary').value) || 0
+            };
+
+            fetch('/api/team-member/' + id, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('edit-member');
+                    loadTeamMembers();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function deleteTeamMember(id) {
+            if (!confirm('Eliminar este miembro del equipo?')) return;
+            fetch('/api/team-member/' + id, { method: 'DELETE' })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.error) alert('Error: ' + result.error);
+                else loadTeamMembers();
+            }).catch(function(e) { alert('Error: ' + e.message); });
+        }
+
+        // ==================== Projects CRUD ====================
+
+        function loadProjectsSettings() {
+            fetch('/api/projects').then(function(r) { return r.json(); }).then(function(data) {
+                projects = data.projects || [];
+                renderProjectsSettings();
+                populateAllocationSelects();
+            }).catch(function(e) {
+                console.error('Error loading projects:', e);
+            });
+        }
+
+        function renderProjectsSettings() {
+            var html = '';
+            projects.forEach(function(p) {
+                var statusClass = p.status === 'Active' ? 'ok' : (p.status === 'Completed' ? '' : 'pending');
+                html += '<tr>';
+                html += '<td>' + (p.name || '-') + '</td>';
+                html += '<td>' + (p.client || '-') + '</td>';
+                html += '<td><span class="status ' + statusClass + '">' + (p.status || 'Active') + '</span></td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="editProject(\'' + p.id + '\')">Editar</button> ';
+                html += '<button class="btn btn-sm btn-outline" onclick="deleteProject(\'' + p.id + '\')" style="color:var(--danger);">X</button></td>';
+                html += '</tr>';
+            });
+            document.getElementById('projects-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay proyectos. Crea la tabla "Projects" en Airtable con campos: Name, Client, Status</td></tr>';
+        }
+
+        function saveProject() {
+            var data = {
+                name: document.getElementById('new-project-name').value,
+                client: document.getElementById('new-project-client').value,
+                status: document.getElementById('new-project-status').value
+            };
+
+            if (!data.name) {
+                alert('Por favor ingresa un nombre');
+                return;
+            }
+
+            fetch('/api/project', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('add-project');
+                    document.getElementById('new-project-name').value = '';
+                    document.getElementById('new-project-client').value = '';
+                    loadProjectsSettings();
+                    loadData(); // reload main data
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function editProject(id) {
+            var project = projects.find(function(p) { return p.id === id; });
+            if (!project) return;
+            document.getElementById('edit-project-id').value = id;
+            document.getElementById('edit-project-name').value = project.name || '';
+            document.getElementById('edit-project-client').value = project.client || '';
+            document.getElementById('edit-project-status').value = project.status || 'Active';
+            openModal('edit-project');
+        }
+
+        function updateProject() {
+            var id = document.getElementById('edit-project-id').value;
+            var data = {
+                name: document.getElementById('edit-project-name').value,
+                client: document.getElementById('edit-project-client').value,
+                status: document.getElementById('edit-project-status').value
+            };
+
+            fetch('/api/project/' + id, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('edit-project');
+                    loadProjectsSettings();
+                    loadData();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function deleteProject(id) {
+            if (!confirm('Eliminar este proyecto?')) return;
+            fetch('/api/project/' + id, { method: 'DELETE' })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.error) alert('Error: ' + result.error);
+                else { loadProjectsSettings(); loadData(); }
+            }).catch(function(e) { alert('Error: ' + e.message); });
+        }
+
+        // ==================== Categories CRUD ====================
+
+        function loadCategories() {
+            fetch('/api/categories').then(function(r) { return r.json(); }).then(function(data) {
+                categories = data.categories || [];
+                renderCategoriesSettings();
+            }).catch(function(e) {
+                console.error('Error loading categories:', e);
+            });
+        }
+
+        function renderCategoriesSettings() {
+            var html = '';
+            categories.forEach(function(c) {
+                var typeLabel = c.type === 'Income' ? 'Ingreso' : 'Gasto';
+                var typeClass = c.type === 'Income' ? 'ok' : '';
+                html += '<tr>';
+                html += '<td>' + (c.name || '-') + '</td>';
+                html += '<td><span class="status ' + typeClass + '">' + typeLabel + '</span></td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="editCategory(\'' + c.id + '\')">Editar</button> ';
+                html += '<button class="btn btn-sm btn-outline" onclick="deleteCategory(\'' + c.id + '\')" style="color:var(--danger);">X</button></td>';
+                html += '</tr>';
+            });
+            document.getElementById('categories-table').innerHTML = html || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">No hay categorias. Crea la tabla "Categories" en Airtable con campos: Name, Type (Income/Expense)</td></tr>';
+        }
+
+        function saveCategory() {
+            var data = {
+                name: document.getElementById('new-category-name').value,
+                type: document.getElementById('new-category-type').value
+            };
+
+            if (!data.name) {
+                alert('Por favor ingresa un nombre');
+                return;
+            }
+
+            fetch('/api/category', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('add-category');
+                    document.getElementById('new-category-name').value = '';
+                    loadCategories();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function editCategory(id) {
+            var category = categories.find(function(c) { return c.id === id; });
+            if (!category) return;
+            document.getElementById('edit-category-id').value = id;
+            document.getElementById('edit-category-name').value = category.name || '';
+            document.getElementById('edit-category-type').value = category.type || 'Expense';
+            openModal('edit-category');
+        }
+
+        function updateCategory() {
+            var id = document.getElementById('edit-category-id').value;
+            var data = {
+                name: document.getElementById('edit-category-name').value,
+                type: document.getElementById('edit-category-type').value
+            };
+
+            fetch('/api/category/' + id, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('edit-category');
+                    loadCategories();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function deleteCategory(id) {
+            if (!confirm('Eliminar esta categoria?')) return;
+            fetch('/api/category/' + id, { method: 'DELETE' })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.error) alert('Error: ' + result.error);
+                else loadCategories();
+            }).catch(function(e) { alert('Error: ' + e.message); });
+        }
+
+        // ==================== Transaction Category Assignment ====================
+
+        function updateTransactionCategory(txId, category) {
+            fetch('/api/transaction/' + txId, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ category: category })
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) alert('Error: ' + result.error);
+                else {
+                    // Update local data
+                    transactions.forEach(function(t) { if (t.id === txId) t.category = category; });
+                    renderPL();
+                }
+            }).catch(function(e) { alert('Error: ' + e.message); });
+        }
+
+        function updateTransactionProject(txId, projectId) {
+            fetch('/api/transaction/' + txId, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ project_id: projectId })
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) alert('Error: ' + result.error);
+                else {
+                    transactions.forEach(function(t) { if (t.id === txId) t.project_id = projectId; });
+                    renderProjects();
+                }
+            }).catch(function(e) { alert('Error: ' + e.message); });
         }
 
         // ==================== Salary Allocations ====================
@@ -1111,11 +1610,13 @@
         }
 
         // Init
-        console.log('G4U Finance Dashboard v3 - with Salary Allocations');
+        console.log('G4U Finance Dashboard v4 - with Categories & Projects CRUD');
         checkStatus();
         loadData();
         initAllocationMonths();
         loadTeamMembers();
+        loadProjectsSettings();
+        loadCategories();
         loadSalaryAllocations();
     </script>
 </body>

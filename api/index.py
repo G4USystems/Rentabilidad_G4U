@@ -1023,6 +1023,198 @@ def api_create_team_member():
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route("/api/team-member/<member_id>", methods=["PUT"])
+def api_update_team_member(member_id):
+    """Update a team member."""
+    try:
+        data = request.json
+        airtable = Airtable()
+        record = {
+            "Name": data.get("name", ""),
+            "Salary": float(data.get("salary", 0)),
+            "Role": data.get("role", "")
+        }
+        record = {k: v for k, v in record.items() if v is not None}
+        airtable.update("Team Members", member_id, record)
+        return jsonify({"ok": True})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/team-member/<member_id>", methods=["DELETE"])
+def api_delete_team_member(member_id):
+    """Delete a team member."""
+    try:
+        airtable = Airtable()
+        airtable.delete_batch("Team Members", [member_id])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ==================== Projects CRUD ====================
+
+@app.route("/api/projects")
+def api_projects():
+    """Get all projects."""
+    try:
+        airtable = Airtable()
+        try:
+            records = airtable.get_all("Projects")
+            projects = []
+            for r in records:
+                projects.append({
+                    "id": r.get("id"),
+                    "name": r.get("Name") or r.get("name") or "",
+                    "client": r.get("Client") or r.get("client") or "",
+                    "status": r.get("Status") or r.get("status") or "Active"
+                })
+            return jsonify({"projects": projects})
+        except Exception:
+            return jsonify({"projects": [], "note": "Create 'Projects' table in Airtable with Name, Client, Status fields"})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/project", methods=["POST"])
+def api_create_project():
+    """Create a project."""
+    try:
+        data = request.json
+        airtable = Airtable()
+        record = {
+            "Name": data.get("name", ""),
+            "Client": data.get("client", ""),
+            "Status": data.get("status", "Active")
+        }
+        record = {k: v for k, v in record.items() if v}
+        result = airtable.create("Projects", record)
+        return jsonify({"ok": True, "id": result.get("id")})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/project/<project_id>", methods=["PUT"])
+def api_update_project(project_id):
+    """Update a project."""
+    try:
+        data = request.json
+        airtable = Airtable()
+        record = {
+            "Name": data.get("name", ""),
+            "Client": data.get("client", ""),
+            "Status": data.get("status", "")
+        }
+        record = {k: v for k, v in record.items() if v is not None}
+        airtable.update("Projects", project_id, record)
+        return jsonify({"ok": True})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/project/<project_id>", methods=["DELETE"])
+def api_delete_project(project_id):
+    """Delete a project."""
+    try:
+        airtable = Airtable()
+        airtable.delete_batch("Projects", [project_id])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ==================== Categories CRUD ====================
+
+@app.route("/api/categories")
+def api_categories():
+    """Get all categories."""
+    try:
+        airtable = Airtable()
+        try:
+            records = airtable.get_all("Categories")
+            categories = []
+            for r in records:
+                categories.append({
+                    "id": r.get("id"),
+                    "name": r.get("Name") or r.get("name") or "",
+                    "type": r.get("Type") or r.get("type") or "Expense",  # Income or Expense
+                    "parent": r.get("Parent") or r.get("parent") or ""
+                })
+            return jsonify({"categories": categories})
+        except Exception:
+            return jsonify({"categories": [], "note": "Create 'Categories' table in Airtable with Name, Type (Income/Expense), Parent fields"})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/category", methods=["POST"])
+def api_create_category():
+    """Create a category."""
+    try:
+        data = request.json
+        airtable = Airtable()
+        record = {
+            "Name": data.get("name", ""),
+            "Type": data.get("type", "Expense"),
+            "Parent": data.get("parent", "")
+        }
+        record = {k: v for k, v in record.items() if v}
+        result = airtable.create("Categories", record)
+        return jsonify({"ok": True, "id": result.get("id")})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/category/<category_id>", methods=["PUT"])
+def api_update_category(category_id):
+    """Update a category."""
+    try:
+        data = request.json
+        airtable = Airtable()
+        record = {
+            "Name": data.get("name", ""),
+            "Type": data.get("type", ""),
+            "Parent": data.get("parent", "")
+        }
+        record = {k: v for k, v in record.items() if v is not None}
+        airtable.update("Categories", category_id, record)
+        return jsonify({"ok": True})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/category/<category_id>", methods=["DELETE"])
+def api_delete_category(category_id):
+    """Delete a category."""
+    try:
+        airtable = Airtable()
+        airtable.delete_batch("Categories", [category_id])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ==================== Transaction Updates ====================
+
+@app.route("/api/transaction/<tx_id>", methods=["PUT"])
+def api_update_transaction(tx_id):
+    """Update a transaction (category, project assignment, etc)."""
+    try:
+        data = request.json
+        airtable = Airtable()
+
+        record = {}
+        if "category" in data:
+            record["Category"] = data["category"]
+        if "project_id" in data:
+            record["Project"] = data["project_id"]
+        if "description" in data:
+            record["Description"] = data["description"]
+
+        if record:
+            airtable.update("Transactions", tx_id, record)
+        return jsonify({"ok": True})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route("/api/salary-allocations")
 def api_salary_allocations():
     """Get salary allocations. Optional ?month=YYYY-MM parameter."""
