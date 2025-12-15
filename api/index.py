@@ -98,7 +98,7 @@ class Qonto:
 
         while True:
             with httpx.Client(timeout=30) as client:
-                params = {"slug": slug, "status": status, "current_page": page, "per_page": 100}
+                params = {"slug": slug, "status": status, "page": page, "per_page": 100}
 
                 r = client.get(
                     f"{self.base_url}/transactions",
