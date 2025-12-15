@@ -177,7 +177,7 @@ HTML = """
         <p class="subtitle">Dashboard financiero conectado a Qonto</p>
 
         <div id="status-bar" class="flex" style="margin-bottom: 20px;">
-            <span id="env-status">Verificando configuración...</span>
+            <span id="env-status">Verificando configuracion...</span>
             <div class="ml-auto">
                 <button class="btn" onclick="syncQonto()">Sincronizar Qonto</button>
             </div>
@@ -194,7 +194,7 @@ HTML = """
         <!-- Tabs -->
         <div class="tabs">
             <div class="tab active" onclick="showTab('transactions', event)">Transacciones</div>
-            <div class="tab" onclick="showTab('categories', event)">Por Categoría</div>
+            <div class="tab" onclick="showTab('categories', event)">Por Categoria</div>
             <div class="tab" onclick="showTab('projects', event)">Por Proyecto</div>
         </div>
 
@@ -214,9 +214,9 @@ HTML = """
                 <thead>
                     <tr>
                         <th>Fecha</th>
-                        <th>Descripción</th>
+                        <th>Descripcion</th>
                         <th>Monto</th>
-                        <th>Categoría</th>
+                        <th>Categoria</th>
                         <th>Proyecto</th>
                     </tr>
                 </thead>
@@ -228,10 +228,10 @@ HTML = """
 
         <!-- Categories Tab -->
         <div id="tab-categories" class="section hidden">
-            <h2>Desglose por Categoría</h2>
+            <h2>Desglose por Categoria</h2>
             <table>
                 <thead>
-                    <tr><th>Categoría</th><th>Ingresos</th><th>Gastos</th><th>Neto</th></tr>
+                    <tr><th>Categoria</th><th>Ingresos</th><th>Gastos</th><th>Neto</th></tr>
                 </thead>
                 <tbody id="categories-body">
                     <tr><td colspan="4" class="loading">Cargando...</td></tr>
@@ -501,7 +501,7 @@ def api_data():
                 continue
 
         if not tx_found:
-            errors.append("No se encontró tabla de transacciones. Crea una tabla 'Transactions' en Airtable con campos: qonto_id, amount, currency, side, counterparty_name, label, settled_at, status")
+            errors.append("No se encontro tabla de transacciones. Crea una tabla 'Transactions' en Airtable con campos: qonto_id, amount, currency, side, counterparty_name, label, settled_at, status")
 
         # Try to get categories
         for table_name in ["Categories", "categories", "Categorias"]:
