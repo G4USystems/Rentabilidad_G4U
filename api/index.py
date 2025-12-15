@@ -193,9 +193,9 @@ HTML = """
 
         <!-- Tabs -->
         <div class="tabs">
-            <div class="tab active" onclick="showTab('transactions')">Transacciones</div>
-            <div class="tab" onclick="showTab('categories')">Por Categoría</div>
-            <div class="tab" onclick="showTab('projects')">Por Proyecto</div>
+            <div class="tab active" onclick="showTab('transactions', event)">Transacciones</div>
+            <div class="tab" onclick="showTab('categories', event)">Por Categoría</div>
+            <div class="tab" onclick="showTab('projects', event)">Por Proyecto</div>
         </div>
 
         <!-- Transactions Tab -->
@@ -254,6 +254,7 @@ HTML = """
     </div>
 
     <script>
+        console.log('G4U Script loading...');
         let transactions = [];
         let categories = [];
         let projects = [];
@@ -264,10 +265,11 @@ HTML = """
         }
 
         // Show tab
-        function showTab(name) {
+        function showTab(name, evt) {
+            console.log('showTab:', name);
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
-            event.target.classList.add('active');
+            if (evt && evt.target) evt.target.classList.add('active');
             document.getElementById('tab-' + name).classList.remove('hidden');
         }
 
@@ -440,6 +442,7 @@ HTML = """
 
         // Sync from Qonto
         async function syncQonto() {
+            console.log('syncQonto called');
             if (!confirm('¿Sincronizar transacciones desde Qonto?')) return;
 
             try {
@@ -475,8 +478,14 @@ HTML = """
         }
 
         // Init
-        checkEnv();
-        loadData();
+        console.log('G4U initializing...');
+        try {
+            checkEnv();
+            loadData();
+            console.log('G4U init complete');
+        } catch(e) {
+            console.error('G4U init error:', e);
+        }
     </script>
 </body>
 </html>
