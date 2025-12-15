@@ -542,66 +542,24 @@ def api_sync():
         qonto = Qonto()
         airtable = Airtable()
 
-        # Get bank account slug
+        # Get transactions from Qonto
         slug = qonto.get_bank_account_id()
         if not slug:
             return jsonify({"error": "Could not get bank account slug"})
 
-        # Fetch transactions from Qonto
         qonto_txs = qonto.get_all_transactions(slug)
         if not qonto_txs:
             return jsonify({"error": "Qonto returned 0 transactions"})
 
-        # Get Airtable schema using metadata API
-        table_name = None
-        table_fields = {}
-        with httpx.Client(timeout=30) as client:
-            r = client.get(
-                f"https://api.airtable.com/v0/meta/bases/{airtable.base_id}/tables",
-                headers=airtable.headers
-            )
-            if r.status_code == 200:
-                tables = r.json().get("tables", [])
-                for t in tables:
-                    if t.get("name", "").lower() in ["transactions", "transacciones"]:
-                        table_name = t.get("name")
-                        for f in t.get("fields", []):
-                            table_fields[f.get("name")] = f.get("type")
-                        break
+        # Get existing from Airtable
+        table_name = "Transactions"
+        existing = []
+        try:
+            existing = airtable.get_all(table_name)
+        except:
+            pass
 
-        if not table_name:
-            return jsonify({
-                "error": "No se encontro tabla 'Transactions'. Crea una en Airtable.",
-                "qonto_count": len(qonto_txs)
-            })
-
-        # Get existing records
-        existing = airtable.get_all(table_name)
-        existing_ids = set()
-        for rec in existing:
-            for key in rec.keys():
-                if key != "id":
-                    existing_ids.add(str(rec.get(key)))
-
-        # Map Qonto fields to Airtable fields
-        field_map = {}
-        for airtable_field, field_type in table_fields.items():
-            lower = airtable_field.lower()
-            if lower in ["name", "qonto_id", "transaction_id", "id"]:
-                field_map["id"] = airtable_field
-            elif lower in ["amount", "monto", "importe"]:
-                field_map["amount"] = airtable_field
-            elif lower in ["side", "tipo", "type"]:
-                field_map["side"] = airtable_field
-            elif lower in ["label", "descripcion", "description", "counterparty", "counterparty_name"]:
-                field_map["label"] = airtable_field
-            elif lower in ["settled_at", "fecha", "date"]:
-                field_map["date"] = airtable_field
-            elif lower in ["currency", "moneda"]:
-                field_map["currency"] = airtable_field
-
-        if "id" not in field_map:
-            field_map["id"] = list(table_fields.keys())[0] if table_fields else "Name"
+        existing_names = {str(r.get("Name", "")) for r in existing}
 
         synced = 0
         skipped = 0
@@ -609,26 +567,14 @@ def api_sync():
 
         for tx in qonto_txs:
             tx_id = tx.get("transaction_id", "")
-            if tx_id in existing_ids:
+            if tx_id in existing_names:
                 skipped += 1
                 continue
 
-            record = {field_map["id"]: tx_id}
-            if "amount" in field_map:
-                record[field_map["amount"]] = float(tx.get("amount", 0))
-            if "side" in field_map:
-                record[field_map["side"]] = tx.get("side", "")
-            if "label" in field_map:
-                record[field_map["label"]] = tx.get("label", "")
-            if "date" in field_map:
-                record[field_map["date"]] = tx.get("settled_at", "")
-            if "currency" in field_map:
-                record[field_map["currency"]] = tx.get("currency", "EUR")
-
             try:
-                airtable.create(table_name, record)
+                airtable.create(table_name, {"Name": tx_id})
                 synced += 1
-                existing_ids.add(tx_id)
+                existing_names.add(tx_id)
             except Exception as e:
                 errors.append(str(e)[:100])
                 if len(errors) >= 3:
@@ -639,9 +585,6 @@ def api_sync():
             "synced": synced,
             "skipped": skipped,
             "existing_count": len(existing),
-            "table_name": table_name,
-            "table_fields": list(table_fields.keys()),
-            "field_map": field_map,
             "errors": errors if errors else None
         })
     except Exception as e:
