@@ -613,6 +613,20 @@ def api_assign_project():
 def health():
     return jsonify({"status": "ok"})
 
+@app.route("/api/airtable-schema")
+def api_airtable_schema():
+    """Return raw Airtable schema."""
+    try:
+        airtable = Airtable()
+        with httpx.Client(timeout=30) as client:
+            r = client.get(
+                f"https://api.airtable.com/v0/meta/bases/{airtable.base_id}/tables",
+                headers=airtable.headers
+            )
+            return jsonify({"status": r.status_code, "data": r.json() if r.status_code == 200 else r.text})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 @app.route("/api/debug")
 def api_debug():
     """Debug endpoint to check all connections."""
