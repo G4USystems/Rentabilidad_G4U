@@ -254,238 +254,208 @@ HTML = """
     </div>
 
     <script>
-        console.log('G4U Script loading...');
-        let transactions = [];
-        let categories = [];
-        let projects = [];
+        console.log("G4U Script loading...");
+        var transactions = [];
+        var categories = [];
+        var projects = [];
 
-        // Format currency
         function fmt(n) {
-            return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n || 0);
+            return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n || 0);
         }
 
-        // Show tab
         function showTab(name, evt) {
-            console.log('showTab:', name);
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
-            if (evt && evt.target) evt.target.classList.add('active');
-            document.getElementById('tab-' + name).classList.remove('hidden');
+            console.log("showTab:", name);
+            var tabs = document.querySelectorAll(".tab");
+            for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove("active"); }
+            var panels = document.querySelectorAll("[id^=tab-]");
+            for (var i = 0; i < panels.length; i++) { panels[i].classList.add("hidden"); }
+            if (evt && evt.target) { evt.target.classList.add("active"); }
+            document.getElementById("tab-" + name).classList.remove("hidden");
         }
 
-        // Check environment
-        async function checkEnv() {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000);
-
-            try {
-                const r = await fetch('/api/status', { signal: controller.signal });
-                clearTimeout(timeout);
-                const data = await r.json();
-                const allOk = Object.values(data).every(v => v === true || v === 'SET');
-                document.getElementById('env-status').innerHTML = allOk
-                    ? '<span class="status ok">Sistema configurado</span>'
-                    : '<span class="status error">Faltan variables de entorno</span>';
-            } catch(e) {
-                clearTimeout(timeout);
-                document.getElementById('env-status').innerHTML = '<span class="status error">Error: ' + e.message + '</span>';
-            }
+        function checkEnv() {
+            fetch("/api/status")
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var ok = data.airtable && data.qonto;
+                    document.getElementById("env-status").innerHTML = ok
+                        ? "<span class='status ok'>Sistema configurado</span>"
+                        : "<span class='status error'>Faltan variables</span>";
+                })
+                .catch(function(e) {
+                    document.getElementById("env-status").innerHTML = "<span class='status error'>Error: " + e.message + "</span>";
+                });
         }
 
-        // Load data
-        async function loadData() {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000);
-
-            try {
-                const r = await fetch('/api/data', { signal: controller.signal });
-                clearTimeout(timeout);
-                const data = await r.json();
-
-                if (data.error) {
-                    document.getElementById('transactions-body').innerHTML =
-                        `<tr><td colspan="5" style="color:red">${data.error}</td></tr>`;
-                    return;
-                }
-
-                transactions = data.transactions || [];
-                categories = data.categories || [];
-                projects = data.projects || [];
-
-                updateKPIs();
-                loadTransactions();
-                loadCategories();
-                loadProjects();
-            } catch(e) {
-                clearTimeout(timeout);
-                console.error(e);
-                document.getElementById('transactions-body').innerHTML =
-                    `<tr><td colspan="5" style="color:red">Error: ${e.message}</td></tr>`;
-            }
+        function loadData() {
+            fetch("/api/data")
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        document.getElementById("transactions-body").innerHTML = "<tr><td colspan='5' style='color:red'>" + data.error + "</td></tr>";
+                        return;
+                    }
+                    transactions = data.transactions || [];
+                    categories = data.categories || [];
+                    projects = data.projects || [];
+                    updateKPIs();
+                    loadTransactions();
+                    loadCategories();
+                    loadProjects();
+                })
+                .catch(function(e) {
+                    console.error(e);
+                    document.getElementById("transactions-body").innerHTML = "<tr><td colspan='5' style='color:red'>Error: " + e.message + "</td></tr>";
+                });
         }
 
-        // Update KPIs
         function updateKPIs() {
-            let income = 0, expenses = 0;
-            transactions.forEach(t => {
-                const amt = parseFloat(t.amount) || 0;
-                if (t.side === 'credit') income += amt;
+            var income = 0, expenses = 0;
+            for (var i = 0; i < transactions.length; i++) {
+                var t = transactions[i];
+                var amt = parseFloat(t.amount) || 0;
+                if (t.side === "credit") income += amt;
                 else expenses += amt;
-            });
-
-            const net = income - expenses;
-            const margin = income > 0 ? (net / income * 100) : 0;
-
-            document.getElementById('total-income').textContent = fmt(income);
-            document.getElementById('total-expenses').textContent = fmt(expenses);
-            document.getElementById('net-result').textContent = fmt(net);
-            document.getElementById('net-result').className = 'value ' + (net >= 0 ? 'positive' : 'negative');
-            document.getElementById('margin').textContent = margin.toFixed(1) + '%';
+            }
+            var net = income - expenses;
+            var margin = income > 0 ? (net / income * 100) : 0;
+            document.getElementById("total-income").textContent = fmt(income);
+            document.getElementById("total-expenses").textContent = fmt(expenses);
+            document.getElementById("net-result").textContent = fmt(net);
+            document.getElementById("net-result").className = "value " + (net >= 0 ? "positive" : "negative");
+            document.getElementById("margin").textContent = margin.toFixed(1) + "%";
         }
 
-        // Load transactions table
         function loadTransactions() {
-            const filter = document.getElementById('filter-side').value;
-            let filtered = transactions;
-            if (filter) filtered = transactions.filter(t => t.side === filter);
-
-            const projectsMap = {};
-            projects.forEach(p => projectsMap[p.id] = p.name);
-
-            const html = filtered.slice(0, 100).map(t => `
-                <tr>
-                    <td>${t.settled_at ? t.settled_at.split('T')[0] : '-'}</td>
-                    <td>${t.counterparty_name || t.label || '-'}</td>
-                    <td class="amount ${t.side}">${t.side === 'credit' ? '+' : '-'}${fmt(t.amount)}</td>
-                    <td>${t.category || '-'}</td>
-                    <td>
-                        <select onchange="assignProject('${t.id}', this.value)" style="width:120px">
-                            <option value="">Sin proyecto</option>
-                            ${projects.map(p => `<option value="${p.id}" ${t.project_id === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}
-                        </select>
-                    </td>
-                </tr>
-            `).join('');
-
-            document.getElementById('transactions-body').innerHTML = html || '<tr><td colspan="5">No hay transacciones</td></tr>';
+            var filter = document.getElementById("filter-side").value;
+            var filtered = [];
+            for (var i = 0; i < transactions.length; i++) {
+                if (!filter || transactions[i].side === filter) {
+                    filtered.push(transactions[i]);
+                }
+            }
+            var html = "";
+            var max = Math.min(filtered.length, 100);
+            for (var i = 0; i < max; i++) {
+                var t = filtered[i];
+                var dateStr = t.settled_at ? t.settled_at.split("T")[0] : "-";
+                var name = t.counterparty_name || t.label || "-";
+                var sign = t.side === "credit" ? "+" : "-";
+                var cls = t.side === "credit" ? "credit" : "debit";
+                html += "<tr>";
+                html += "<td>" + dateStr + "</td>";
+                html += "<td>" + name + "</td>";
+                html += "<td class='amount " + cls + "'>" + sign + fmt(t.amount) + "</td>";
+                html += "<td>" + (t.category || "-") + "</td>";
+                html += "<td><select onchange=\"assignProject('" + t.id + "', this.value)\" style='width:120px'>";
+                html += "<option value=''>Sin proyecto</option>";
+                for (var j = 0; j < projects.length; j++) {
+                    var p = projects[j];
+                    var sel = t.project_id === p.id ? " selected" : "";
+                    html += "<option value='" + p.id + "'" + sel + ">" + p.name + "</option>";
+                }
+                html += "</select></td></tr>";
+            }
+            document.getElementById("transactions-body").innerHTML = html || "<tr><td colspan='5'>No hay transacciones</td></tr>";
         }
 
-        // Load categories breakdown
         function loadCategories() {
-            const byCategory = {};
-            transactions.forEach(t => {
-                const cat = t.category || 'Sin categoría';
+            var byCategory = {};
+            for (var i = 0; i < transactions.length; i++) {
+                var t = transactions[i];
+                var cat = t.category || "Sin categoria";
                 if (!byCategory[cat]) byCategory[cat] = { income: 0, expense: 0 };
-                const amt = parseFloat(t.amount) || 0;
-                if (t.side === 'credit') byCategory[cat].income += amt;
+                var amt = parseFloat(t.amount) || 0;
+                if (t.side === "credit") byCategory[cat].income += amt;
                 else byCategory[cat].expense += amt;
-            });
-
-            const html = Object.entries(byCategory).map(([cat, v]) => `
-                <tr>
-                    <td>${cat}</td>
-                    <td class="amount credit">${fmt(v.income)}</td>
-                    <td class="amount debit">${fmt(v.expense)}</td>
-                    <td class="amount ${v.income - v.expense >= 0 ? 'credit' : 'debit'}">${fmt(v.income - v.expense)}</td>
-                </tr>
-            `).join('');
-
-            document.getElementById('categories-body').innerHTML = html || '<tr><td colspan="4">No hay datos</td></tr>';
+            }
+            var html = "";
+            for (var cat in byCategory) {
+                var v = byCategory[cat];
+                var netCls = (v.income - v.expense) >= 0 ? "credit" : "debit";
+                html += "<tr>";
+                html += "<td>" + cat + "</td>";
+                html += "<td class='amount credit'>" + fmt(v.income) + "</td>";
+                html += "<td class='amount debit'>" + fmt(v.expense) + "</td>";
+                html += "<td class='amount " + netCls + "'>" + fmt(v.income - v.expense) + "</td>";
+                html += "</tr>";
+            }
+            document.getElementById("categories-body").innerHTML = html || "<tr><td colspan='4'>No hay datos</td></tr>";
         }
 
-        // Load projects breakdown
         function loadProjects() {
-            const byProject = {};
-            projects.forEach(p => byProject[p.id] = { name: p.name, income: 0, expense: 0 });
-
-            transactions.forEach(t => {
+            var byProject = {};
+            for (var i = 0; i < projects.length; i++) {
+                var p = projects[i];
+                byProject[p.id] = { name: p.name, income: 0, expense: 0 };
+            }
+            for (var i = 0; i < transactions.length; i++) {
+                var t = transactions[i];
                 if (t.project_id && byProject[t.project_id]) {
-                    const amt = parseFloat(t.amount) || 0;
-                    if (t.side === 'credit') byProject[t.project_id].income += amt;
+                    var amt = parseFloat(t.amount) || 0;
+                    if (t.side === "credit") byProject[t.project_id].income += amt;
                     else byProject[t.project_id].expense += amt;
                 }
-            });
-
-            const html = Object.values(byProject).map(p => {
-                const margin = p.income > 0 ? ((p.income - p.expense) / p.income * 100) : 0;
-                const roi = p.expense > 0 ? ((p.income - p.expense) / p.expense * 100) : 0;
-                return `
-                    <tr>
-                        <td>${p.name}</td>
-                        <td class="amount credit">${fmt(p.income)}</td>
-                        <td class="amount debit">${fmt(p.expense)}</td>
-                        <td>${margin.toFixed(1)}%</td>
-                        <td>${roi.toFixed(1)}%</td>
-                    </tr>
-                `;
-            }).join('');
-
-            document.getElementById('projects-body').innerHTML = html || '<tr><td colspan="5">No hay proyectos</td></tr>';
+            }
+            var html = "";
+            for (var id in byProject) {
+                var p = byProject[id];
+                var margin = p.income > 0 ? ((p.income - p.expense) / p.income * 100) : 0;
+                var roi = p.expense > 0 ? ((p.income - p.expense) / p.expense * 100) : 0;
+                html += "<tr>";
+                html += "<td>" + p.name + "</td>";
+                html += "<td class='amount credit'>" + fmt(p.income) + "</td>";
+                html += "<td class='amount debit'>" + fmt(p.expense) + "</td>";
+                html += "<td>" + margin.toFixed(1) + "%</td>";
+                html += "<td>" + roi.toFixed(1) + "%</td>";
+                html += "</tr>";
+            }
+            document.getElementById("projects-body").innerHTML = html || "<tr><td colspan='5'>No hay proyectos</td></tr>";
         }
 
-        // Assign project to transaction
-        async function assignProject(txId, projectId) {
-            try {
-                await fetch('/api/assign-project', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ transaction_id: txId, project_id: projectId })
-                });
-                // Update local data
-                const tx = transactions.find(t => t.id === txId);
-                if (tx) tx.project_id = projectId;
+        function assignProject(txId, projectId) {
+            fetch("/api/assign-project", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ transaction_id: txId, project_id: projectId })
+            }).then(function() {
+                for (var i = 0; i < transactions.length; i++) {
+                    if (transactions[i].id === txId) {
+                        transactions[i].project_id = projectId;
+                        break;
+                    }
+                }
                 loadProjects();
-            } catch(e) {
-                alert('Error al asignar proyecto');
-            }
+            }).catch(function(e) {
+                alert("Error al asignar proyecto");
+            });
         }
 
-        // Sync from Qonto
-        async function syncQonto() {
-            console.log('syncQonto called');
-            if (!confirm('¿Sincronizar transacciones desde Qonto?')) return;
-
-            try {
-                const r = await fetch('/api/sync', { method: 'POST' });
-                const data = await r.json();
-
-                // Show full response for debugging
-                console.log('Sync response:', data);
-
-                let msg = `Qonto: ${data.qonto_count || 0} transacciones\n`;
-                msg += `Sincronizadas: ${data.synced || 0}\n`;
-                msg += `Saltadas: ${data.skipped || 0}\n`;
-                msg += `En Airtable: ${data.existing_count || 0}\n`;
-
-                if (data.debug_api_status) {
-                    msg += `\nAPI Status: ${data.debug_api_status}`;
-                }
-                if (data.debug_tx_count !== undefined) {
-                    msg += `\nAPI Test: ${data.debug_tx_count} tx`;
-                }
-                if (data.errors && data.errors.length > 0) {
-                    msg += `\n\nErrores:\n${data.errors.join('\n')}`;
-                }
-                if (data.error) {
-                    msg += `\n\nError: ${data.error}`;
-                }
-
-                alert(msg);
-                loadData();
-            } catch(e) {
-                alert('Error de conexión: ' + e.message);
-            }
+        function syncQonto() {
+            console.log("syncQonto called");
+            if (!confirm("Sincronizar transacciones desde Qonto?")) return;
+            fetch("/api/sync", { method: "POST" })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    console.log("Sync response:", data);
+                    var msg = "Qonto: " + (data.qonto_count || 0) + " transacciones\n";
+                    msg += "Sincronizadas: " + (data.synced || 0) + "\n";
+                    msg += "Saltadas: " + (data.skipped || 0) + "\n";
+                    msg += "En Airtable: " + (data.existing_count || 0) + "\n";
+                    if (data.error) msg += "\nError: " + data.error;
+                    if (data.errors && data.errors.length > 0) msg += "\nErrores: " + data.errors.join(", ");
+                    alert(msg);
+                    loadData();
+                })
+                .catch(function(e) {
+                    alert("Error de conexion: " + e.message);
+                });
         }
 
-        // Init
-        console.log('G4U initializing...');
-        try {
-            checkEnv();
-            loadData();
-            console.log('G4U init complete');
-        } catch(e) {
-            console.error('G4U init error:', e);
-        }
+        console.log("G4U initializing...");
+        checkEnv();
+        loadData();
+        console.log("G4U init complete");
     </script>
 </body>
 </html>
