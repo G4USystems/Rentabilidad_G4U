@@ -349,7 +349,9 @@
                 <div class="header">
                     <h1>Ajustes</h1>
                 </div>
-                <div class="card">
+
+                <!-- Connections Card -->
+                <div class="card mb-4">
                     <div class="card-header">Conexiones</div>
                     <div class="card-body">
                         <p class="mb-4">Estado de las integraciones:</p>
@@ -359,6 +361,42 @@
                         </div>
                         <div class="mt-4">
                             <button class="btn btn-outline" onclick="syncQonto()">Sincronizar Qonto</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Team Members Card -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        Equipo
+                        <button class="btn btn-sm btn-primary" onclick="openModal('add-member')">+ Nuevo Miembro</button>
+                    </div>
+                    <div class="card-body" style="padding:0;">
+                        <table>
+                            <thead>
+                                <tr><th>Nombre</th><th>Rol</th><th style="text-align:right">Salario Mensual</th></tr>
+                            </thead>
+                            <tbody id="team-members-table">
+                                <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Salary Allocations Card -->
+                <div class="card">
+                    <div class="card-header">
+                        Asignacion de Salarios por Proyecto
+                        <div style="display:flex;gap:12px;align-items:center;">
+                            <select id="allocation-month" onchange="loadSalaryAllocations()" style="width:150px;">
+                            </select>
+                            <button class="btn btn-sm btn-primary" onclick="openModal('add-allocation')">+ Asignar</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-sm text-muted mb-4">Las asignaciones se guardan por mes. Cambiar un mes no afecta meses anteriores.</p>
+                        <div id="allocations-container">
+                            <div class="text-muted" style="text-align:center;padding:20px;">Selecciona un mes y agrega asignaciones</div>
                         </div>
                     </div>
                 </div>
@@ -407,12 +445,79 @@
         </div>
     </div>
 
+    <!-- Add Team Member Modal -->
+    <div class="modal-overlay" id="modal-add-member">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Nuevo Miembro del Equipo</h3>
+                <button class="modal-close" onclick="closeModal('add-member')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="new-member-name" placeholder="Nombre completo">
+                </div>
+                <div class="form-group">
+                    <label>Rol</label>
+                    <input type="text" id="new-member-role" placeholder="Ej: Desarrollador, Disenador...">
+                </div>
+                <div class="form-group">
+                    <label>Salario Mensual (EUR)</label>
+                    <input type="number" step="0.01" id="new-member-salary" placeholder="0.00">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('add-member')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveTeamMember()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Salary Allocation Modal -->
+    <div class="modal-overlay" id="modal-add-allocation">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Asignar Salario a Proyecto</h3>
+                <button class="modal-close" onclick="closeModal('add-allocation')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Miembro del Equipo</label>
+                    <select id="alloc-member">
+                        <option value="">Seleccionar...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Proyecto</label>
+                    <select id="alloc-project">
+                        <option value="">Seleccionar...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Porcentaje de Dedicacion (%)</label>
+                    <input type="number" step="1" min="0" max="100" id="alloc-percentage" placeholder="100" value="100">
+                </div>
+                <div class="form-group">
+                    <label>Monto Calculado (EUR)</label>
+                    <input type="number" step="0.01" id="alloc-amount" placeholder="0.00" readonly style="background:#f8fafc;">
+                </div>
+                <p class="text-sm text-muted">El monto se calcula automaticamente: Salario x Porcentaje / 100</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('add-allocation')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveSalaryAllocation()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // State
         var transactions = [];
         var categories = [];
         var projects = [];
         var filteredTransactions = [];
+        var teamMembers = [];
+        var salaryAllocations = [];
 
         // Utilities
         function fmt(n) {
@@ -656,16 +761,28 @@
         }
 
         function renderProjects() {
+            // Fetch all salary allocations for project profitability
+            fetch('/api/salary-allocations').then(function(r) { return r.json(); }).then(function(data) {
+                var allAllocations = data.allocations || [];
+                renderProjectsWithAllocations(allAllocations);
+            }).catch(function(e) {
+                console.error('Error fetching allocations for projects:', e);
+                renderProjectsWithAllocations([]);
+            });
+        }
+
+        function renderProjectsWithAllocations(allAllocations) {
             var byProject = {};
             var totalIncome = 0;
 
             projects.forEach(function(p) {
-                byProject[p.id] = {name: p.name, income: 0, expense: 0};
+                byProject[p.id] = {name: p.name, income: 0, expense: 0, salaries: 0};
             });
 
             // Also add "Sin proyecto" for unassigned
-            byProject['_none'] = {name: 'Sin asignar', income: 0, expense: 0};
+            byProject['_none'] = {name: 'Sin asignar', income: 0, expense: 0, salaries: 0};
 
+            // Add transaction costs
             transactions.forEach(function(t) {
                 var amt = parseFloat(t.amount) || 0;
                 var pid = t.project_id || '_none';
@@ -678,14 +795,23 @@
                 }
             });
 
+            // Add salary allocations (all months)
+            allAllocations.forEach(function(a) {
+                var pid = a.project_id;
+                if (byProject[pid]) {
+                    byProject[pid].salaries += a.amount || 0;
+                }
+            });
+
             var projectList = Object.keys(byProject).map(function(id) {
                 var p = byProject[id];
                 p.id = id;
-                p.net = p.income - p.expense;
+                p.totalCosts = p.expense + p.salaries;
+                p.net = p.income - p.totalCosts;
                 p.margin = p.income > 0 ? (p.net / p.income * 100) : 0;
                 return p;
             }).filter(function(p) {
-                return p.income > 0 || p.expense > 0;
+                return p.income > 0 || p.expense > 0 || p.salaries > 0;
             }).sort(function(a, b) {
                 return b.income - a.income;
             });
@@ -710,7 +836,11 @@
                 html += '<div class="project-name">' + p.name + '</div>';
                 html += '<div class="project-stats">';
                 html += '<div class="project-stat"><div class="project-stat-label">Ingresos</div><div class="project-stat-value positive">' + fmt(p.income) + '</div></div>';
-                html += '<div class="project-stat"><div class="project-stat-label">Costos</div><div class="project-stat-value negative">' + fmt(p.expense) + '</div></div>';
+                html += '<div class="project-stat"><div class="project-stat-label">Gastos Directos</div><div class="project-stat-value negative">' + fmt(p.expense) + '</div></div>';
+                html += '<div class="project-stat"><div class="project-stat-label">Salarios</div><div class="project-stat-value negative">' + fmt(p.salaries) + '</div></div>';
+                html += '<div class="project-stat"><div class="project-stat-label">Costo Total</div><div class="project-stat-value negative">' + fmt(p.totalCosts) + '</div></div>';
+                html += '</div>';
+                html += '<div class="project-stats mt-4">';
                 html += '<div class="project-stat"><div class="project-stat-label">Neto</div><div class="project-stat-value ' + (p.net >= 0 ? 'positive' : 'negative') + '">' + fmt(p.net) + '</div></div>';
                 html += '<div class="project-stat"><div class="project-stat-label">Margen</div><div class="project-stat-value">' + p.margin.toFixed(1) + '%</div></div>';
                 html += '</div>';
@@ -766,10 +896,227 @@
             });
         }
 
+        // ==================== Team Members ====================
+
+        function loadTeamMembers() {
+            fetch('/api/team-members').then(function(r) { return r.json(); }).then(function(data) {
+                teamMembers = data.members || [];
+                renderTeamMembers();
+                populateAllocationSelects();
+            }).catch(function(e) {
+                console.error('Error loading team members:', e);
+            });
+        }
+
+        function renderTeamMembers() {
+            var html = '';
+            teamMembers.forEach(function(m) {
+                html += '<tr>';
+                html += '<td>' + (m.name || '-') + '</td>';
+                html += '<td>' + (m.role || '-') + '</td>';
+                html += '<td style="text-align:right" class="amount">' + fmt(m.salary) + '</td>';
+                html += '</tr>';
+            });
+            document.getElementById('team-members-table').innerHTML = html || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">No hay miembros. Crea la tabla "Team Members" en Airtable con campos: Name, Role, Salary</td></tr>';
+        }
+
+        function saveTeamMember() {
+            var data = {
+                name: document.getElementById('new-member-name').value,
+                role: document.getElementById('new-member-role').value,
+                salary: parseFloat(document.getElementById('new-member-salary').value) || 0
+            };
+
+            if (!data.name) {
+                alert('Por favor ingresa un nombre');
+                return;
+            }
+
+            fetch('/api/team-member', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('add-member');
+                    document.getElementById('new-member-name').value = '';
+                    document.getElementById('new-member-role').value = '';
+                    document.getElementById('new-member-salary').value = '';
+                    loadTeamMembers();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        // ==================== Salary Allocations ====================
+
+        function initAllocationMonths() {
+            var select = document.getElementById('allocation-month');
+            var now = new Date();
+            var html = '';
+
+            // Generate last 6 months and next 6 months
+            for (var i = -6; i <= 6; i++) {
+                var d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+                var value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                var label = d.toLocaleString('es-ES', {month: 'long', year: 'numeric'});
+                var selected = i === 0 ? ' selected' : '';
+                html += '<option value="' + value + '"' + selected + '>' + label.charAt(0).toUpperCase() + label.slice(1) + '</option>';
+            }
+            select.innerHTML = html;
+        }
+
+        function loadSalaryAllocations() {
+            var month = document.getElementById('allocation-month').value;
+            if (!month) return;
+
+            fetch('/api/salary-allocations?month=' + month).then(function(r) { return r.json(); }).then(function(data) {
+                salaryAllocations = data.allocations || [];
+                renderSalaryAllocations();
+            }).catch(function(e) {
+                console.error('Error loading allocations:', e);
+            });
+        }
+
+        function renderSalaryAllocations() {
+            var container = document.getElementById('allocations-container');
+            if (salaryAllocations.length === 0) {
+                container.innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">No hay asignaciones para este mes</div>';
+                return;
+            }
+
+            var html = '<table><thead><tr><th>Miembro</th><th>Proyecto</th><th style="text-align:right">%</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>';
+            salaryAllocations.forEach(function(a) {
+                html += '<tr>';
+                html += '<td>' + (a.team_member_name || '-') + '</td>';
+                html += '<td>' + (a.project_name || '-') + '</td>';
+                html += '<td style="text-align:right">' + a.percentage + '%</td>';
+                html += '<td style="text-align:right" class="amount">' + fmt(a.amount) + '</td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="deleteAllocation(\'' + a.id + '\')" style="color:var(--danger);">X</button></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+
+            // Add total
+            var total = salaryAllocations.reduce(function(sum, a) { return sum + (a.amount || 0); }, 0);
+            html += '<div style="padding:12px 16px;background:var(--bg);font-weight:600;display:flex;justify-content:space-between;border-top:1px solid var(--border);">';
+            html += '<span>Total Asignado</span><span class="amount">' + fmt(total) + '</span></div>';
+
+            container.innerHTML = html;
+        }
+
+        function populateAllocationSelects() {
+            var memberSelect = document.getElementById('alloc-member');
+            var projectSelect = document.getElementById('alloc-project');
+
+            // Populate members
+            var memberHtml = '<option value="">Seleccionar miembro...</option>';
+            teamMembers.forEach(function(m) {
+                memberHtml += '<option value="' + m.id + '" data-salary="' + m.salary + '" data-name="' + m.name + '">' + m.name + ' (' + fmt(m.salary) + '/mes)</option>';
+            });
+            memberSelect.innerHTML = memberHtml;
+
+            // Populate projects
+            var projectHtml = '<option value="">Seleccionar proyecto...</option>';
+            projects.forEach(function(p) {
+                projectHtml += '<option value="' + p.id + '" data-name="' + p.name + '">' + p.name + '</option>';
+            });
+            projectSelect.innerHTML = projectHtml;
+        }
+
+        // Calculate amount when member or percentage changes
+        document.addEventListener('change', function(e) {
+            if (e.target.id === 'alloc-member' || e.target.id === 'alloc-percentage') {
+                calculateAllocationAmount();
+            }
+        });
+        document.addEventListener('input', function(e) {
+            if (e.target.id === 'alloc-percentage') {
+                calculateAllocationAmount();
+            }
+        });
+
+        function calculateAllocationAmount() {
+            var memberSelect = document.getElementById('alloc-member');
+            var percentage = parseFloat(document.getElementById('alloc-percentage').value) || 0;
+            var amountInput = document.getElementById('alloc-amount');
+
+            var selectedOption = memberSelect.options[memberSelect.selectedIndex];
+            var salary = parseFloat(selectedOption.getAttribute('data-salary')) || 0;
+
+            var amount = salary * percentage / 100;
+            amountInput.value = amount.toFixed(2);
+        }
+
+        function saveSalaryAllocation() {
+            var month = document.getElementById('allocation-month').value;
+            var memberSelect = document.getElementById('alloc-member');
+            var projectSelect = document.getElementById('alloc-project');
+            var percentage = parseFloat(document.getElementById('alloc-percentage').value) || 0;
+            var amount = parseFloat(document.getElementById('alloc-amount').value) || 0;
+
+            var selectedMember = memberSelect.options[memberSelect.selectedIndex];
+            var selectedProject = projectSelect.options[projectSelect.selectedIndex];
+
+            if (!memberSelect.value || !projectSelect.value) {
+                alert('Por favor selecciona miembro y proyecto');
+                return;
+            }
+
+            var data = {
+                month: month,
+                team_member_id: memberSelect.value,
+                team_member_name: selectedMember.getAttribute('data-name') || '',
+                project_id: projectSelect.value,
+                project_name: selectedProject.getAttribute('data-name') || '',
+                percentage: percentage,
+                amount: amount
+            };
+
+            fetch('/api/salary-allocation', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('add-allocation');
+                    document.getElementById('alloc-percentage').value = '100';
+                    document.getElementById('alloc-amount').value = '';
+                    loadSalaryAllocations();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function deleteAllocation(id) {
+            if (!confirm('Eliminar esta asignacion?')) return;
+
+            fetch('/api/salary-allocation/' + id, {
+                method: 'DELETE'
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    loadSalaryAllocations();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
         // Init
-        console.log('G4U Finance Dashboard v2');
+        console.log('G4U Finance Dashboard v3 - with Salary Allocations');
         checkStatus();
         loadData();
+        initAllocationMonths();
+        loadTeamMembers();
+        loadSalaryAllocations();
     </script>
 </body>
 </html>

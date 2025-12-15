@@ -979,6 +979,178 @@ def api_diagnostics():
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+# ==================== Salary Allocation ====================
+
+@app.route("/api/team-members")
+def api_team_members():
+    """Get all team members."""
+    try:
+        airtable = Airtable()
+        # Try to get Team Members table
+        try:
+            records = airtable.get_all("Team Members")
+            members = []
+            for r in records:
+                members.append({
+                    "id": r.get("id"),
+                    "name": r.get("Name") or r.get("name") or "",
+                    "salary": float(r.get("Salary") or r.get("salary") or r.get("Monthly Salary") or 0),
+                    "role": r.get("Role") or r.get("role") or ""
+                })
+            return jsonify({"members": members})
+        except Exception:
+            # Table doesn't exist, return empty
+            return jsonify({"members": [], "note": "Create 'Team Members' table in Airtable with Name, Salary, Role fields"})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/team-member", methods=["POST"])
+def api_create_team_member():
+    """Create a team member."""
+    try:
+        data = request.json
+        airtable = Airtable()
+        record = {
+            "Name": data.get("name", ""),
+            "Salary": float(data.get("salary", 0)),
+            "Role": data.get("role", "")
+        }
+        record = {k: v for k, v in record.items() if v}
+        result = airtable.create("Team Members", record)
+        return jsonify({"ok": True, "id": result.get("id")})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/salary-allocations")
+def api_salary_allocations():
+    """Get salary allocations. Optional ?month=YYYY-MM parameter."""
+    try:
+        airtable = Airtable()
+        month = request.args.get("month")  # Format: YYYY-MM
+
+        try:
+            records = airtable.get_all("Salary Allocations")
+            allocations = []
+            for r in records:
+                alloc = {
+                    "id": r.get("id"),
+                    "team_member_id": r.get("Team Member ID") or r.get("team_member_id") or "",
+                    "team_member_name": r.get("Team Member Name") or r.get("team_member_name") or "",
+                    "project_id": r.get("Project ID") or r.get("project_id") or "",
+                    "project_name": r.get("Project Name") or r.get("project_name") or "",
+                    "percentage": float(r.get("Percentage") or r.get("percentage") or 0),
+                    "month": r.get("Month") or r.get("month") or "",  # Format: YYYY-MM
+                    "amount": float(r.get("Amount") or r.get("amount") or 0)
+                }
+                # Filter by month if specified
+                if month and alloc["month"] != month:
+                    continue
+                allocations.append(alloc)
+            return jsonify({"allocations": allocations})
+        except Exception:
+            return jsonify({"allocations": [], "note": "Create 'Salary Allocations' table in Airtable"})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/salary-allocation", methods=["POST"])
+def api_save_salary_allocation():
+    """Save or update a salary allocation for a specific month."""
+    try:
+        data = request.json
+        airtable = Airtable()
+
+        month = data.get("month")  # Required: YYYY-MM
+        team_member_id = data.get("team_member_id")
+        team_member_name = data.get("team_member_name", "")
+        project_id = data.get("project_id")
+        project_name = data.get("project_name", "")
+        percentage = float(data.get("percentage", 0))
+        amount = float(data.get("amount", 0))
+
+        if not month or not team_member_id:
+            return jsonify({"error": "month and team_member_id are required"}), 400
+
+        # Check if allocation already exists for this member/project/month
+        existing_id = None
+        try:
+            formula = f"AND({{Team Member ID}}='{team_member_id}', {{Project ID}}='{project_id}', {{Month}}='{month}')"
+            existing = airtable.get_all("Salary Allocations", formula=formula)
+            if existing:
+                existing_id = existing[0].get("id")
+        except Exception:
+            pass
+
+        record = {
+            "Team Member ID": team_member_id,
+            "Team Member Name": team_member_name,
+            "Project ID": project_id,
+            "Project Name": project_name,
+            "Percentage": percentage,
+            "Month": month,
+            "Amount": amount
+        }
+        record = {k: v for k, v in record.items() if v is not None}
+
+        if existing_id:
+            # Update existing allocation
+            result = airtable.update("Salary Allocations", existing_id, record)
+        else:
+            # Create new allocation
+            result = airtable.create("Salary Allocations", record)
+
+        return jsonify({"ok": True, "id": result.get("id") or existing_id})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/salary-allocation/<allocation_id>", methods=["DELETE"])
+def api_delete_salary_allocation(allocation_id):
+    """Delete a salary allocation."""
+    try:
+        airtable = Airtable()
+        airtable.delete_batch("Salary Allocations", [allocation_id])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/project-costs")
+def api_project_costs():
+    """Get project costs including salary allocations for a given month."""
+    try:
+        airtable = Airtable()
+        month = request.args.get("month")  # Optional: YYYY-MM
+
+        # Get salary allocations
+        allocations = []
+        try:
+            records = airtable.get_all("Salary Allocations")
+            for r in records:
+                alloc_month = r.get("Month") or ""
+                if month and alloc_month != month:
+                    continue
+                allocations.append({
+                    "project_id": r.get("Project ID") or "",
+                    "amount": float(r.get("Amount") or 0)
+                })
+        except Exception:
+            pass
+
+        # Aggregate by project
+        by_project = {}
+        for a in allocations:
+            pid = a["project_id"]
+            if pid not in by_project:
+                by_project[pid] = 0
+            by_project[pid] += a["amount"]
+
+        return jsonify({"salary_costs": by_project})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route("/api/cleanup-duplicates", methods=["POST"])
 def api_cleanup_duplicates():
     """Remove duplicate transactions, keeping only the first occurrence of each Qonto Transaction ID."""
