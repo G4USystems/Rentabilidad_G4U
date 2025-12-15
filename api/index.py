@@ -91,9 +91,14 @@ class Qonto:
         transactions = []
         page = 1
 
+        # Get the bank account slug (required for transactions endpoint)
+        slug = self.get_bank_account_id()
+        if not slug:
+            return []  # Can't fetch without valid slug
+
         while True:
             with httpx.Client(timeout=30) as client:
-                params = {"iban": self.iban, "status": status, "current_page": page, "per_page": 100}
+                params = {"slug": slug, "status": status, "current_page": page, "per_page": 100}
 
                 r = client.get(
                     f"{self.base_url}/transactions",
@@ -531,11 +536,24 @@ def api_sync():
         # Get from Qonto
         qonto_txs = qonto.get_transactions()
 
+        result = {
+            "table_name": table_name,
+            "existing_count": len(existing),
+            "qonto_count": len(qonto_txs),
+        }
+
+        if not qonto_txs:
+            result["error"] = "No transactions returned from Qonto"
+            return jsonify(result)
+
         synced = 0
+        skipped = 0
         errors = []
+
         for tx in qonto_txs:
             tx_id = tx.get("transaction_id")
             if tx_id in existing_ids:
+                skipped += 1
                 continue
 
             try:
@@ -552,13 +570,14 @@ def api_sync():
                 })
                 synced += 1
             except Exception as e:
-                errors.append(str(e))
-                if len(errors) >= 3:
+                errors.append(f"{tx_id}: {str(e)}")
+                if len(errors) >= 5:
                     break
 
-        result = {"synced": synced, "total": len(qonto_txs)}
+        result["synced"] = synced
+        result["skipped"] = skipped
         if errors:
-            result["errors"] = errors[:3]
+            result["errors"] = errors
         return jsonify(result)
     except Exception as e:
         import traceback
