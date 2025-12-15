@@ -806,6 +806,92 @@ def api_airtable_schema():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+@app.route("/api/schema-check")
+def api_schema_check():
+    """Check current Airtable schema and return what's missing."""
+    try:
+        airtable = Airtable()
+
+        # Required schema definition
+        required_schema = {
+            "Transactions": {
+                "fields": ["Qonto Transaction ID", "Date", "Amount", "Description", "Counterparty", "Type", "Category", "Project"],
+                "description": "Transacciones de Qonto"
+            },
+            "Team Members": {
+                "fields": ["Name", "Role", "Salary"],
+                "description": "Miembros del equipo con salarios"
+            },
+            "Salary Allocations": {
+                "fields": ["Team Member ID", "Team Member Name", "Project ID", "Project Name", "Percentage", "Month", "Amount"],
+                "description": "Asignacion de salarios a proyectos por mes"
+            },
+            "Projects": {
+                "fields": ["Name", "Client", "Status"],
+                "description": "Proyectos para tracking de rentabilidad"
+            },
+            "Categories": {
+                "fields": ["Name", "Type"],
+                "description": "Categorias de ingresos y gastos"
+            }
+        }
+
+        # Fetch current schema
+        with httpx.Client(timeout=30) as client:
+            r = client.get(
+                f"https://api.airtable.com/v0/meta/bases/{airtable.base_id}/tables",
+                headers=airtable.headers
+            )
+            if r.status_code != 200:
+                return jsonify({"error": "Could not fetch schema", "status": r.status_code})
+
+            current_tables = {t["name"]: t for t in r.json().get("tables", [])}
+
+        # Compare and build instructions
+        results = {
+            "existing_tables": list(current_tables.keys()),
+            "missing_tables": [],
+            "missing_fields": {},
+            "instructions": []
+        }
+
+        for table_name, spec in required_schema.items():
+            if table_name not in current_tables:
+                results["missing_tables"].append(table_name)
+                results["instructions"].append({
+                    "action": "CREATE_TABLE",
+                    "table": table_name,
+                    "fields": spec["fields"],
+                    "description": spec["description"]
+                })
+            else:
+                # Check fields
+                existing_fields = [f["name"] for f in current_tables[table_name].get("fields", [])]
+                missing = [f for f in spec["fields"] if f not in existing_fields]
+                if missing:
+                    results["missing_fields"][table_name] = missing
+                    results["instructions"].append({
+                        "action": "ADD_FIELDS",
+                        "table": table_name,
+                        "fields": missing
+                    })
+
+        # Generate human-readable instructions
+        human_instructions = []
+        for inst in results["instructions"]:
+            if inst["action"] == "CREATE_TABLE":
+                human_instructions.append(f"CREAR TABLA '{inst['table']}' con campos: {', '.join(inst['fields'])}")
+            elif inst["action"] == "ADD_FIELDS":
+                human_instructions.append(f"AGREGAR a '{inst['table']}': {', '.join(inst['fields'])}")
+
+        results["human_instructions"] = human_instructions
+        results["all_good"] = len(results["instructions"]) == 0
+
+        return jsonify(results)
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route("/api/debug")
 def api_debug():
     """Debug endpoint to check all connections."""
