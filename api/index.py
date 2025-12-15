@@ -254,7 +254,8 @@ HTML = """
     </div>
 
     <script>
-        console.log("G4U Script loading...");
+        /* v5 - clean */
+        console.log("G4U Script loading v5...");
         var transactions = [];
         var categories = [];
         var projects = [];
