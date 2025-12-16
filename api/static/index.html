@@ -355,6 +355,7 @@
                 <div class="tabs mb-4">
                     <div class="tab active" onclick="showSettingsTab('connections', event)">Conexiones</div>
                     <div class="tab" onclick="showSettingsTab('team', event)">Equipo</div>
+                    <div class="tab" onclick="showSettingsTab('clients', event)">Clientes</div>
                     <div class="tab" onclick="showSettingsTab('projects', event)">Proyectos</div>
                     <div class="tab" onclick="showSettingsTab('categories', event)">Categorias</div>
                     <div class="tab" onclick="showSettingsTab('salaries', event)">Salarios</div>
@@ -391,6 +392,26 @@
                                 </thead>
                                 <tbody id="team-members-table">
                                     <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Clients Section -->
+                <div id="settings-clients" class="settings-section hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            Clientes
+                            <button class="btn btn-sm btn-primary" onclick="openModal('add-client')">+ Nuevo Cliente</button>
+                        </div>
+                        <div class="card-body" style="padding:0;">
+                            <table>
+                                <thead>
+                                    <tr><th>Nombre</th><th>Contacto</th><th>Email</th><th>Telefono</th><th style="width:100px;"></th></tr>
+                                </thead>
+                                <tbody id="clients-table">
+                                    <tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -609,7 +630,9 @@
                 </div>
                 <div class="form-group">
                     <label>Cliente</label>
-                    <input type="text" id="new-project-client" placeholder="Nombre del cliente">
+                    <select id="new-project-client">
+                        <option value="">Sin cliente</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Estado</label>
@@ -642,7 +665,9 @@
                 </div>
                 <div class="form-group">
                     <label>Cliente</label>
-                    <input type="text" id="edit-project-client" placeholder="Nombre del cliente">
+                    <select id="edit-project-client">
+                        <option value="">Sin cliente</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Estado</label>
@@ -715,11 +740,89 @@
         </div>
     </div>
 
+    <!-- Add Client Modal -->
+    <div class="modal-overlay" id="modal-add-client">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Nuevo Cliente</h3>
+                <button class="modal-close" onclick="closeModal('add-client')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="new-client-name" placeholder="Nombre de la empresa/cliente">
+                </div>
+                <div class="form-group">
+                    <label>Contacto</label>
+                    <input type="text" id="new-client-contact" placeholder="Persona de contacto">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="new-client-email" placeholder="email@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Telefono</label>
+                        <input type="text" id="new-client-phone" placeholder="+34...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notas</label>
+                    <textarea id="new-client-notes" rows="3" placeholder="Notas adicionales..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('add-client')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveClient()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Client Modal -->
+    <div class="modal-overlay" id="modal-edit-client">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Editar Cliente</h3>
+                <button class="modal-close" onclick="closeModal('edit-client')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-client-id">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="edit-client-name" placeholder="Nombre de la empresa/cliente">
+                </div>
+                <div class="form-group">
+                    <label>Contacto</label>
+                    <input type="text" id="edit-client-contact" placeholder="Persona de contacto">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="edit-client-email" placeholder="email@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Telefono</label>
+                        <input type="text" id="edit-client-phone" placeholder="+34...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notas</label>
+                    <textarea id="edit-client-notes" rows="3" placeholder="Notas adicionales..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('edit-client')">Cancelar</button>
+                <button class="btn btn-primary" onclick="updateClient()">Actualizar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // State
         var transactions = [];
         var categories = [];
         var projects = [];
+        var clients = [];
         var filteredTransactions = [];
         var teamMembers = [];
         var salaryAllocations = [];
@@ -1235,16 +1338,22 @@
         function renderProjectsSettings() {
             var html = '';
             projects.forEach(function(p) {
+                // Look up client name from clients array
+                var clientName = '-';
+                if (p.client) {
+                    var client = clients.find(function(c) { return c.id === p.client; });
+                    clientName = client ? client.name : p.client;
+                }
                 var statusClass = p.status === 'Active' ? 'ok' : (p.status === 'Completed' ? '' : 'pending');
                 html += '<tr>';
                 html += '<td>' + (p.name || '-') + '</td>';
-                html += '<td>' + (p.client || '-') + '</td>';
+                html += '<td>' + clientName + '</td>';
                 html += '<td><span class="status ' + statusClass + '">' + (p.status || 'Active') + '</span></td>';
                 html += '<td><button class="btn btn-sm btn-outline" onclick="editProject(\'' + p.id + '\')">Editar</button> ';
                 html += '<button class="btn btn-sm btn-outline" onclick="deleteProject(\'' + p.id + '\')" style="color:var(--danger);">X</button></td>';
                 html += '</tr>';
             });
-            document.getElementById('projects-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay proyectos. Crea la tabla "Projects" en Airtable con campos: Name, Client, Status</td></tr>';
+            document.getElementById('projects-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay proyectos</td></tr>';
         }
 
         function saveProject() {
@@ -1417,6 +1526,137 @@
                 if (result.error) alert('Error: ' + result.error);
                 else loadCategories();
             }).catch(function(e) { alert('Error: ' + e.message); });
+        }
+
+        // ==================== Clients CRUD ====================
+
+        function loadClients() {
+            fetch('/api/clients').then(function(r) { return r.json(); }).then(function(data) {
+                clients = data.clients || [];
+                renderClientsSettings();
+                populateProjectClientSelect();
+            }).catch(function(e) {
+                console.error('Error loading clients:', e);
+            });
+        }
+
+        function renderClientsSettings() {
+            var html = '';
+            clients.forEach(function(c) {
+                html += '<tr>';
+                html += '<td>' + (c.name || '-') + '</td>';
+                html += '<td>' + (c.contact || '-') + '</td>';
+                html += '<td>' + (c.email || '-') + '</td>';
+                html += '<td>' + (c.phone || '-') + '</td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="editClient(\'' + c.id + '\')">Editar</button> ';
+                html += '<button class="btn btn-sm btn-outline" onclick="deleteClient(\'' + c.id + '\')" style="color:var(--danger);">X</button></td>';
+                html += '</tr>';
+            });
+            document.getElementById('clients-table').innerHTML = html || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">No hay clientes</td></tr>';
+        }
+
+        function saveClient() {
+            var data = {
+                name: document.getElementById('new-client-name').value,
+                contact: document.getElementById('new-client-contact').value,
+                email: document.getElementById('new-client-email').value,
+                phone: document.getElementById('new-client-phone').value,
+                notes: document.getElementById('new-client-notes').value
+            };
+
+            if (!data.name) {
+                alert('Por favor ingresa un nombre');
+                return;
+            }
+
+            fetch('/api/client', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('add-client');
+                    document.getElementById('new-client-name').value = '';
+                    document.getElementById('new-client-contact').value = '';
+                    document.getElementById('new-client-email').value = '';
+                    document.getElementById('new-client-phone').value = '';
+                    document.getElementById('new-client-notes').value = '';
+                    loadClients();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function editClient(id) {
+            var client = clients.find(function(c) { return c.id === id; });
+            if (!client) return;
+            document.getElementById('edit-client-id').value = id;
+            document.getElementById('edit-client-name').value = client.name || '';
+            document.getElementById('edit-client-contact').value = client.contact || '';
+            document.getElementById('edit-client-email').value = client.email || '';
+            document.getElementById('edit-client-phone').value = client.phone || '';
+            document.getElementById('edit-client-notes').value = client.notes || '';
+            openModal('edit-client');
+        }
+
+        function updateClient() {
+            var id = document.getElementById('edit-client-id').value;
+            var data = {
+                name: document.getElementById('edit-client-name').value,
+                contact: document.getElementById('edit-client-contact').value,
+                email: document.getElementById('edit-client-email').value,
+                phone: document.getElementById('edit-client-phone').value,
+                notes: document.getElementById('edit-client-notes').value
+            };
+
+            fetch('/api/client/' + id, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    closeModal('edit-client');
+                    loadClients();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function deleteClient(id) {
+            if (!confirm('Eliminar este cliente?')) return;
+            fetch('/api/client/' + id, { method: 'DELETE' })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.error) alert('Error: ' + result.error);
+                else loadClients();
+            }).catch(function(e) { alert('Error: ' + e.message); });
+        }
+
+        function populateProjectClientSelect() {
+            // For add project modal
+            var addSelect = document.getElementById('new-project-client');
+            if (addSelect) {
+                var html = '<option value="">Sin cliente</option>';
+                clients.forEach(function(c) {
+                    html += '<option value="' + c.id + '">' + c.name + '</option>';
+                });
+                addSelect.innerHTML = html;
+            }
+            // For edit project modal
+            var editSelect = document.getElementById('edit-project-client');
+            if (editSelect) {
+                var html = '<option value="">Sin cliente</option>';
+                clients.forEach(function(c) {
+                    html += '<option value="' + c.id + '">' + c.name + '</option>';
+                });
+                editSelect.innerHTML = html;
+            }
         }
 
         // ==================== Transaction Category Assignment ====================
@@ -1610,11 +1850,12 @@
         }
 
         // Init
-        console.log('G4U Finance Dashboard v4 - with Categories & Projects CRUD');
+        console.log('G4U Finance Dashboard v5 - with Clients CRUD');
         checkStatus();
         loadData();
         initAllocationMonths();
         loadTeamMembers();
+        loadClients();
         loadProjectsSettings();
         loadCategories();
         loadSalaryAllocations();
