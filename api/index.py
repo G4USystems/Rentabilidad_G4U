@@ -516,6 +516,7 @@ def api_data():
         transactions = []
         categories = []
         projects = []
+        clients = []
 
         # Step 1: Discover tables from Airtable metadata API
         table_map = {}  # maps purpose -> table name
@@ -535,6 +536,8 @@ def api_data():
                         table_map["categories"] = name
                     elif "project" in name_lower or "proyecto" in name_lower:
                         table_map["projects"] = name
+                    elif "client" in name_lower or "cliente" in name_lower:
+                        table_map["clients"] = name
 
                 # If no transactions table found, use first table
                 if "transactions" not in table_map and tables:
@@ -592,9 +595,29 @@ def api_data():
             try:
                 raw_projects = airtable.get_all(table_map["projects"])
                 for p in raw_projects:
+                    # Handle Client field - could be linked record (array) or text
+                    client_val = p.get("Client") or p.get("client") or ""
+                    if isinstance(client_val, list) and len(client_val) > 0:
+                        client_val = client_val[0]  # Get first linked record ID
                     projects.append({
                         "id": p.get("id"),
-                        "name": p.get("Name") or p.get("name") or p.get("Nombre") or p.get("id")
+                        "name": p.get("Name") or p.get("name") or p.get("Nombre") or p.get("id"),
+                        "client": client_val,
+                        "status": p.get("Status") or p.get("status") or "Active"
+                    })
+            except:
+                pass
+
+        if "clients" in table_map:
+            try:
+                raw_clients = airtable.get_all(table_map["clients"])
+                for c in raw_clients:
+                    clients.append({
+                        "id": c.get("id"),
+                        "name": c.get("Name") or c.get("name") or "",
+                        "contact": c.get("Contact") or c.get("contact") or "",
+                        "email": c.get("Email") or c.get("email") or "",
+                        "phone": c.get("Phone") or c.get("phone") or ""
                     })
             except:
                 pass
@@ -603,6 +626,7 @@ def api_data():
             "transactions": transactions,
             "categories": categories,
             "projects": projects,
+            "clients": clients,
             "tables_found": table_map
         })
     except Exception as e:
@@ -843,6 +867,10 @@ def api_schema_check():
             "Projects": {
                 "fields": ["Name", "Client", "Status"],
                 "description": "Proyectos para tracking de rentabilidad"
+            },
+            "Clients": {
+                "fields": ["Name", "Contact", "Email", "Phone", "Notes"],
+                "description": "Clientes para asociar a proyectos"
             },
             "Categories": {
                 "fields": ["Name", "Type"],
@@ -1162,10 +1190,14 @@ def api_projects():
             records = airtable.get_all("Projects")
             projects = []
             for r in records:
+                # Handle Client as linked record (array) or text
+                client_val = r.get("Client") or r.get("client") or ""
+                if isinstance(client_val, list) and len(client_val) > 0:
+                    client_val = client_val[0]  # Get first linked record ID
                 projects.append({
                     "id": r.get("id"),
                     "name": r.get("Name") or r.get("name") or "",
-                    "client": r.get("Client") or r.get("client") or "",
+                    "client": client_val,
                     "status": r.get("Status") or r.get("status") or "Active"
                 })
             return jsonify({"projects": projects})
@@ -1181,11 +1213,16 @@ def api_create_project():
     try:
         data = request.json
         airtable = Airtable()
+
+        # Handle Client as linked record - needs to be an array
+        client_id = data.get("client", "")
         record = {
             "Name": data.get("name", ""),
-            "Client": data.get("client", ""),
             "Status": data.get("status", "Active")
         }
+        if client_id:
+            record["Client"] = [client_id]  # Linked record expects array
+
         record = {k: v for k, v in record.items() if v}
         result = airtable.create("Projects", record)
         return jsonify({"ok": True, "id": result.get("id")})
@@ -1199,11 +1236,16 @@ def api_update_project(project_id):
     try:
         data = request.json
         airtable = Airtable()
+
         record = {
             "Name": data.get("name", ""),
-            "Client": data.get("client", ""),
             "Status": data.get("status", "")
         }
+        # Handle Client as linked record - needs to be an array
+        if "client" in data:
+            client_id = data.get("client", "")
+            record["Client"] = [client_id] if client_id else []
+
         record = {k: v for k, v in record.items() if v is not None}
         airtable.update("Projects", project_id, record)
         return jsonify({"ok": True})
@@ -1217,6 +1259,82 @@ def api_delete_project(project_id):
     try:
         airtable = Airtable()
         airtable.delete_batch("Projects", [project_id])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ==================== Clients CRUD ====================
+
+@app.route("/api/clients")
+def api_clients():
+    """Get all clients."""
+    try:
+        airtable = Airtable()
+        try:
+            records = airtable.get_all("Clients")
+            clients = []
+            for r in records:
+                clients.append({
+                    "id": r.get("id"),
+                    "name": r.get("Name") or r.get("name") or "",
+                    "contact": r.get("Contact") or r.get("contact") or "",
+                    "email": r.get("Email") or r.get("email") or "",
+                    "phone": r.get("Phone") or r.get("phone") or "",
+                    "notes": r.get("Notes") or r.get("notes") or ""
+                })
+            return jsonify({"clients": clients})
+        except Exception:
+            return jsonify({"clients": [], "note": "Create 'Clients' table in Airtable"})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/client", methods=["POST"])
+def api_create_client():
+    """Create a client."""
+    try:
+        data = request.json
+        airtable = Airtable()
+        record = {
+            "Name": data.get("name", ""),
+            "Contact": data.get("contact", ""),
+            "Email": data.get("email", ""),
+            "Phone": data.get("phone", ""),
+            "Notes": data.get("notes", "")
+        }
+        record = {k: v for k, v in record.items() if v}
+        result = airtable.create("Clients", record)
+        return jsonify({"ok": True, "id": result.get("id")})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/client/<client_id>", methods=["PUT"])
+def api_update_client(client_id):
+    """Update a client."""
+    try:
+        data = request.json
+        airtable = Airtable()
+        record = {
+            "Name": data.get("name", ""),
+            "Contact": data.get("contact", ""),
+            "Email": data.get("email", ""),
+            "Phone": data.get("phone", ""),
+            "Notes": data.get("notes", "")
+        }
+        record = {k: v for k, v in record.items() if v is not None}
+        airtable.update("Clients", client_id, record)
+        return jsonify({"ok": True})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/client/<client_id>", methods=["DELETE"])
+def api_delete_client(client_id):
+    """Delete a client."""
+    try:
+        airtable = Airtable()
+        airtable.delete_batch("Clients", [client_id])
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
