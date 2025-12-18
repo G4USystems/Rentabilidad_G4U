@@ -368,12 +368,19 @@
                         <div class="card-header">Conexiones</div>
                         <div class="card-body">
                             <p class="mb-4">Estado de las integraciones:</p>
-                            <div style="display:flex;gap:16px;">
+                            <div style="display:flex;gap:16px;margin-bottom:16px;">
                                 <div><strong>Qonto:</strong> <span id="status-qonto">-</span></div>
                                 <div><strong>Airtable:</strong> <span id="status-airtable">-</span></div>
                             </div>
-                            <div class="mt-4">
-                                <button class="btn btn-outline" onclick="syncQonto()">Sincronizar Qonto</button>
+                            <div id="qonto-org-info" class="mb-4" style="padding:12px;background:var(--bg);border-radius:8px;display:none;">
+                                <strong>Organizacion:</strong> <span id="qonto-org-name">-</span><br>
+                                <strong>Saldo:</strong> <span id="qonto-balance">-</span>
+                            </div>
+                            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                                <button class="btn btn-primary" onclick="syncQonto()">Sincronizar Transacciones</button>
+                                <button class="btn btn-outline" onclick="syncQontoLabels()">Importar Labels como Categorias</button>
+                                <button class="btn btn-outline" onclick="syncQontoMembers()">Importar Miembros de Qonto</button>
+                                <button class="btn btn-outline" onclick="loadQontoOrganization()">Ver Info Organizacion</button>
                             </div>
                         </div>
                     </div>
@@ -1867,8 +1874,71 @@
             });
         }
 
+        // ==================== Qonto Extended Sync ====================
+
+        function syncQontoLabels() {
+            if (!confirm('Importar etiquetas de Qonto como categorias? (Las existentes no se duplicaran)')) return;
+
+            fetch('/api/qonto/sync-labels', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    var msg = 'Labels en Qonto: ' + data.qonto_labels + '\n';
+                    msg += 'Categorias creadas: ' + data.created + '\n';
+                    msg += 'Ya existian: ' + data.skipped;
+                    alert(msg);
+                    loadCategories();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function syncQontoMembers() {
+            if (!confirm('Importar miembros del equipo desde Qonto? (Los existentes no se duplicaran)')) return;
+
+            fetch('/api/qonto/sync-members', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    var msg = 'Miembros en Qonto: ' + data.qonto_memberships + '\n';
+                    msg += 'Miembros creados: ' + data.created + '\n';
+                    msg += 'Ya existian: ' + data.skipped + '\n\n';
+                    msg += 'Nota: Los salarios se importan en 0, debes actualizarlos manualmente.';
+                    alert(msg);
+                    loadTeamMembers();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function loadQontoOrganization() {
+            fetch('/api/qonto/organization')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    document.getElementById('qonto-org-name').textContent = data.legal_name || data.slug || '-';
+                    var balance = 0;
+                    if (data.bank_accounts && data.bank_accounts.length > 0) {
+                        balance = data.bank_accounts[0].balance || 0;
+                    }
+                    document.getElementById('qonto-balance').textContent = fmt(balance);
+                    document.getElementById('qonto-org-info').style.display = 'block';
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
         // Init
-        console.log('G4U Finance Dashboard v5 - with Clients CRUD');
+        console.log('G4U Finance Dashboard v6 - with Qonto Extended Data');
         checkStatus();
         loadData();
         initAllocationMonths();

@@ -113,7 +113,7 @@ class Qonto:
         return None
 
     def get_all_transactions(self, slug):
-        """Fetch all transactions for a given bank account slug."""
+        """Fetch all transactions for a given bank account slug with extended data."""
         transactions = []
         page = 1
 
@@ -140,6 +140,40 @@ class Qonto:
                 page += 1
 
         return transactions
+
+    def get_labels(self):
+        """Fetch all labels from Qonto."""
+        labels = []
+        with httpx.Client(timeout=30) as client:
+            r = client.get(f"{self.base_url}/labels", headers=self.headers)
+            if r.status_code == 200:
+                labels = r.json().get("labels", [])
+        return labels
+
+    def get_memberships(self):
+        """Fetch all memberships (team members) from Qonto."""
+        memberships = []
+        with httpx.Client(timeout=30) as client:
+            r = client.get(f"{self.base_url}/memberships", headers=self.headers)
+            if r.status_code == 200:
+                memberships = r.json().get("memberships", [])
+        return memberships
+
+    def get_attachment(self, attachment_id):
+        """Get attachment details including download URL."""
+        with httpx.Client(timeout=30) as client:
+            r = client.get(f"{self.base_url}/attachments/{attachment_id}", headers=self.headers)
+            if r.status_code == 200:
+                return r.json().get("attachment", {})
+        return None
+
+    def get_organization(self):
+        """Get organization details including bank accounts."""
+        with httpx.Client(timeout=30) as client:
+            r = client.get(f"{self.base_url}/organization", headers=self.headers)
+            if r.status_code == 200:
+                return r.json().get("organization", {})
+        return None
 
 # ==================== HTML Template ====================
 
@@ -693,6 +727,14 @@ def api_sync():
         type_field = find_field(["Type", "type", "Tipo", "tipo", "Side", "side"])
         date_field = find_field(["Date", "date", "Fecha", "fecha", "settled_at"])
         counterparty_field = find_field(["Counterparty", "counterparty", "Contraparte", "contraparte"])
+        # Extended fields
+        reference_field = find_field(["Reference", "reference", "Referencia", "referencia"])
+        note_field = find_field(["Note", "note", "Nota", "nota", "Notes", "notes"])
+        vat_amount_field = find_field(["VAT Amount", "vat_amount", "IVA", "iva"])
+        vat_rate_field = find_field(["VAT Rate", "vat_rate", "Tipo IVA", "tipo_iva"])
+        attachment_ids_field = find_field(["Attachment IDs", "attachment_ids", "Attachments", "attachments"])
+        label_ids_field = find_field(["Label IDs", "label_ids", "Labels", "labels"])
+        card_digits_field = find_field(["Card Last Digits", "card_last_digits", "Tarjeta", "tarjeta"])
 
         # Get existing records to check for duplicates
         existing = []
@@ -741,6 +783,22 @@ def api_sync():
                     record[date_field] = settled.split("T")[0]
             if counterparty_field:
                 record[counterparty_field] = tx.get("label", "")
+
+            # Extended Qonto fields
+            if reference_field and tx.get("reference"):
+                record[reference_field] = tx.get("reference", "")
+            if note_field and tx.get("note"):
+                record[note_field] = tx.get("note", "")
+            if vat_amount_field and tx.get("vat_amount"):
+                record[vat_amount_field] = float(tx.get("vat_amount", 0))
+            if vat_rate_field and tx.get("vat_rate"):
+                record[vat_rate_field] = float(tx.get("vat_rate", 0))
+            if attachment_ids_field and tx.get("attachment_ids"):
+                record[attachment_ids_field] = ",".join(tx.get("attachment_ids", []))
+            if label_ids_field and tx.get("label_ids"):
+                record[label_ids_field] = ",".join(tx.get("label_ids", []))
+            if card_digits_field and tx.get("card_last_digits"):
+                record[card_digits_field] = tx.get("card_last_digits", "")
 
             # If no fields matched, use Name field (exists in every Airtable table)
             if not record:
@@ -1596,6 +1654,262 @@ def api_cleanup_duplicates():
             "total_duplicates": len(to_delete),
             "remaining": len(to_delete) - deleted,
             "errors": errors if errors else None
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+# ==================== Qonto Extended Data ====================
+
+@app.route("/api/qonto/labels")
+def api_qonto_labels():
+    """Get all labels from Qonto."""
+    try:
+        qonto = Qonto()
+        labels = qonto.get_labels()
+        return jsonify({
+            "labels": [
+                {
+                    "id": l.get("id"),
+                    "name": l.get("name"),
+                    "parent_id": l.get("parent_id")
+                }
+                for l in labels
+            ],
+            "count": len(labels)
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/qonto/sync-labels", methods=["POST"])
+def api_qonto_sync_labels():
+    """Sync Qonto labels to Categories table."""
+    try:
+        qonto = Qonto()
+        airtable = Airtable()
+
+        # Get labels from Qonto
+        qonto_labels = qonto.get_labels()
+        if not qonto_labels:
+            return jsonify({"error": "No labels found in Qonto or API error"})
+
+        # Get existing categories
+        existing = []
+        try:
+            existing = airtable.get_all("Categories")
+        except:
+            pass
+
+        existing_names = {c.get("Name", "").lower() for c in existing}
+
+        # Create new categories from Qonto labels
+        created = 0
+        skipped = 0
+        for label in qonto_labels:
+            name = label.get("name", "")
+            if not name:
+                continue
+
+            if name.lower() in existing_names:
+                skipped += 1
+                continue
+
+            try:
+                airtable.create("Categories", {
+                    "Name": name,
+                    "Type": "Expense"  # Default to expense, user can change
+                })
+                created += 1
+                existing_names.add(name.lower())
+            except Exception as e:
+                pass
+
+        return jsonify({
+            "qonto_labels": len(qonto_labels),
+            "created": created,
+            "skipped": skipped
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/qonto/memberships")
+def api_qonto_memberships():
+    """Get all memberships from Qonto."""
+    try:
+        qonto = Qonto()
+        memberships = qonto.get_memberships()
+        return jsonify({
+            "memberships": [
+                {
+                    "id": m.get("id"),
+                    "first_name": m.get("first_name"),
+                    "last_name": m.get("last_name"),
+                    "email": m.get("email"),
+                    "role": m.get("role")
+                }
+                for m in memberships
+            ],
+            "count": len(memberships)
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/qonto/sync-members", methods=["POST"])
+def api_qonto_sync_members():
+    """Sync Qonto memberships to Team Members table."""
+    try:
+        qonto = Qonto()
+        airtable = Airtable()
+
+        # Get memberships from Qonto
+        memberships = qonto.get_memberships()
+        if not memberships:
+            return jsonify({"error": "No memberships found in Qonto or API error"})
+
+        # Get existing team members
+        existing = []
+        try:
+            existing = airtable.get_all("Team Members")
+        except:
+            pass
+
+        existing_names = {m.get("Name", "").lower() for m in existing}
+
+        # Create new team members from Qonto memberships
+        created = 0
+        skipped = 0
+        for m in memberships:
+            first = m.get("first_name", "")
+            last = m.get("last_name", "")
+            name = f"{first} {last}".strip()
+
+            if not name:
+                continue
+
+            if name.lower() in existing_names:
+                skipped += 1
+                continue
+
+            try:
+                airtable.create("Team Members", {
+                    "Name": name,
+                    "Role": m.get("role", ""),
+                    "Salary": 0  # Default, user must set
+                })
+                created += 1
+                existing_names.add(name.lower())
+            except Exception as e:
+                pass
+
+        return jsonify({
+            "qonto_memberships": len(memberships),
+            "created": created,
+            "skipped": skipped
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/qonto/attachment/<attachment_id>")
+def api_qonto_attachment(attachment_id):
+    """Get attachment details from Qonto."""
+    try:
+        qonto = Qonto()
+        attachment = qonto.get_attachment(attachment_id)
+        if attachment:
+            return jsonify({
+                "id": attachment.get("id"),
+                "filename": attachment.get("file_name"),
+                "file_size": attachment.get("file_size"),
+                "file_type": attachment.get("file_content_type"),
+                "url": attachment.get("url"),
+                "created_at": attachment.get("created_at")
+            })
+        return jsonify({"error": "Attachment not found"}), 404
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/qonto/organization")
+def api_qonto_organization():
+    """Get organization details from Qonto."""
+    try:
+        qonto = Qonto()
+        org = qonto.get_organization()
+        if org:
+            bank_accounts = []
+            for ba in org.get("bank_accounts", []):
+                bank_accounts.append({
+                    "slug": ba.get("slug"),
+                    "iban": ba.get("iban"),
+                    "bic": ba.get("bic"),
+                    "name": ba.get("name"),
+                    "balance": ba.get("balance"),
+                    "balance_cents": ba.get("balance_cents"),
+                    "currency": ba.get("currency")
+                })
+            return jsonify({
+                "slug": org.get("slug"),
+                "legal_name": org.get("legal_name"),
+                "bank_accounts": bank_accounts
+            })
+        return jsonify({"error": "Organization not found"}), 404
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/qonto/transaction-details/<tx_id>")
+def api_qonto_transaction_details(tx_id):
+    """Get extended transaction details from Airtable including Qonto metadata."""
+    try:
+        airtable = Airtable()
+        qonto = Qonto()
+
+        # Get transaction from Airtable
+        records = airtable.get_all("Transactions", formula=f"{{Qonto Transaction ID}}='{tx_id}'")
+        if not records:
+            return jsonify({"error": "Transaction not found"}), 404
+
+        tx = records[0]
+
+        # Get attachment info if available
+        attachments = []
+        attachment_ids = tx.get("Attachment IDs", "") or ""
+        if attachment_ids:
+            for att_id in attachment_ids.split(","):
+                att_id = att_id.strip()
+                if att_id:
+                    att_info = qonto.get_attachment(att_id)
+                    if att_info:
+                        attachments.append({
+                            "id": att_id,
+                            "filename": att_info.get("file_name"),
+                            "url": att_info.get("url"),
+                            "type": att_info.get("file_content_type")
+                        })
+
+        return jsonify({
+            "id": tx.get("id"),
+            "qonto_id": tx.get("Qonto Transaction ID"),
+            "amount": tx.get("Amount"),
+            "type": tx.get("Type"),
+            "date": tx.get("Date"),
+            "description": tx.get("Description"),
+            "counterparty": tx.get("Counterparty"),
+            "reference": tx.get("Reference"),
+            "note": tx.get("Note"),
+            "vat_amount": tx.get("VAT Amount"),
+            "vat_rate": tx.get("VAT Rate"),
+            "label_ids": tx.get("Label IDs"),
+            "category": tx.get("Category"),
+            "project": tx.get("Project"),
+            "client": tx.get("Client"),
+            "attachments": attachments,
+            "attachment_required": tx.get("Attachment Required"),
+            "attachment_lost": tx.get("Attachment Lost")
         })
     except Exception as e:
         import traceback
