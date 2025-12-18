@@ -595,10 +595,8 @@ def api_data():
             try:
                 raw_projects = airtable.get_all(table_map["projects"])
                 for p in raw_projects:
-                    # Handle Client field - could be linked record (array) or text
+                    # Client is a text field (name)
                     client_val = p.get("Client") or p.get("client") or ""
-                    if isinstance(client_val, list) and len(client_val) > 0:
-                        client_val = client_val[0]  # Get first linked record ID
                     projects.append({
                         "id": p.get("id"),
                         "name": p.get("Name") or p.get("name") or p.get("Nombre") or p.get("id"),
@@ -1190,14 +1188,11 @@ def api_projects():
             records = airtable.get_all("Projects")
             projects = []
             for r in records:
-                # Handle Client as linked record (array) or text
-                client_val = r.get("Client") or r.get("client") or ""
-                if isinstance(client_val, list) and len(client_val) > 0:
-                    client_val = client_val[0]  # Get first linked record ID
+                # Client is a text field (name)
                 projects.append({
                     "id": r.get("id"),
                     "name": r.get("Name") or r.get("name") or "",
-                    "client": client_val,
+                    "client": r.get("Client") or r.get("client") or "",
                     "status": r.get("Status") or r.get("status") or "Active"
                 })
             return jsonify({"projects": projects})
@@ -1214,14 +1209,11 @@ def api_create_project():
         data = request.json
         airtable = Airtable()
 
-        # Handle Client as linked record - needs to be an array
-        client_id = data.get("client", "")
         record = {
             "Name": data.get("name", ""),
-            "Status": data.get("status", "Active")
+            "Status": data.get("status", "Active"),
+            "Client": data.get("client", "")  # Text field, not linked record
         }
-        if client_id:
-            record["Client"] = [client_id]  # Linked record expects array
 
         record = {k: v for k, v in record.items() if v}
         result = airtable.create("Projects", record)
@@ -1241,10 +1233,9 @@ def api_update_project(project_id):
             "Name": data.get("name", ""),
             "Status": data.get("status", "")
         }
-        # Handle Client as linked record - needs to be an array
+        # Client is a text field
         if "client" in data:
-            client_id = data.get("client", "")
-            record["Client"] = [client_id] if client_id else []
+            record["Client"] = data.get("client", "")
 
         record = {k: v for k, v in record.items() if v is not None}
         airtable.update("Projects", project_id, record)

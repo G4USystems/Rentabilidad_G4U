@@ -1338,12 +1338,8 @@
         function renderProjectsSettings() {
             var html = '';
             projects.forEach(function(p) {
-                // Look up client name from clients array
-                var clientName = '-';
-                if (p.client) {
-                    var client = clients.find(function(c) { return c.id === p.client; });
-                    clientName = client ? client.name : p.client;
-                }
+                // Client is now stored as text (name), not ID
+                var clientName = p.client || '-';
                 var statusClass = p.status === 'Active' ? 'ok' : (p.status === 'Completed' ? '' : 'pending');
                 html += '<tr>';
                 html += '<td>' + (p.name || '-') + '</td>';
@@ -1639,12 +1635,12 @@
         }
 
         function populateProjectClientSelect() {
-            // For add project modal
+            // For add project modal - use client NAME as value (text field in Airtable)
             var addSelect = document.getElementById('new-project-client');
             if (addSelect) {
                 var html = '<option value="">Sin cliente</option>';
                 clients.forEach(function(c) {
-                    html += '<option value="' + c.id + '">' + c.name + '</option>';
+                    html += '<option value="' + c.name + '">' + c.name + '</option>';
                 });
                 addSelect.innerHTML = html;
             }
@@ -1653,7 +1649,7 @@
             if (editSelect) {
                 var html = '<option value="">Sin cliente</option>';
                 clients.forEach(function(c) {
-                    html += '<option value="' + c.id + '">' + c.name + '</option>';
+                    html += '<option value="' + c.name + '">' + c.name + '</option>';
                 });
                 editSelect.innerHTML = html;
             }
