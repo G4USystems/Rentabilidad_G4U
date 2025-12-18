@@ -306,6 +306,7 @@
                                 <tr>
                                     <th>Fecha</th>
                                     <th>Descripcion</th>
+                                    <th>Labels Qonto</th>
                                     <th>Categoria</th>
                                     <th>Proyecto</th>
                                     <th>Cliente</th>
@@ -313,7 +314,7 @@
                                 </tr>
                             </thead>
                             <tbody id="transactions-table">
-                                <tr><td colspan="6" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                <tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -834,6 +835,7 @@
         var filteredTransactions = [];
         var teamMembers = [];
         var salaryAllocations = [];
+        var qontoLabels = [];  // Labels from Qonto API
 
         // Utilities
         function fmt(n) {
@@ -900,6 +902,28 @@
             }).catch(function(e) {
                 console.error('Error loading data:', e);
             });
+        }
+
+        function loadQontoLabels() {
+            fetch('/api/qonto/labels').then(function(r) { return r.json(); }).then(function(data) {
+                if (data.labels) {
+                    qontoLabels = data.labels;
+                    console.log('Loaded ' + qontoLabels.length + ' Qonto labels');
+                }
+            }).catch(function(e) {
+                console.log('Could not load Qonto labels:', e);
+            });
+        }
+
+        function getLabelNames(labelIds) {
+            if (!labelIds) return '';
+            var ids = labelIds.split(',').map(function(id) { return id.trim(); });
+            var names = [];
+            ids.forEach(function(id) {
+                var label = qontoLabels.find(function(l) { return l.id === id; });
+                if (label) names.push(label.name);
+            });
+            return names.join(', ');
         }
 
         function checkStatus() {
@@ -1012,7 +1036,9 @@
                         var client = clients.find(function(c) { return c.id === t.client_id; });
                         if (client) clientName = client.name;
                     }
-                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '') + ' ' + clientName).toLowerCase();
+                    // Include Qonto labels in search
+                    var labelNames = getLabelNames(t.label_ids);
+                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '') + ' ' + clientName + ' ' + labelNames).toLowerCase();
                     if (text.indexOf(search) === -1) return false;
                 }
                 return true;
@@ -1022,6 +1048,9 @@
             filtered.forEach(function(t) {
                 var cls = t.side === 'credit' ? 'positive' : 'negative';
                 var sign = t.side === 'credit' ? '+' : '-';
+
+                // Get Qonto label names
+                var labelNames = getLabelNames(t.label_ids);
 
                 // Build category dropdown
                 var catOptions = '<option value="">Sin categoria</option>';
@@ -1047,13 +1076,14 @@
                 html += '<tr>';
                 html += '<td>' + formatDate(t.settled_at) + '</td>';
                 html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
+                html += '<td style="font-size:12px;color:#666;">' + (labelNames || '<span class="text-muted">-</span>') + '</td>';
                 html += '<td><select onchange="updateTransactionCategory(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + catOptions + '</select></td>';
                 html += '<td><select onchange="updateTransactionProject(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + projOptions + '</select></td>';
                 html += '<td><select onchange="updateTransactionClient(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + clientOptions + '</select></td>';
                 html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
                 html += '</tr>';
             });
-            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
+            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
         function renderPL() {
@@ -1953,6 +1983,7 @@
         loadProjectsSettings();
         loadCategories();
         loadSalaryAllocations();
+        loadQontoLabels();
     </script>
 </body>
 </html>

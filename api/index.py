@@ -604,6 +604,9 @@ def api_data():
                     client_field = r.get("Client") or r.get("client") or r.get("Cliente") or []
                     client_id = client_field[0] if isinstance(client_field, list) and client_field else ""
 
+                    # Label IDs from Qonto (stored as comma-separated string)
+                    label_ids = r.get("Label IDs") or r.get("label_ids") or r.get("Labels") or ""
+
                     transactions.append({
                         "id": r.get("id"),
                         "amount": float(amt) if amt else 0,
@@ -613,7 +616,8 @@ def api_data():
                         "settled_at": date,
                         "category": r.get("Category") or r.get("category") or r.get("Categoria") or "",
                         "project_id": r.get("Project") or r.get("project") or r.get("Proyecto") or "",
-                        "client_id": client_id
+                        "client_id": client_id,
+                        "label_ids": label_ids
                     })
             except Exception as e:
                 pass
