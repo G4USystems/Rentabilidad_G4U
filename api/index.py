@@ -574,7 +574,8 @@ def api_data():
                         "counterparty_name": counterparty,
                         "settled_at": date,
                         "category": r.get("Category") or r.get("category") or r.get("Categoria") or "",
-                        "project_id": r.get("Project") or r.get("project") or r.get("Proyecto") or ""
+                        "project_id": r.get("Project") or r.get("project") or r.get("Proyecto") or "",
+                        "client": r.get("Client") or r.get("client") or r.get("Cliente") or ""
                     })
             except Exception as e:
                 pass
@@ -1344,8 +1345,7 @@ def api_categories():
                 categories.append({
                     "id": r.get("id"),
                     "name": r.get("Name") or r.get("name") or "",
-                    "type": r.get("Type") or r.get("type") or "Expense",  # Income or Expense
-                    "parent": r.get("Parent") or r.get("parent") or ""
+                    "type": r.get("Type") or r.get("type") or "Expense"  # Income or Expense
                 })
             return jsonify({"categories": categories})
         except Exception:
@@ -1362,8 +1362,7 @@ def api_create_category():
         airtable = Airtable()
         record = {
             "Name": data.get("name", ""),
-            "Type": data.get("type", "Expense"),
-            "Parent": data.get("parent", "")
+            "Type": data.get("type", "Expense")
         }
         record = {k: v for k, v in record.items() if v}
         result = airtable.create("Categories", record)
@@ -1380,10 +1379,9 @@ def api_update_category(category_id):
         airtable = Airtable()
         record = {
             "Name": data.get("name", ""),
-            "Type": data.get("type", ""),
-            "Parent": data.get("parent", "")
+            "Type": data.get("type", "")
         }
-        record = {k: v for k, v in record.items() if v is not None}
+        record = {k: v for k, v in record.items() if v is not None and v != ""}
         airtable.update("Categories", category_id, record)
         return jsonify({"ok": True})
     except Exception as e:
@@ -1404,7 +1402,7 @@ def api_delete_category(category_id):
 
 @app.route("/api/transaction/<tx_id>", methods=["PUT"])
 def api_update_transaction(tx_id):
-    """Update a transaction (category, project assignment, etc)."""
+    """Update a transaction (category, project, client assignment, etc)."""
     try:
         data = request.json
         airtable = Airtable()
@@ -1414,6 +1412,8 @@ def api_update_transaction(tx_id):
             record["Category"] = data["category"]
         if "project_id" in data:
             record["Project"] = data["project_id"]
+        if "client" in data:
+            record["Client"] = data["client"]
         if "description" in data:
             record["Description"] = data["description"]
 

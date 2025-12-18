@@ -308,11 +308,12 @@
                                     <th>Descripcion</th>
                                     <th>Categoria</th>
                                     <th>Proyecto</th>
+                                    <th>Cliente</th>
                                     <th style="text-align:right">Monto</th>
                                 </tr>
                             </thead>
                             <tbody id="transactions-table">
-                                <tr><td colspan="5" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                <tr><td colspan="6" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -998,7 +999,7 @@
             var filtered = transactions.filter(function(t) {
                 if (filterType && t.side !== filterType) return false;
                 if (search) {
-                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '')).toLowerCase();
+                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '') + ' ' + (t.client || '')).toLowerCase();
                     if (text.indexOf(search) === -1) return false;
                 }
                 return true;
@@ -1023,15 +1024,23 @@
                     projOptions += '<option value="' + p.id + '"' + sel + '>' + p.name + '</option>';
                 });
 
+                // Build client dropdown
+                var clientOptions = '<option value="">Sin cliente</option>';
+                clients.forEach(function(c) {
+                    var sel = (t.client === c.name) ? ' selected' : '';
+                    clientOptions += '<option value="' + c.name + '"' + sel + '>' + c.name + '</option>';
+                });
+
                 html += '<tr>';
                 html += '<td>' + formatDate(t.settled_at) + '</td>';
                 html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
-                html += '<td><select onchange="updateTransactionCategory(\'' + t.id + '\', this.value)" style="width:130px;padding:4px 8px;">' + catOptions + '</select></td>';
-                html += '<td><select onchange="updateTransactionProject(\'' + t.id + '\', this.value)" style="width:130px;padding:4px 8px;">' + projOptions + '</select></td>';
+                html += '<td><select onchange="updateTransactionCategory(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + catOptions + '</select></td>';
+                html += '<td><select onchange="updateTransactionProject(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + projOptions + '</select></td>';
+                html += '<td><select onchange="updateTransactionClient(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + clientOptions + '</select></td>';
                 html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
                 html += '</tr>';
             });
-            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
+            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
         function renderPL() {
@@ -1682,6 +1691,19 @@
                 else {
                     transactions.forEach(function(t) { if (t.id === txId) t.project_id = projectId; });
                     renderProjects();
+                }
+            }).catch(function(e) { alert('Error: ' + e.message); });
+        }
+
+        function updateTransactionClient(txId, clientName) {
+            fetch('/api/transaction/' + txId, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ client: clientName })
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) alert('Error: ' + result.error);
+                else {
+                    transactions.forEach(function(t) { if (t.id === txId) t.client = clientName; });
                 }
             }).catch(function(e) { alert('Error: ' + e.message); });
         }
