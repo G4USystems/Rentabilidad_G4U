@@ -600,6 +600,10 @@ def api_data():
                     # Try to find counterparty
                     counterparty = r.get("Counterparty") or r.get("counterparty") or r.get("Contraparte") or label
 
+                    # Client is a linked record - returns array of record IDs
+                    client_field = r.get("Client") or r.get("client") or r.get("Cliente") or []
+                    client_id = client_field[0] if isinstance(client_field, list) and client_field else ""
+
                     transactions.append({
                         "id": r.get("id"),
                         "amount": float(amt) if amt else 0,
@@ -609,7 +613,7 @@ def api_data():
                         "settled_at": date,
                         "category": r.get("Category") or r.get("category") or r.get("Categoria") or "",
                         "project_id": r.get("Project") or r.get("project") or r.get("Proyecto") or "",
-                        "client": r.get("Client") or r.get("client") or r.get("Cliente") or ""
+                        "client_id": client_id
                     })
             except Exception as e:
                 pass
@@ -1470,8 +1474,10 @@ def api_update_transaction(tx_id):
             record["Category"] = data["category"]
         if "project_id" in data:
             record["Project"] = data["project_id"]
-        if "client" in data:
-            record["Client"] = data["client"]
+        if "client_id" in data:
+            # Client is a linked record - send as array of record IDs
+            client_id = data["client_id"]
+            record["Client"] = [client_id] if client_id else []
         if "description" in data:
             record["Description"] = data["description"]
 

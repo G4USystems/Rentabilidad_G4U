@@ -1006,7 +1006,13 @@
             var filtered = transactions.filter(function(t) {
                 if (filterType && t.side !== filterType) return false;
                 if (search) {
-                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '') + ' ' + (t.client || '')).toLowerCase();
+                    // Resolve client name from client_id for search
+                    var clientName = '';
+                    if (t.client_id) {
+                        var client = clients.find(function(c) { return c.id === t.client_id; });
+                        if (client) clientName = client.name;
+                    }
+                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '') + ' ' + clientName).toLowerCase();
                     if (text.indexOf(search) === -1) return false;
                 }
                 return true;
@@ -1031,11 +1037,11 @@
                     projOptions += '<option value="' + p.id + '"' + sel + '>' + p.name + '</option>';
                 });
 
-                // Build client dropdown
+                // Build client dropdown (linked record - uses IDs)
                 var clientOptions = '<option value="">Sin cliente</option>';
                 clients.forEach(function(c) {
-                    var sel = (t.client === c.name) ? ' selected' : '';
-                    clientOptions += '<option value="' + c.name + '"' + sel + '>' + c.name + '</option>';
+                    var sel = (t.client_id === c.id) ? ' selected' : '';
+                    clientOptions += '<option value="' + c.id + '"' + sel + '>' + c.name + '</option>';
                 });
 
                 html += '<tr>';
@@ -1702,15 +1708,15 @@
             }).catch(function(e) { alert('Error: ' + e.message); });
         }
 
-        function updateTransactionClient(txId, clientName) {
+        function updateTransactionClient(txId, clientId) {
             fetch('/api/transaction/' + txId, {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ client: clientName })
+                body: JSON.stringify({ client_id: clientId })
             }).then(function(r) { return r.json(); }).then(function(result) {
                 if (result.error) alert('Error: ' + result.error);
                 else {
-                    transactions.forEach(function(t) { if (t.id === txId) t.client = clientName; });
+                    transactions.forEach(function(t) { if (t.id === txId) t.client_id = clientId; });
                 }
             }).catch(function(e) { alert('Error: ' + e.message); });
         }
