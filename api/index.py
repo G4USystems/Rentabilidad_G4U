@@ -839,7 +839,9 @@ def api_sync():
                 "amount": amount_field,
                 "description": desc_field,
                 "type": type_field,
-                "date": date_field
+                "date": date_field,
+                "label_ids": label_ids_field,
+                "attachment_ids": attachment_ids_field
             },
             "errors": errors if errors else None
         })
