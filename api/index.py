@@ -1746,6 +1746,102 @@ def api_qonto_sync_labels():
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route("/api/qonto/update-transaction-labels", methods=["POST"])
+def api_qonto_update_transaction_labels():
+    """Update existing transactions with their Qonto label IDs."""
+    try:
+        qonto = Qonto()
+        airtable = Airtable()
+
+        # Get bank account slug
+        slug = qonto.get_bank_account_id()
+        if not slug:
+            return jsonify({"error": "Could not get bank account slug"})
+
+        # Get all transactions from Qonto
+        qonto_txs = qonto.get_all_transactions(slug)
+        if not qonto_txs:
+            return jsonify({"error": "No transactions from Qonto"})
+
+        # Build a map of Qonto transaction_id -> label_ids
+        qonto_labels_map = {}
+        for tx in qonto_txs:
+            tx_id = tx.get("transaction_id", "")
+            label_ids = tx.get("label_ids", [])
+            if tx_id and label_ids:
+                qonto_labels_map[tx_id] = ",".join(label_ids)
+
+        # Discover table name
+        table_name = None
+        with httpx.Client(timeout=30) as client:
+            r = client.get(
+                f"https://api.airtable.com/v0/meta/bases/{airtable.base_id}/tables",
+                headers=airtable.headers
+            )
+            if r.status_code == 200:
+                tables = r.json().get("tables", [])
+                for t in tables:
+                    name_lower = t.get("name", "").lower()
+                    if "trans" in name_lower or "movimiento" in name_lower:
+                        table_name = t.get("name")
+                        break
+                if not table_name and tables:
+                    table_name = tables[0].get("name")
+
+        if not table_name:
+            return jsonify({"error": "No transactions table found"})
+
+        # Get all Airtable transactions
+        airtable_txs = airtable.get_all(table_name)
+
+        updated = 0
+        skipped = 0
+        no_labels = 0
+
+        for atx in airtable_txs:
+            record_id = atx.get("id")
+            # Find the Qonto transaction ID field
+            qonto_id = None
+            for key in ["Qonto Transaction ID", "qonto_id", "transaction_id", "ID", "Name"]:
+                if atx.get(key):
+                    qonto_id = atx.get(key)
+                    break
+
+            if not qonto_id:
+                skipped += 1
+                continue
+
+            # Check if already has labels
+            current_labels = atx.get("Label IDs") or atx.get("label_ids") or ""
+            if current_labels:
+                skipped += 1
+                continue
+
+            # Find label_ids from Qonto
+            new_labels = qonto_labels_map.get(qonto_id, "")
+            if not new_labels:
+                no_labels += 1
+                continue
+
+            # Update the record
+            try:
+                airtable.update(table_name, record_id, {"Label IDs": new_labels})
+                updated += 1
+            except Exception as e:
+                pass
+
+        return jsonify({
+            "qonto_transactions": len(qonto_txs),
+            "transactions_with_labels": len(qonto_labels_map),
+            "airtable_transactions": len(airtable_txs),
+            "updated": updated,
+            "skipped": skipped,
+            "no_labels_in_qonto": no_labels
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route("/api/qonto/memberships")
 def api_qonto_memberships():
     """Get all memberships from Qonto."""
