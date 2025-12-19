@@ -379,11 +379,10 @@
                             </div>
                             <div style="display:flex;gap:12px;flex-wrap:wrap;">
                                 <button class="btn btn-primary" onclick="syncQonto()">Sincronizar Transacciones</button>
-                                <button class="btn btn-outline" onclick="updateTransactionLabels()">Actualizar Labels</button>
                                 <button class="btn btn-outline" onclick="syncQontoMembers()">Importar Miembros de Qonto</button>
                                 <button class="btn btn-outline" onclick="loadQontoOrganization()">Ver Info Organizacion</button>
                             </div>
-                            <p style="font-size:13px;color:var(--text-muted);margin-top:12px;">Las Labels de Qonto se muestran automaticamente en la columna "Labels Qonto" de las transacciones. Usa "Actualizar Labels" para sincronizar labels en transacciones existentes.</p>
+                            <p style="font-size:13px;color:var(--text-muted);margin-top:12px;">Sincronizar importa transacciones nuevas y actualiza labels en todas las existentes.</p>
                         </div>
                     </div>
                 </div>
@@ -1235,8 +1234,9 @@
             if (!confirm('Sincronizar transacciones desde Qonto?')) return;
             fetch('/api/sync', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {
                 var msg = 'Qonto: ' + (data.qonto_count || 0) + ' transacciones\n';
-                msg += 'Sincronizadas: ' + (data.synced || 0) + '\n';
-                msg += 'Existentes: ' + (data.skipped || 0);
+                msg += 'Nuevas: ' + (data.synced || 0) + '\n';
+                msg += 'Existentes: ' + (data.skipped || 0) + '\n';
+                msg += 'Labels actualizadas: ' + (data.labels_updated || 0);
                 if (data.fields_found) {
                     if (!data.fields_found.label_ids) {
                         msg += '\n\n⚠️ Campo "Label IDs" no encontrado en Airtable.\nCrea un campo llamado "Label IDs" (tipo texto) en la tabla Transactions para guardar las labels.';
@@ -1917,29 +1917,6 @@
         }
 
         // ==================== Qonto Extended Sync ====================
-
-        function updateTransactionLabels() {
-            if (!confirm('Actualizar labels de Qonto en transacciones existentes?')) return;
-
-            fetch('/api/qonto/update-transaction-labels', { method: 'POST' })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                } else {
-                    var msg = 'Transacciones en Qonto: ' + data.qonto_transactions + '\n';
-                    msg += 'Con labels en Qonto: ' + data.transactions_with_labels + '\n';
-                    msg += 'En Airtable: ' + data.airtable_transactions + '\n\n';
-                    msg += 'Actualizadas: ' + data.updated + '\n';
-                    msg += 'Ya tenian labels: ' + data.skipped + '\n';
-                    msg += 'Sin labels en Qonto: ' + data.no_labels_in_qonto;
-                    alert(msg);
-                    loadData();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
 
         function syncQontoMembers() {
             if (!confirm('Importar miembros del equipo desde Qonto? (Los existentes no se duplicaran)')) return;

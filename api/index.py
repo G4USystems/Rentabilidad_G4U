@@ -828,10 +828,57 @@ def api_sync():
                 if len(errors) >= 3:
                     break
 
+        # ===== UPDATE LABELS ON EXISTING TRANSACTIONS =====
+        labels_updated = 0
+        if label_ids_field:
+            # Build map of Qonto transaction_id -> label_ids
+            qonto_labels_map = {}
+            for tx in qonto_txs:
+                tx_id = tx.get("transaction_id", "")
+                label_ids = tx.get("label_ids", [])
+                if tx_id and label_ids:
+                    qonto_labels_map[tx_id] = ",".join(label_ids)
+
+            # Re-fetch existing records to get fresh data
+            try:
+                existing = airtable.get_all(table_name)
+            except:
+                existing = []
+
+            for record in existing:
+                record_id = record.get("id")
+                # Find Qonto transaction ID
+                qonto_id = None
+                for key in ["Qonto Transaction ID", "qonto_id", "transaction_id", "ID", "Name"]:
+                    if record.get(key):
+                        qonto_id = record.get(key)
+                        break
+
+                if not qonto_id:
+                    continue
+
+                # Check if already has labels
+                current_labels = record.get(label_ids_field) or ""
+                if current_labels:
+                    continue
+
+                # Get labels from Qonto
+                new_labels = qonto_labels_map.get(qonto_id, "")
+                if not new_labels:
+                    continue
+
+                # Update record
+                try:
+                    airtable.update(table_name, record_id, {label_ids_field: new_labels})
+                    labels_updated += 1
+                except:
+                    pass
+
         return jsonify({
             "qonto_count": len(qonto_txs),
             "synced": synced,
             "skipped": skipped,
+            "labels_updated": labels_updated,
             "existing_count": len(existing),
             "table_name": table_name,
             "fields_found": {
