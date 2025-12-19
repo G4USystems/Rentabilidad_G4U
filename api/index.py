@@ -1889,6 +1889,51 @@ def api_qonto_update_transaction_labels():
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route("/api/debug/labels")
+def api_debug_labels():
+    """Debug endpoint to see label data from Qonto and Airtable."""
+    try:
+        qonto = Qonto()
+        airtable = Airtable()
+
+        # Get Qonto transactions with labels
+        slug = qonto.get_bank_account_id()
+        qonto_txs = qonto.get_all_transactions(slug) if slug else []
+
+        # Find transactions that have labels
+        qonto_with_labels = []
+        for tx in qonto_txs[:50]:  # Check first 50
+            label_ids = tx.get("label_ids", [])
+            if label_ids:
+                qonto_with_labels.append({
+                    "transaction_id": tx.get("transaction_id"),
+                    "label": tx.get("label"),
+                    "label_ids": label_ids,
+                    "amount": tx.get("amount")
+                })
+
+        # Get Airtable transactions
+        airtable_txs = airtable.get_all("Transactions")
+        airtable_sample = []
+        for atx in airtable_txs[:10]:
+            airtable_sample.append({
+                "id": atx.get("id"),
+                "Qonto Transaction ID": atx.get("Qonto Transaction ID"),
+                "Name": atx.get("Name"),
+                "Label IDs": atx.get("Label IDs"),
+                "Description": atx.get("Description")
+            })
+
+        return jsonify({
+            "qonto_total": len(qonto_txs),
+            "qonto_with_labels": qonto_with_labels,
+            "qonto_with_labels_count": len(qonto_with_labels),
+            "airtable_sample": airtable_sample
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route("/api/qonto/memberships")
 def api_qonto_memberships():
     """Get all memberships from Qonto."""
