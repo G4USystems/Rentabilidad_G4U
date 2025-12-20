@@ -3,7 +3,7 @@
 import enum
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import String, Text, DateTime, Date, Numeric, Enum, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.project import Project
     from app.models.account import QontoAccount
+    from app.models.transaction_allocation import TransactionAllocation
 
 
 class TransactionSide(str, enum.Enum):
@@ -40,6 +41,12 @@ class TransactionType(str, enum.Enum):
     CHECK = "check"
     SWIFT = "swift"
     OTHER = "other"
+
+
+class ReviewStatus(str, enum.Enum):
+    """Review status for manual transaction review."""
+    PENDING = "pending"    # Needs manual review
+    CONFIRMED = "confirmed"  # Manually confirmed
 
 
 class Transaction(Base):
@@ -119,6 +126,13 @@ class Transaction(Base):
     is_reconciled: Mapped[bool] = mapped_column(Boolean, default=False)
     is_excluded_from_reports: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Review status for manual confirmation
+    review_status: Mapped[ReviewStatus] = mapped_column(
+        Enum(ReviewStatus),
+        default=ReviewStatus.PENDING,
+        nullable=False
+    )
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -149,6 +163,11 @@ class Transaction(Base):
     project: Mapped[Optional["Project"]] = relationship(
         "Project",
         back_populates="transactions"
+    )
+    allocations: Mapped[List["TransactionAllocation"]] = relationship(
+        "TransactionAllocation",
+        back_populates="transaction",
+        cascade="all, delete-orphan"
     )
 
     @property

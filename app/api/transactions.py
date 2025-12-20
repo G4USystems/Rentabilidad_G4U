@@ -9,16 +9,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.database import get_db
-from app.models.transaction import Transaction, TransactionSide, TransactionStatus
+from app.models.transaction import Transaction, TransactionSide, TransactionStatus, ReviewStatus
 from app.models.category import Category
 from app.models.project import Project
+from app.models.transaction_allocation import TransactionAllocation
 from app.schemas.transaction import (
     TransactionResponse,
     TransactionListResponse,
     TransactionUpdate,
     TransactionProjectSuggestion,
+    TransactionAllocationsPayload,
+    AllocationResponse,
+    TransactionWithAllocationsResponse,
+    ReviewConfirmRequest,
+    ReviewConfirmResponse,
 )
 from app.services.project_assignment_service import ProjectAssignmentService
+from app.services.allocation_service import AllocationService
 
 router = APIRouter()
 
@@ -31,6 +38,7 @@ async def list_transactions(
     project_id: Optional[int] = None,
     side: Optional[TransactionSide] = None,
     status: Optional[TransactionStatus] = None,
+    review_status: Optional[ReviewStatus] = None,
     search: Optional[str] = None,
     include_excluded: bool = False,
     page: int = Query(1, ge=1),
@@ -39,6 +47,8 @@ async def list_transactions(
 ):
     """
     List transactions with filters and pagination.
+
+    - review_status: Filter by review status (pending/confirmed)
     """
     # Base query
     query = select(Transaction).options(
@@ -61,6 +71,8 @@ async def list_transactions(
         conditions.append(Transaction.side == side)
     if status:
         conditions.append(Transaction.status == status)
+    if review_status:
+        conditions.append(Transaction.review_status == review_status)
     if not include_excluded:
         conditions.append(Transaction.is_excluded_from_reports == False)
     if search:
@@ -121,6 +133,7 @@ async def list_transactions(
                 has_attachments=tx.has_attachments,
                 is_reconciled=tx.is_reconciled,
                 is_excluded_from_reports=tx.is_excluded_from_reports,
+                review_status=tx.review_status,
                 created_at=tx.created_at,
                 updated_at=tx.updated_at,
             )
@@ -185,6 +198,7 @@ async def get_transaction(
         has_attachments=tx.has_attachments,
         is_reconciled=tx.is_reconciled,
         is_excluded_from_reports=tx.is_excluded_from_reports,
+        review_status=tx.review_status,
         created_at=tx.created_at,
         updated_at=tx.updated_at,
     )
@@ -253,6 +267,7 @@ async def update_transaction(
         has_attachments=tx.has_attachments,
         is_reconciled=tx.is_reconciled,
         is_excluded_from_reports=tx.is_excluded_from_reports,
+        review_status=tx.review_status,
         created_at=tx.created_at,
         updated_at=tx.updated_at,
     )
@@ -427,3 +442,211 @@ async def bulk_suggest_projects(
         )
 
     return suggestions
+
+
+# ============================================================================
+# Allocation Endpoints - Partial project/client assignments
+# ============================================================================
+
+@router.post("/{transaction_id}/allocations", response_model=List[AllocationResponse])
+async def create_allocations(
+    transaction_id: int,
+    payload: TransactionAllocationsPayload,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create or replace allocations for a transaction.
+
+    This endpoint allows partial assignment of a transaction to multiple
+    projects and/or clients. Project and client are independent fields.
+
+    Validation rules:
+    - Each allocation must have project_id or client_name (or both)
+    - If percentage is provided, total sum must equal 100 (with small tolerance)
+    - If amount_allocated is provided without percentage, percentage is calculated
+    - If percentage is provided without amount_allocated, amount is calculated
+
+    Previous allocations for this transaction are deleted before saving new ones.
+    """
+    service = AllocationService(db)
+
+    allocations = await service.create_allocations(
+        transaction_id=transaction_id,
+        allocations=payload.allocations,
+    )
+
+    return allocations
+
+
+@router.get("/{transaction_id}/allocations", response_model=List[AllocationResponse])
+async def get_allocations(
+    transaction_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all allocations for a transaction."""
+    service = AllocationService(db)
+    return await service.get_allocations(transaction_id)
+
+
+@router.delete("/{transaction_id}/allocations")
+async def delete_allocations(
+    transaction_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete all allocations for a transaction."""
+    service = AllocationService(db)
+    deleted_count = await service.delete_allocations(transaction_id)
+    return {"status": "success", "deleted_count": deleted_count}
+
+
+@router.get("/{transaction_id}/with-allocations", response_model=TransactionWithAllocationsResponse)
+async def get_transaction_with_allocations(
+    transaction_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a transaction with its allocation details."""
+    result = await db.execute(
+        select(Transaction)
+        .options(
+            joinedload(Transaction.category),
+            joinedload(Transaction.project),
+            joinedload(Transaction.allocations).joinedload(TransactionAllocation.project),
+        )
+        .where(Transaction.id == transaction_id)
+    )
+    tx = result.unique().scalar_one_or_none()
+
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Build allocation responses
+    allocation_responses = []
+    for alloc in tx.allocations:
+        allocation_responses.append(
+            AllocationResponse(
+                id=alloc.id,
+                transaction_id=alloc.transaction_id,
+                project_id=alloc.project_id,
+                project_name=alloc.project.name if alloc.project else None,
+                project_code=alloc.project.code if alloc.project else None,
+                client_name=alloc.client_name,
+                percentage=alloc.percentage,
+                amount_allocated=alloc.amount_allocated,
+                created_at=alloc.created_at,
+                updated_at=alloc.updated_at,
+            )
+        )
+
+    return TransactionWithAllocationsResponse(
+        id=tx.id,
+        qonto_id=tx.qonto_id,
+        account_id=tx.account_id,
+        amount=tx.amount,
+        currency=tx.currency,
+        signed_amount=tx.signed_amount,
+        local_amount=tx.local_amount,
+        local_currency=tx.local_currency,
+        side=tx.side,
+        status=tx.status,
+        operation_type=tx.operation_type,
+        emitted_at=tx.emitted_at,
+        settled_at=tx.settled_at,
+        transaction_date=tx.transaction_date,
+        label=tx.label,
+        reference=tx.reference,
+        note=tx.note,
+        counterparty_name=tx.counterparty_name,
+        counterparty_iban=tx.counterparty_iban,
+        category_id=tx.category_id,
+        category_name=tx.category.name if tx.category else None,
+        project_id=tx.project_id,
+        project_name=tx.project.name if tx.project else None,
+        vat_amount=tx.vat_amount,
+        vat_rate=tx.vat_rate,
+        has_attachments=tx.has_attachments,
+        is_reconciled=tx.is_reconciled,
+        is_excluded_from_reports=tx.is_excluded_from_reports,
+        review_status=tx.review_status,
+        created_at=tx.created_at,
+        updated_at=tx.updated_at,
+        allocations=allocation_responses,
+        has_allocations=len(allocation_responses) > 0,
+    )
+
+
+# ============================================================================
+# Review Status Endpoints
+# ============================================================================
+
+@router.post("/review/confirm", response_model=ReviewConfirmResponse)
+async def confirm_transactions(
+    request: ReviewConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Confirm review status for a list of transactions.
+
+    Marks the specified transactions as 'confirmed', indicating they have
+    been manually reviewed and approved for reporting.
+    """
+    # Fetch transactions
+    result = await db.execute(
+        select(Transaction).where(Transaction.id.in_(request.transaction_ids))
+    )
+    transactions = result.scalars().all()
+
+    if not transactions:
+        raise HTTPException(status_code=404, detail="No transactions found")
+
+    # Update review status
+    confirmed_ids = []
+    for tx in transactions:
+        tx.review_status = ReviewStatus.CONFIRMED
+        confirmed_ids.append(tx.id)
+
+    await db.flush()
+
+    return ReviewConfirmResponse(
+        confirmed_count=len(confirmed_ids),
+        transaction_ids=confirmed_ids,
+    )
+
+
+@router.post("/{transaction_id}/review/confirm")
+async def confirm_single_transaction(
+    transaction_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirm review status for a single transaction."""
+    result = await db.execute(
+        select(Transaction).where(Transaction.id == transaction_id)
+    )
+    tx = result.scalar_one_or_none()
+
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    tx.review_status = ReviewStatus.CONFIRMED
+    await db.flush()
+
+    return {"status": "success", "transaction_id": transaction_id, "review_status": "confirmed"}
+
+
+@router.post("/{transaction_id}/review/reset")
+async def reset_transaction_review(
+    transaction_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset review status to pending for a single transaction."""
+    result = await db.execute(
+        select(Transaction).where(Transaction.id == transaction_id)
+    )
+    tx = result.scalar_one_or_none()
+
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    tx.review_status = ReviewStatus.PENDING
+    await db.flush()
+
+    return {"status": "success", "transaction_id": transaction_id, "review_status": "pending"}

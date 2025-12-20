@@ -6,6 +6,11 @@ from app.schemas.transaction import (
     TransactionUpdate,
     TransactionResponse,
     TransactionListResponse,
+    AllocationInput,
+    AllocationResponse,
+    TransactionAllocationsPayload,
+    TransactionWithAllocationsResponse,
+    AllocationSummary,
 )
 from app.schemas.category import (
     CategoryBase,
@@ -33,6 +38,11 @@ __all__ = [
     "TransactionUpdate",
     "TransactionResponse",
     "TransactionListResponse",
+    "AllocationInput",
+    "AllocationResponse",
+    "TransactionAllocationsPayload",
+    "TransactionWithAllocationsResponse",
+    "AllocationSummary",
     "CategoryBase",
     "CategoryCreate",
     "CategoryUpdate",

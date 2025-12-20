@@ -6,7 +6,7 @@ from typing import Optional, List
 
 from pydantic import BaseModel, Field
 
-from app.models.transaction import TransactionSide, TransactionStatus, TransactionType
+from app.models.transaction import TransactionSide, TransactionStatus, TransactionType, ReviewStatus
 
 
 class TransactionBase(BaseModel):
@@ -88,6 +88,9 @@ class TransactionResponse(BaseModel):
     is_reconciled: bool
     is_excluded_from_reports: bool
 
+    # Review status
+    review_status: ReviewStatus = ReviewStatus.PENDING
+
     # Timestamps
     created_at: datetime
     updated_at: datetime
@@ -137,3 +140,89 @@ class TransactionProjectSuggestion(BaseModel):
 
     transaction_id: int
     suggestion: Optional[ProjectSuggestion] = None
+
+
+# ============================================================================
+# Allocation Schemas for partial project/client assignments
+# ============================================================================
+
+class AllocationInput(BaseModel):
+    """Schema for creating a single allocation entry."""
+
+    project_id: Optional[int] = None
+    client_name: Optional[str] = Field(None, max_length=200)
+    percentage: Optional[Decimal] = Field(
+        None,
+        ge=Decimal("0"),
+        le=Decimal("100"),
+        description="Percentage of transaction to allocate (0-100)"
+    )
+    amount_allocated: Optional[Decimal] = Field(
+        None,
+        description="Absolute amount to allocate. If not provided, calculated from percentage."
+    )
+
+
+class AllocationResponse(BaseModel):
+    """Schema for allocation response."""
+
+    id: int
+    transaction_id: int
+    project_id: Optional[int] = None
+    project_name: Optional[str] = None
+    project_code: Optional[str] = None
+    client_name: Optional[str] = None
+    percentage: Decimal
+    amount_allocated: Decimal
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TransactionAllocationsPayload(BaseModel):
+    """Schema for bulk allocation update on a transaction."""
+
+    allocations: List[AllocationInput] = Field(
+        ...,
+        min_length=1,
+        description="List of allocations. Each must have project_id or client_name (or both)."
+    )
+
+
+class TransactionWithAllocationsResponse(TransactionResponse):
+    """Transaction response including allocation details."""
+
+    allocations: List[AllocationResponse] = []
+    has_allocations: bool = False
+
+
+class AllocationSummary(BaseModel):
+    """Summary of allocations for reporting."""
+
+    total_allocated: Decimal
+    total_percentage: Decimal
+    allocation_count: int
+    is_fully_allocated: bool
+
+
+# ============================================================================
+# Review Status Schemas
+# ============================================================================
+
+class ReviewConfirmRequest(BaseModel):
+    """Request to confirm review status of transactions."""
+
+    transaction_ids: List[int] = Field(
+        ...,
+        min_length=1,
+        description="List of transaction IDs to confirm"
+    )
+
+
+class ReviewConfirmResponse(BaseModel):
+    """Response after confirming transactions."""
+
+    confirmed_count: int
+    transaction_ids: List[int]

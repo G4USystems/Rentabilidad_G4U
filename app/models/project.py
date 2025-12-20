@@ -11,6 +11,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.transaction import Transaction
+    from app.models.transaction_allocation import TransactionAllocation
 
 import enum
 
@@ -81,6 +82,10 @@ class Project(Base):
     # Relationships
     transactions: Mapped[List["Transaction"]] = relationship(
         "Transaction",
+        back_populates="project"
+    )
+    allocations: Mapped[List["TransactionAllocation"]] = relationship(
+        "TransactionAllocation",
         back_populates="project"
     )
 
