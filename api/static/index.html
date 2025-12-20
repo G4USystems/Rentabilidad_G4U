@@ -75,6 +75,9 @@
         /* Tables */
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 12px 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: var(--bg); border-bottom: 1px solid var(--border); }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { background: #e2e8f0; }
+        th.sortable span { font-size: 10px; margin-left: 4px; }
         td { padding: 14px 16px; border-bottom: 1px solid var(--border); }
         tr:hover { background: #fafafa; }
         .amount { font-family: 'SF Mono', Monaco, monospace; font-weight: 500; }
@@ -284,7 +287,7 @@
                     </div>
                 </div>
 
-                <div class="filters">
+                <div class="filters" style="flex-wrap:wrap;">
                     <div class="filter-group">
                         <label>Tipo:</label>
                         <select id="tx-filter-type" onchange="renderTransactions()">
@@ -294,27 +297,60 @@
                         </select>
                     </div>
                     <div class="filter-group">
+                        <label>Proyecto:</label>
+                        <select id="tx-filter-project" onchange="renderTransactions()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Cliente:</label>
+                        <select id="tx-filter-client" onchange="renderTransactions()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Categoria:</label>
+                        <select id="tx-filter-category" onchange="renderTransactions()">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Cat. Qonto:</label>
+                        <select id="tx-filter-qonto-cat" onchange="renderTransactions()">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Desde:</label>
+                        <input type="date" id="tx-filter-from" onchange="renderTransactions()">
+                    </div>
+                    <div class="filter-group">
+                        <label>Hasta:</label>
+                        <input type="date" id="tx-filter-to" onchange="renderTransactions()">
+                    </div>
+                    <div class="filter-group">
                         <label>Buscar:</label>
                         <input type="text" id="tx-search" placeholder="Descripcion..." onkeyup="renderTransactions()">
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-body" style="padding:0;">
+                    <div class="card-body" style="padding:0;overflow-x:auto;">
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Fecha</th>
-                                    <th>Descripcion</th>
-                                    <th>Cat. Qonto</th>
+                                    <th class="sortable" onclick="sortTransactions('settled_at')">Fecha <span id="sort-settled_at"></span></th>
+                                    <th class="sortable" onclick="sortTransactions('counterparty_name')">Descripcion <span id="sort-counterparty_name"></span></th>
+                                    <th class="sortable" onclick="sortTransactions('qonto_category')">Cat. Qonto <span id="sort-qonto_category"></span></th>
                                     <th>Categoria</th>
                                     <th>Proyecto</th>
                                     <th>Cliente</th>
-                                    <th style="text-align:right">Monto</th>
+                                    <th class="sortable" onclick="sortTransactions('vat_amount')" style="text-align:right">IVA <span id="sort-vat_amount"></span></th>
+                                    <th class="sortable" onclick="sortTransactions('amount')" style="text-align:right">Monto <span id="sort-amount"></span></th>
                                 </tr>
                             </thead>
                             <tbody id="transactions-table">
-                                <tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                <tr><td colspan="8" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -835,6 +871,8 @@
         var filteredTransactions = [];
         var teamMembers = [];
         var salaryAllocations = [];
+        var sortField = 'settled_at';
+        var sortDirection = 'desc';
 
         // Utilities
         function fmt(n) {
@@ -891,11 +929,7 @@
                 categories = data.categories || [];
                 projects = data.projects || [];
 
-                // Sort transactions by date descending
-                transactions.sort(function(a, b) {
-                    return (b.settled_at || '').localeCompare(a.settled_at || '');
-                });
-
+                populateTransactionFilters();
                 applyFilters();
                 renderAll();
             }).catch(function(e) {
@@ -1000,20 +1034,90 @@
             document.getElementById('recent-transactions').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
+        function sortTransactions(field) {
+            if (sortField === field) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortField = field;
+                sortDirection = 'desc';
+            }
+            // Update sort indicators
+            ['settled_at', 'counterparty_name', 'qonto_category', 'vat_amount', 'amount'].forEach(function(f) {
+                var el = document.getElementById('sort-' + f);
+                if (el) el.textContent = (f === sortField) ? (sortDirection === 'asc' ? '▲' : '▼') : '';
+            });
+            renderTransactions();
+        }
+
+        function populateTransactionFilters() {
+            // Populate project filter
+            var projFilter = document.getElementById('tx-filter-project');
+            var projHtml = '<option value="">Todos</option>';
+            projects.forEach(function(p) {
+                projHtml += '<option value="' + p.id + '">' + p.name + '</option>';
+            });
+            projFilter.innerHTML = projHtml;
+
+            // Populate client filter
+            var clientFilter = document.getElementById('tx-filter-client');
+            var clientHtml = '<option value="">Todos</option>';
+            clients.forEach(function(c) {
+                clientHtml += '<option value="' + c.id + '">' + c.name + '</option>';
+            });
+            clientFilter.innerHTML = clientHtml;
+
+            // Populate category filter
+            var catFilter = document.getElementById('tx-filter-category');
+            var catHtml = '<option value="">Todas</option>';
+            categories.forEach(function(c) {
+                catHtml += '<option value="' + c.name + '">' + c.name + '</option>';
+            });
+            catFilter.innerHTML = catHtml;
+
+            // Populate Qonto category filter (unique values from transactions)
+            var qontoCats = {};
+            transactions.forEach(function(t) {
+                if (t.qonto_category) qontoCats[t.qonto_category] = true;
+            });
+            var qontoCatFilter = document.getElementById('tx-filter-qonto-cat');
+            var qontoCatHtml = '<option value="">Todas</option>';
+            Object.keys(qontoCats).sort().forEach(function(cat) {
+                qontoCatHtml += '<option value="' + cat + '">' + cat + '</option>';
+            });
+            qontoCatFilter.innerHTML = qontoCatHtml;
+        }
+
         function renderTransactions() {
             var filterType = document.getElementById('tx-filter-type').value;
+            var filterProject = document.getElementById('tx-filter-project').value;
+            var filterClient = document.getElementById('tx-filter-client').value;
+            var filterCategory = document.getElementById('tx-filter-category').value;
+            var filterQontoCat = document.getElementById('tx-filter-qonto-cat').value;
+            var filterFrom = document.getElementById('tx-filter-from').value;
+            var filterTo = document.getElementById('tx-filter-to').value;
             var search = (document.getElementById('tx-search').value || '').toLowerCase();
 
             var filtered = transactions.filter(function(t) {
+                // Type filter
                 if (filterType && t.side !== filterType) return false;
+                // Project filter
+                if (filterProject && t.project_id !== filterProject) return false;
+                // Client filter
+                if (filterClient && t.client_id !== filterClient) return false;
+                // Category filter
+                if (filterCategory && t.category !== filterCategory) return false;
+                // Qonto category filter
+                if (filterQontoCat && t.qonto_category !== filterQontoCat) return false;
+                // Date range filter
+                if (filterFrom && t.settled_at < filterFrom) return false;
+                if (filterTo && t.settled_at > filterTo) return false;
+                // Search filter
                 if (search) {
-                    // Resolve client name from client_id for search
                     var clientName = '';
                     if (t.client_id) {
                         var client = clients.find(function(c) { return c.id === t.client_id; });
                         if (client) clientName = client.name;
                     }
-                    // Include Qonto category in search
                     var qontoCat = t.qonto_category || '';
                     var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '') + ' ' + clientName + ' ' + qontoCat).toLowerCase();
                     if (text.indexOf(search) === -1) return false;
@@ -1021,13 +1125,25 @@
                 return true;
             });
 
+            // Sort transactions
+            filtered.sort(function(a, b) {
+                var aVal = a[sortField] || '';
+                var bVal = b[sortField] || '';
+                if (sortField === 'amount' || sortField === 'vat_amount') {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                }
+                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
             var html = '';
             filtered.forEach(function(t) {
                 var cls = t.side === 'credit' ? 'positive' : 'negative';
                 var sign = t.side === 'credit' ? '+' : '-';
-
-                // Get Qonto category
                 var qontoCategory = t.qonto_category || '';
+                var vatAmount = t.vat_amount || 0;
 
                 // Build category dropdown
                 var catOptions = '<option value="">Sin categoria</option>';
@@ -1043,7 +1159,7 @@
                     projOptions += '<option value="' + p.id + '"' + sel + '>' + p.name + '</option>';
                 });
 
-                // Build client dropdown (linked record - uses IDs)
+                // Build client dropdown
                 var clientOptions = '<option value="">Sin cliente</option>';
                 clients.forEach(function(c) {
                     var sel = (t.client_id === c.id) ? ' selected' : '';
@@ -1051,16 +1167,17 @@
                 });
 
                 html += '<tr>';
-                html += '<td>' + formatDate(t.settled_at) + '</td>';
+                html += '<td style="white-space:nowrap;">' + formatDate(t.settled_at) + '</td>';
                 html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
                 html += '<td style="font-size:12px;color:#666;">' + (qontoCategory || '<span class="text-muted">-</span>') + '</td>';
-                html += '<td><select onchange="updateTransactionCategory(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + catOptions + '</select></td>';
-                html += '<td><select onchange="updateTransactionProject(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + projOptions + '</select></td>';
-                html += '<td><select onchange="updateTransactionClient(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + clientOptions + '</select></td>';
+                html += '<td><select onchange="updateTransactionCategory(\'' + t.id + '\', this.value)" style="width:100px;padding:4px 6px;font-size:12px;">' + catOptions + '</select></td>';
+                html += '<td><select onchange="updateTransactionProject(\'' + t.id + '\', this.value)" style="width:100px;padding:4px 6px;font-size:12px;">' + projOptions + '</select></td>';
+                html += '<td><select onchange="updateTransactionClient(\'' + t.id + '\', this.value)" style="width:100px;padding:4px 6px;font-size:12px;">' + clientOptions + '</select></td>';
+                html += '<td style="text-align:right;font-size:12px;color:#666;">' + (vatAmount ? fmt(vatAmount) : '-') + '</td>';
                 html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
                 html += '</tr>';
             });
-            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
+            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
         function renderPL() {

@@ -607,6 +607,10 @@ def api_data():
                     # Qonto Category (stored as text)
                     qonto_category = r.get("Qonto Category") or r.get("qonto_category") or r.get("Categoria Qonto") or ""
 
+                    # VAT fields
+                    vat_amount = r.get("VAT Amount") or r.get("vat_amount") or r.get("IVA") or 0
+                    vat_rate = r.get("VAT Rate") or r.get("vat_rate") or r.get("Tipo IVA") or 0
+
                     transactions.append({
                         "id": r.get("id"),
                         "amount": float(amt) if amt else 0,
@@ -617,7 +621,9 @@ def api_data():
                         "category": r.get("Category") or r.get("category") or r.get("Categoria") or "",
                         "project_id": r.get("Project") or r.get("project") or r.get("Proyecto") or "",
                         "client_id": client_id,
-                        "qonto_category": qonto_category
+                        "qonto_category": qonto_category,
+                        "vat_amount": float(vat_amount) if vat_amount else 0,
+                        "vat_rate": float(vat_rate) if vat_rate else 0
                     })
             except Exception as e:
                 pass
