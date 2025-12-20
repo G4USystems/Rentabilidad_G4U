@@ -297,6 +297,12 @@
                         </select>
                     </div>
                     <div class="filter-group">
+                        <label>Cat. Qonto:</label>
+                        <select id="tx-filter-qonto-cat" onchange="renderTransactions()">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
                         <label>Proyecto:</label>
                         <select id="tx-filter-project" onchange="renderTransactions()">
                             <option value="">Todos</option>
@@ -309,15 +315,12 @@
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label>Categoria:</label>
-                        <select id="tx-filter-category" onchange="renderTransactions()">
+                        <label>Asignacion:</label>
+                        <select id="tx-filter-assigned" onchange="renderTransactions()">
                             <option value="">Todas</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Cat. Qonto:</label>
-                        <select id="tx-filter-qonto-cat" onchange="renderTransactions()">
-                            <option value="">Todas</option>
+                            <option value="assigned">Asignadas</option>
+                            <option value="unassigned">Sin asignar</option>
+                            <option value="partial">Parcialmente asignadas</option>
                         </select>
                     </div>
                     <div class="filter-group">
@@ -342,16 +345,14 @@
                                     <th class="sortable" onclick="sortTransactions('settled_at')">Fecha <span id="sort-settled_at"></span></th>
                                     <th class="sortable" onclick="sortTransactions('counterparty_name')">Descripcion <span id="sort-counterparty_name"></span></th>
                                     <th class="sortable" onclick="sortTransactions('qonto_category')">Cat. Qonto <span id="sort-qonto_category"></span></th>
-                                    <th>Categoria</th>
-                                    <th>Proyecto</th>
-                                    <th>Cliente</th>
+                                    <th>Asignacion</th>
                                     <th class="sortable" onclick="sortTransactions('vat_amount')" style="text-align:right">IVA <span id="sort-vat_amount"></span></th>
                                     <th class="sortable" onclick="sortTransactions('amount')" style="text-align:right">Monto <span id="sort-amount"></span></th>
                                     <th style="width:60px;"></th>
                                 </tr>
                             </thead>
                             <tbody id="transactions-table">
-                                <tr><td colspan="9" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                <tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -886,18 +887,26 @@
                     <h4 style="margin-bottom:12px;">Agregar asignacion</h4>
                     <div class="form-row">
                         <div class="form-group">
+                            <label>Categoria</label>
+                            <select id="tx-alloc-category" style="width:100%;">
+                                <option value="">Sin categoria</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Proyecto</label>
                             <select id="tx-alloc-project" style="width:100%;">
                                 <option value="">Sin proyecto</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="form-row">
                         <div class="form-group">
                             <label>Cliente</label>
                             <select id="tx-alloc-client" style="width:100%;">
                                 <option value="">Sin cliente</option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex:0 0 80px;">
+                        <div class="form-group" style="flex:0 0 100px;">
                             <label>%</label>
                             <input type="number" id="tx-alloc-pct" min="0" max="100" value="100" style="width:100%;">
                         </div>
@@ -1101,6 +1110,18 @@
         }
 
         function populateTransactionFilters() {
+            // Populate Qonto category filter (unique values from transactions)
+            var qontoCats = {};
+            transactions.forEach(function(t) {
+                if (t.qonto_category) qontoCats[t.qonto_category] = true;
+            });
+            var qontoCatFilter = document.getElementById('tx-filter-qonto-cat');
+            var qontoCatHtml = '<option value="">Todas</option>';
+            Object.keys(qontoCats).sort().forEach(function(cat) {
+                qontoCatHtml += '<option value="' + cat + '">' + cat + '</option>';
+            });
+            qontoCatFilter.innerHTML = qontoCatHtml;
+
             // Populate project filter
             var projFilter = document.getElementById('tx-filter-project');
             var projHtml = '<option value="">Todos</option>';
@@ -1116,34 +1137,14 @@
                 clientHtml += '<option value="' + c.id + '">' + c.name + '</option>';
             });
             clientFilter.innerHTML = clientHtml;
-
-            // Populate category filter
-            var catFilter = document.getElementById('tx-filter-category');
-            var catHtml = '<option value="">Todas</option>';
-            categories.forEach(function(c) {
-                catHtml += '<option value="' + c.name + '">' + c.name + '</option>';
-            });
-            catFilter.innerHTML = catHtml;
-
-            // Populate Qonto category filter (unique values from transactions)
-            var qontoCats = {};
-            transactions.forEach(function(t) {
-                if (t.qonto_category) qontoCats[t.qonto_category] = true;
-            });
-            var qontoCatFilter = document.getElementById('tx-filter-qonto-cat');
-            var qontoCatHtml = '<option value="">Todas</option>';
-            Object.keys(qontoCats).sort().forEach(function(cat) {
-                qontoCatHtml += '<option value="' + cat + '">' + cat + '</option>';
-            });
-            qontoCatFilter.innerHTML = qontoCatHtml;
         }
 
         function renderTransactions() {
             var filterType = document.getElementById('tx-filter-type').value;
+            var filterQontoCat = document.getElementById('tx-filter-qonto-cat').value;
             var filterProject = document.getElementById('tx-filter-project').value;
             var filterClient = document.getElementById('tx-filter-client').value;
-            var filterCategory = document.getElementById('tx-filter-category').value;
-            var filterQontoCat = document.getElementById('tx-filter-qonto-cat').value;
+            var filterAssigned = document.getElementById('tx-filter-assigned').value;
             var filterFrom = document.getElementById('tx-filter-from').value;
             var filterTo = document.getElementById('tx-filter-to').value;
             var search = (document.getElementById('tx-search').value || '').toLowerCase();
@@ -1151,26 +1152,48 @@
             var filtered = transactions.filter(function(t) {
                 // Type filter
                 if (filterType && t.side !== filterType) return false;
-                // Project filter
-                if (filterProject && t.project_id !== filterProject) return false;
-                // Client filter
-                if (filterClient && t.client_id !== filterClient) return false;
-                // Category filter
-                if (filterCategory && t.category !== filterCategory) return false;
                 // Qonto category filter
                 if (filterQontoCat && t.qonto_category !== filterQontoCat) return false;
                 // Date range filter
                 if (filterFrom && t.settled_at < filterFrom) return false;
                 if (filterTo && t.settled_at > filterTo) return false;
+
+                // Get allocations for this transaction
+                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
+                var totalPct = txAllocs.reduce(function(sum, a) { return sum + a.percentage; }, 0);
+
+                // Project filter (based on allocations)
+                if (filterProject) {
+                    var hasProject = txAllocs.some(function(a) { return a.project_id === filterProject; });
+                    if (!hasProject) return false;
+                }
+                // Client filter (based on allocations)
+                if (filterClient) {
+                    var hasClient = txAllocs.some(function(a) { return a.client_id === filterClient; });
+                    if (!hasClient) return false;
+                }
+                // Assignment status filter
+                if (filterAssigned === 'assigned' && totalPct < 100) return false;
+                if (filterAssigned === 'unassigned' && totalPct > 0) return false;
+                if (filterAssigned === 'partial' && (totalPct === 0 || totalPct >= 100)) return false;
+
                 // Search filter
                 if (search) {
-                    var clientName = '';
-                    if (t.client_id) {
-                        var client = clients.find(function(c) { return c.id === t.client_id; });
-                        if (client) clientName = client.name;
-                    }
                     var qontoCat = t.qonto_category || '';
-                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '') + ' ' + clientName + ' ' + qontoCat).toLowerCase();
+                    var allocInfo = txAllocs.map(function(a) {
+                        var parts = [];
+                        if (a.category) parts.push(a.category);
+                        if (a.project_id) {
+                            var p = projects.find(function(p) { return p.id === a.project_id; });
+                            if (p) parts.push(p.name);
+                        }
+                        if (a.client_id) {
+                            var c = clients.find(function(c) { return c.id === a.client_id; });
+                            if (c) parts.push(c.name);
+                        }
+                        return parts.join(' ');
+                    }).join(' ');
+                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + qontoCat + ' ' + allocInfo).toLowerCase();
                     if (text.indexOf(search) === -1) return false;
                 }
                 return true;
@@ -1196,62 +1219,84 @@
                 var qontoCategory = t.qonto_category || '';
                 var vatAmount = t.vat_amount || 0;
 
-                // Build category dropdown
-                var catOptions = '<option value="">Sin categoria</option>';
-                categories.forEach(function(c) {
-                    var sel = (t.category === c.name) ? ' selected' : '';
-                    catOptions += '<option value="' + c.name + '"' + sel + '>' + c.name + '</option>';
-                });
-
-                // Build project dropdown
-                var projOptions = '<option value="">Sin proyecto</option>';
-                projects.forEach(function(p) {
-                    var sel = (t.project_id === p.id) ? ' selected' : '';
-                    projOptions += '<option value="' + p.id + '"' + sel + '>' + p.name + '</option>';
-                });
-
-                // Build client dropdown
-                var clientOptions = '<option value="">Sin cliente</option>';
-                clients.forEach(function(c) {
-                    var sel = (t.client_id === c.id) ? ' selected' : '';
-                    clientOptions += '<option value="' + c.id + '"' + sel + '>' + c.name + '</option>';
-                });
-
-                // Check if has allocations
+                // Build allocation summary
                 var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
                 var allocPct = txAllocs.reduce(function(sum, a) { return sum + a.percentage; }, 0);
-                var allocBadge = allocPct > 0 ? '<span style="background:#10b981;color:white;padding:2px 6px;border-radius:10px;font-size:10px;margin-left:4px;">' + allocPct + '%</span>' : '';
+                var allocSummary = '';
+                if (txAllocs.length === 0) {
+                    allocSummary = '<span class="text-muted" style="font-size:11px;">Sin asignar</span>';
+                } else {
+                    var summaryParts = [];
+                    txAllocs.forEach(function(a) {
+                        var parts = [];
+                        if (a.category) parts.push(a.category);
+                        if (a.project_id) {
+                            var proj = projects.find(function(p) { return p.id === a.project_id; });
+                            if (proj) parts.push(proj.name);
+                        }
+                        if (a.client_id) {
+                            var client = clients.find(function(c) { return c.id === a.client_id; });
+                            if (client) parts.push(client.name);
+                        }
+                        if (parts.length > 0) {
+                            summaryParts.push(parts.join('/') + ' ' + a.percentage + '%');
+                        }
+                    });
+                    allocSummary = '<span style="font-size:11px;">' + summaryParts.join(', ') + '</span>';
+                    if (allocPct === 100) {
+                        allocSummary += '<span style="background:#10b981;color:white;padding:1px 4px;border-radius:8px;font-size:9px;margin-left:4px;">✓</span>';
+                    } else {
+                        allocSummary += '<span style="background:#f59e0b;color:white;padding:1px 4px;border-radius:8px;font-size:9px;margin-left:4px;">' + allocPct + '%</span>';
+                    }
+                }
 
                 html += '<tr>';
                 html += '<td style="white-space:nowrap;">' + formatDate(t.settled_at) + '</td>';
-                html += '<td>' + (t.counterparty_name || t.label || '-') + allocBadge + '</td>';
+                html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
                 html += '<td style="font-size:12px;color:#666;">' + (qontoCategory || '<span class="text-muted">-</span>') + '</td>';
-                html += '<td><select onchange="updateTransactionCategory(\'' + t.id + '\', this.value)" style="width:100px;padding:4px 6px;font-size:12px;">' + catOptions + '</select></td>';
-                html += '<td><select onchange="updateTransactionProject(\'' + t.id + '\', this.value)" style="width:100px;padding:4px 6px;font-size:12px;">' + projOptions + '</select></td>';
-                html += '<td><select onchange="updateTransactionClient(\'' + t.id + '\', this.value)" style="width:100px;padding:4px 6px;font-size:12px;">' + clientOptions + '</select></td>';
+                html += '<td style="max-width:250px;">' + allocSummary + ' <button onclick="openTxAllocation(\'' + t.id + '\')" class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;margin-left:4px;">Asignar</button></td>';
                 html += '<td style="text-align:right;font-size:12px;color:#666;">' + (vatAmount ? fmt(vatAmount) : '-') + '</td>';
                 html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
-                html += '<td><button onclick="openTxAllocation(\'' + t.id + '\')" class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;">%</button></td>';
+                html += '<td></td>';
                 html += '</tr>';
             });
-            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="9" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
+            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
         function renderPL() {
-            // Group by Income/Expense
+            // Group by Income/Expense using allocation categories
             var income = 0, expenses = 0;
             var byCategory = {};
 
             filteredTransactions.forEach(function(t) {
                 var amt = parseFloat(t.amount) || 0;
-                var cat = t.category || 'Sin categoria';
-                if (!byCategory[cat]) byCategory[cat] = {income: 0, expense: 0};
-                if (t.side === 'credit') {
-                    income += amt;
-                    byCategory[cat].income += amt;
+                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
+
+                if (txAllocs.length > 0) {
+                    // Distribute by allocations
+                    txAllocs.forEach(function(alloc) {
+                        var allocAmt = amt * alloc.percentage / 100;
+                        var cat = alloc.category || 'Sin categoria';
+                        if (!byCategory[cat]) byCategory[cat] = {income: 0, expense: 0};
+                        if (t.side === 'credit') {
+                            income += allocAmt;
+                            byCategory[cat].income += allocAmt;
+                        } else {
+                            expenses += allocAmt;
+                            byCategory[cat].expense += allocAmt;
+                        }
+                    });
                 } else {
-                    expenses += amt;
-                    byCategory[cat].expense += amt;
+                    // No allocations - put in "Sin categoria"
+                    var cat = 'Sin categoria';
+                    if (!byCategory[cat]) byCategory[cat] = {income: 0, expense: 0};
+                    if (t.side === 'credit') {
+                        income += amt;
+                        byCategory[cat].income += amt;
+                    } else {
+                        expenses += amt;
+                        byCategory[cat].expense += amt;
+                    }
                 }
             });
 
@@ -2132,13 +2177,21 @@
             document.getElementById('tx-alloc-desc').textContent = tx.counterparty_name || tx.label || '-';
             document.getElementById('tx-alloc-amount').textContent = fmt(tx.amount);
 
-            // Populate project and client selects
+            // Populate category select
+            var catHtml = '<option value="">Sin categoria</option>';
+            categories.forEach(function(c) {
+                catHtml += '<option value="' + c.name + '">' + c.name + '</option>';
+            });
+            document.getElementById('tx-alloc-category').innerHTML = catHtml;
+
+            // Populate project select
             var projHtml = '<option value="">Sin proyecto</option>';
             projects.forEach(function(p) {
                 projHtml += '<option value="' + p.id + '">' + p.name + '</option>';
             });
             document.getElementById('tx-alloc-project').innerHTML = projHtml;
 
+            // Populate client select
             var clientHtml = '<option value="">Sin cliente</option>';
             clients.forEach(function(c) {
                 clientHtml += '<option value="' + c.id + '">' + c.name + '</option>';
@@ -2146,6 +2199,9 @@
             document.getElementById('tx-alloc-client').innerHTML = clientHtml;
 
             // Reset form
+            document.getElementById('tx-alloc-category').value = '';
+            document.getElementById('tx-alloc-project').value = '';
+            document.getElementById('tx-alloc-client').value = '';
             document.getElementById('tx-alloc-pct').value = '100';
 
             // Render current allocations
@@ -2159,14 +2215,15 @@
             var container = document.getElementById('tx-alloc-list');
 
             if (txAllocs.length === 0) {
-                container.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">Sin asignaciones. La transaccion se asigna 100% a proyecto/cliente seleccionados arriba.</div>';
+                container.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">Sin asignaciones. Usa el formulario abajo para asignar categoria, proyecto y/o cliente.</div>';
                 document.getElementById('tx-alloc-total-pct').textContent = '0%';
                 return;
             }
 
-            var html = '<table style="font-size:13px;"><thead><tr><th>Proyecto</th><th>Cliente</th><th style="text-align:right">%</th><th></th></tr></thead><tbody>';
+            var html = '<table style="font-size:13px;width:100%;"><thead><tr><th>Categoria</th><th>Proyecto</th><th>Cliente</th><th style="text-align:right">%</th><th></th></tr></thead><tbody>';
             var totalPct = 0;
             txAllocs.forEach(function(a) {
+                var catName = a.category || '-';
                 var projName = '-';
                 var clientName = '-';
                 if (a.project_id) {
@@ -2179,6 +2236,7 @@
                 }
                 totalPct += a.percentage;
                 html += '<tr>';
+                html += '<td>' + catName + '</td>';
                 html += '<td>' + projName + '</td>';
                 html += '<td>' + clientName + '</td>';
                 html += '<td style="text-align:right">' + a.percentage + '%</td>';
@@ -2192,12 +2250,13 @@
         }
 
         function addTransactionAllocation() {
+            var category = document.getElementById('tx-alloc-category').value;
             var projectId = document.getElementById('tx-alloc-project').value;
             var clientId = document.getElementById('tx-alloc-client').value;
             var percentage = parseFloat(document.getElementById('tx-alloc-pct').value) || 0;
 
-            if (!projectId && !clientId) {
-                alert('Selecciona al menos un proyecto o cliente');
+            if (!category && !projectId && !clientId) {
+                alert('Selecciona al menos una categoria, proyecto o cliente');
                 return;
             }
             if (percentage <= 0 || percentage > 100) {
@@ -2210,6 +2269,7 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     transaction_id: currentAllocTxId,
+                    category: category || '',
                     project_id: projectId || null,
                     client_id: clientId || null,
                     percentage: percentage

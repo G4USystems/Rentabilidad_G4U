@@ -1666,12 +1666,15 @@ def api_transaction_allocations():
             # Client is a linked record
             client_field = r.get("Client") or []
             client_id = client_field[0] if isinstance(client_field, list) and client_field else ""
+            # Category is text
+            category = r.get("Category") or ""
 
             allocations.append({
                 "id": r.get("id"),
                 "transaction_id": tx_id,
                 "project_id": proj_id,
                 "client_id": client_id,
+                "category": category,
                 "percentage": float(r.get("Percentage") or 0)
             })
         return jsonify({"allocations": allocations})
@@ -1695,12 +1698,14 @@ def api_transaction_allocations_by_tx(transaction_id):
             proj_id = proj_field[0] if isinstance(proj_field, list) and proj_field else ""
             client_field = r.get("Client") or []
             client_id = client_field[0] if isinstance(client_field, list) and client_field else ""
+            category = r.get("Category") or ""
 
             allocations.append({
                 "id": r.get("id"),
                 "transaction_id": tx_id,
                 "project_id": proj_id,
                 "client_id": client_id,
+                "category": category,
                 "percentage": float(r.get("Percentage") or 0)
             })
         return jsonify({"allocations": allocations})
@@ -1718,10 +1723,11 @@ def api_create_transaction_allocation():
             "Transaction": [data.get("transaction_id")] if data.get("transaction_id") else [],
             "Project": [data.get("project_id")] if data.get("project_id") else [],
             "Client": [data.get("client_id")] if data.get("client_id") else [],
+            "Category": data.get("category", ""),
             "Percentage": float(data.get("percentage", 0))
         }
 
-        # Remove empty arrays
+        # Remove empty values
         record = {k: v for k, v in record.items() if v}
 
         result = airtable.create("Transaction Allocations", record)
