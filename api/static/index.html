@@ -1302,26 +1302,71 @@
 
         function renderProjectsWithAllocations(allAllocations) {
             var byProject = {};
+            var byClient = {};
             var totalIncome = 0;
 
             projects.forEach(function(p) {
                 byProject[p.id] = {name: p.name, income: 0, expense: 0, salaries: 0};
             });
+            clients.forEach(function(c) {
+                byClient[c.id] = {name: c.name, income: 0, expense: 0};
+            });
 
             // Also add "Sin proyecto" for unassigned
             byProject['_none'] = {name: 'Sin asignar', income: 0, expense: 0, salaries: 0};
+            byClient['_none'] = {name: 'Sin cliente', income: 0, expense: 0};
 
-            // Add transaction costs
+            // Add transaction costs using transaction allocations
             transactions.forEach(function(t) {
                 var amt = parseFloat(t.amount) || 0;
-                var pid = t.project_id || '_none';
-                if (!byProject[pid]) return;
-                if (t.side === 'credit') {
-                    byProject[pid].income += amt;
-                    totalIncome += amt;
+
+                // Check if transaction has specific allocations
+                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
+
+                if (txAllocs.length > 0) {
+                    // Distribute according to allocations
+                    txAllocs.forEach(function(alloc) {
+                        var allocAmt = amt * alloc.percentage / 100;
+                        var pid = alloc.project_id || '_none';
+                        var cid = alloc.client_id || '_none';
+
+                        if (byProject[pid]) {
+                            if (t.side === 'credit') {
+                                byProject[pid].income += allocAmt;
+                            } else {
+                                byProject[pid].expense += allocAmt;
+                            }
+                        }
+                        if (byClient[cid]) {
+                            if (t.side === 'credit') {
+                                byClient[cid].income += allocAmt;
+                            } else {
+                                byClient[cid].expense += allocAmt;
+                            }
+                        }
+                    });
                 } else {
-                    byProject[pid].expense += amt;
+                    // Use direct project_id/client_id assignment (100%)
+                    var pid = t.project_id || '_none';
+                    var cid = t.client_id || '_none';
+
+                    if (byProject[pid]) {
+                        if (t.side === 'credit') {
+                            byProject[pid].income += amt;
+                        } else {
+                            byProject[pid].expense += amt;
+                        }
+                    }
+                    if (byClient[cid]) {
+                        if (t.side === 'credit') {
+                            byClient[cid].income += amt;
+                        } else {
+                            byClient[cid].expense += amt;
+                        }
+                    }
                 }
+
+                if (t.side === 'credit') totalIncome += amt;
             });
 
             // Add salary allocations (all months)
