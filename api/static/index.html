@@ -306,7 +306,7 @@
                                 <tr>
                                     <th>Fecha</th>
                                     <th>Descripcion</th>
-                                    <th>Labels Qonto</th>
+                                    <th>Cat. Qonto</th>
                                     <th>Categoria</th>
                                     <th>Proyecto</th>
                                     <th>Cliente</th>
@@ -382,7 +382,7 @@
                                 <button class="btn btn-outline" onclick="syncQontoMembers()">Importar Miembros de Qonto</button>
                                 <button class="btn btn-outline" onclick="loadQontoOrganization()">Ver Info Organizacion</button>
                             </div>
-                            <p style="font-size:13px;color:var(--text-muted);margin-top:12px;">Sincronizar importa transacciones nuevas y actualiza labels en todas las existentes.</p>
+                            <p style="font-size:13px;color:var(--text-muted);margin-top:12px;">Sincronizar importa transacciones nuevas y actualiza categorias de Qonto en las existentes.</p>
                         </div>
                     </div>
                 </div>
@@ -835,7 +835,6 @@
         var filteredTransactions = [];
         var teamMembers = [];
         var salaryAllocations = [];
-        var qontoLabels = [];  // Labels from Qonto API
 
         // Utilities
         function fmt(n) {
@@ -902,28 +901,6 @@
             }).catch(function(e) {
                 console.error('Error loading data:', e);
             });
-        }
-
-        function loadQontoLabels() {
-            fetch('/api/qonto/labels').then(function(r) { return r.json(); }).then(function(data) {
-                if (data.labels) {
-                    qontoLabels = data.labels;
-                    console.log('Loaded ' + qontoLabels.length + ' Qonto labels');
-                }
-            }).catch(function(e) {
-                console.log('Could not load Qonto labels:', e);
-            });
-        }
-
-        function getLabelNames(labelIds) {
-            if (!labelIds) return '';
-            var ids = labelIds.split(',').map(function(id) { return id.trim(); });
-            var names = [];
-            ids.forEach(function(id) {
-                var label = qontoLabels.find(function(l) { return l.id === id; });
-                if (label) names.push(label.name);
-            });
-            return names.join(', ');
         }
 
         function checkStatus() {
@@ -1036,9 +1013,9 @@
                         var client = clients.find(function(c) { return c.id === t.client_id; });
                         if (client) clientName = client.name;
                     }
-                    // Include Qonto labels in search
-                    var labelNames = getLabelNames(t.label_ids);
-                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '') + ' ' + clientName + ' ' + labelNames).toLowerCase();
+                    // Include Qonto category in search
+                    var qontoCat = t.qonto_category || '';
+                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '') + ' ' + clientName + ' ' + qontoCat).toLowerCase();
                     if (text.indexOf(search) === -1) return false;
                 }
                 return true;
@@ -1049,8 +1026,8 @@
                 var cls = t.side === 'credit' ? 'positive' : 'negative';
                 var sign = t.side === 'credit' ? '+' : '-';
 
-                // Get Qonto label names
-                var labelNames = getLabelNames(t.label_ids);
+                // Get Qonto category
+                var qontoCategory = t.qonto_category || '';
 
                 // Build category dropdown
                 var catOptions = '<option value="">Sin categoria</option>';
@@ -1076,7 +1053,7 @@
                 html += '<tr>';
                 html += '<td>' + formatDate(t.settled_at) + '</td>';
                 html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
-                html += '<td style="font-size:12px;color:#666;">' + (labelNames || '<span class="text-muted">-</span>') + '</td>';
+                html += '<td style="font-size:12px;color:#666;">' + (qontoCategory || '<span class="text-muted">-</span>') + '</td>';
                 html += '<td><select onchange="updateTransactionCategory(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + catOptions + '</select></td>';
                 html += '<td><select onchange="updateTransactionProject(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + projOptions + '</select></td>';
                 html += '<td><select onchange="updateTransactionClient(\'' + t.id + '\', this.value)" style="width:120px;padding:4px 8px;">' + clientOptions + '</select></td>';
@@ -1236,10 +1213,10 @@
                 var msg = 'Qonto: ' + (data.qonto_count || 0) + ' transacciones\n';
                 msg += 'Nuevas: ' + (data.synced || 0) + '\n';
                 msg += 'Existentes: ' + (data.skipped || 0) + '\n';
-                msg += 'Labels actualizadas: ' + (data.labels_updated || 0);
+                msg += 'Categorias actualizadas: ' + (data.categories_updated || 0);
                 if (data.fields_found) {
-                    if (!data.fields_found.label_ids) {
-                        msg += '\n\n⚠️ Campo "Label IDs" no encontrado en Airtable.\nCrea un campo llamado "Label IDs" (tipo texto) en la tabla Transactions para guardar las labels.';
+                    if (!data.fields_found.qonto_category) {
+                        msg += '\n\n⚠️ Campo "Qonto Category" no encontrado en Airtable.\nCrea un campo llamado "Qonto Category" (tipo texto) en la tabla Transactions.';
                     }
                 }
                 if (data.error) msg += '\n\nError: ' + data.error;
@@ -1969,7 +1946,6 @@
         loadProjectsSettings();
         loadCategories();
         loadSalaryAllocations();
-        loadQontoLabels();
     </script>
 </body>
 </html>

@@ -604,8 +604,8 @@ def api_data():
                     client_field = r.get("Client") or r.get("client") or r.get("Cliente") or []
                     client_id = client_field[0] if isinstance(client_field, list) and client_field else ""
 
-                    # Label IDs from Qonto (stored as comma-separated string)
-                    label_ids = r.get("Label IDs") or r.get("label_ids") or r.get("Labels") or ""
+                    # Qonto Category (stored as text)
+                    qonto_category = r.get("Qonto Category") or r.get("qonto_category") or r.get("Categoria Qonto") or ""
 
                     transactions.append({
                         "id": r.get("id"),
@@ -617,7 +617,7 @@ def api_data():
                         "category": r.get("Category") or r.get("category") or r.get("Categoria") or "",
                         "project_id": r.get("Project") or r.get("project") or r.get("Proyecto") or "",
                         "client_id": client_id,
-                        "label_ids": label_ids
+                        "qonto_category": qonto_category
                     })
             except Exception as e:
                 pass
@@ -742,6 +742,7 @@ def api_sync():
         vat_rate_field = find_field(["VAT Rate", "vat_rate", "Tipo IVA", "tipo_iva"])
         attachment_ids_field = find_field(["Attachment IDs", "attachment_ids", "Attachments", "attachments"])
         label_ids_field = find_field(["Label IDs", "label_ids", "Labels", "labels"])
+        qonto_category_field = find_field(["Qonto Category", "qonto_category", "Categoria Qonto", "categoria_qonto"])
         card_digits_field = find_field(["Card Last Digits", "card_last_digits", "Tarjeta", "tarjeta"])
 
         # Get existing records to check for duplicates
@@ -805,6 +806,8 @@ def api_sync():
                 record[attachment_ids_field] = ",".join(tx.get("attachment_ids", []))
             if label_ids_field and tx.get("label_ids"):
                 record[label_ids_field] = ",".join(tx.get("label_ids", []))
+            if qonto_category_field and tx.get("category"):
+                record[qonto_category_field] = tx.get("category", "")
             if card_digits_field and tx.get("card_last_digits"):
                 record[card_digits_field] = tx.get("card_last_digits", "")
 
@@ -828,16 +831,16 @@ def api_sync():
                 if len(errors) >= 3:
                     break
 
-        # ===== UPDATE LABELS ON EXISTING TRANSACTIONS =====
-        labels_updated = 0
-        if label_ids_field:
-            # Build map of Qonto transaction_id -> label_ids
-            qonto_labels_map = {}
+        # ===== UPDATE CATEGORIES ON EXISTING TRANSACTIONS =====
+        categories_updated = 0
+        if qonto_category_field:
+            # Build map of Qonto transaction_id -> category
+            qonto_category_map = {}
             for tx in qonto_txs:
                 tx_id = tx.get("transaction_id", "")
-                label_ids = tx.get("label_ids", [])
-                if tx_id and label_ids:
-                    qonto_labels_map[tx_id] = ",".join(label_ids)
+                category = tx.get("category", "")
+                if tx_id and category:
+                    qonto_category_map[tx_id] = category
 
             # Re-fetch existing records to get fresh data
             try:
@@ -857,20 +860,20 @@ def api_sync():
                 if not qonto_id:
                     continue
 
-                # Check if already has labels
-                current_labels = record.get(label_ids_field) or ""
-                if current_labels:
+                # Check if already has category
+                current_category = record.get(qonto_category_field) or ""
+                if current_category:
                     continue
 
-                # Get labels from Qonto
-                new_labels = qonto_labels_map.get(qonto_id, "")
-                if not new_labels:
+                # Get category from Qonto
+                new_category = qonto_category_map.get(qonto_id, "")
+                if not new_category:
                     continue
 
                 # Update record
                 try:
-                    airtable.update(table_name, record_id, {label_ids_field: new_labels})
-                    labels_updated += 1
+                    airtable.update(table_name, record_id, {qonto_category_field: new_category})
+                    categories_updated += 1
                 except:
                     pass
 
@@ -878,7 +881,7 @@ def api_sync():
             "qonto_count": len(qonto_txs),
             "synced": synced,
             "skipped": skipped,
-            "labels_updated": labels_updated,
+            "categories_updated": categories_updated,
             "existing_count": len(existing),
             "table_name": table_name,
             "fields_found": {
@@ -887,8 +890,7 @@ def api_sync():
                 "description": desc_field,
                 "type": type_field,
                 "date": date_field,
-                "label_ids": label_ids_field,
-                "attachment_ids": attachment_ids_field
+                "qonto_category": qonto_category_field
             },
             "errors": errors if errors else None
         })
