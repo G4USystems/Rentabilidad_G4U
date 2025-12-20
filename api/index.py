@@ -1934,6 +1934,30 @@ def api_debug_labels():
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route("/api/debug/transaction-sample")
+def api_debug_transaction_sample():
+    """Show raw Qonto transaction data to see all available fields."""
+    try:
+        qonto = Qonto()
+        slug = qonto.get_bank_account_id()
+        if not slug:
+            return jsonify({"error": "No bank account"})
+
+        with httpx.Client(timeout=30) as client:
+            params = {"slug": slug, "status": "completed", "per_page": 5}
+            r = client.get(f"{qonto.base_url}/transactions", headers=qonto.headers, params=params)
+            if r.status_code == 200:
+                data = r.json()
+                return jsonify({
+                    "sample_transactions": data.get("transactions", []),
+                    "meta": data.get("meta", {})
+                })
+            else:
+                return jsonify({"error": f"Qonto API error: {r.status_code}", "body": r.text})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route("/api/qonto/memberships")
 def api_qonto_memberships():
     """Get all memberships from Qonto."""
