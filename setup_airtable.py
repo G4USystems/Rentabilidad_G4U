@@ -147,6 +147,35 @@ FIELD_UPDATES = {
     ]
 }
 
+def list_tables(token, base_id):
+    """List all tables and their fields."""
+    url = f"https://api.airtable.com/v0/meta/bases/{base_id}/tables"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    print("📋 Estructura actual de Airtable:\n")
+    print("=" * 60)
+
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode('utf-8'))
+
+            for table in result.get("tables", []):
+                print(f"\n🗂️  {table['name']} (ID: {table['id']})")
+                print("-" * 40)
+
+                for field in table.get("fields", []):
+                    field_type = field.get("type", "unknown")
+                    field_name = field.get("name", "?")
+                    print(f"   • {field_name}: {field_type}")
+
+            print("\n" + "=" * 60)
+            print(f"Total: {len(result.get('tables', []))} tablas")
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+
 def get_table_id(token, base_id, table_name):
     """Get table ID by name."""
     url = f"https://api.airtable.com/v0/meta/bases/{base_id}/tables"
@@ -295,7 +324,7 @@ def main():
     parser = argparse.ArgumentParser(description='Setup Airtable tables')
     parser.add_argument('--token', help='Airtable Personal Access Token')
     parser.add_argument('--base', help='Airtable Base ID')
-    parser.add_argument('--mode', choices=['all', 'base', 'new', 'update'],
+    parser.add_argument('--mode', choices=['all', 'base', 'new', 'update', 'list'],
                        default='all', help='What to create/update')
     args = parser.parse_args()
 
@@ -307,11 +336,16 @@ def main():
         print("\nUso:")
         print("  python setup_airtable.py --token TU_TOKEN --base TU_BASE_ID")
         print("\nModos disponibles:")
+        print("  --mode list   : Listar estructura actual de tablas")
         print("  --mode all    : Crear todo (base + nuevas + actualizar)")
         print("  --mode base   : Solo tablas base originales")
         print("  --mode new    : Solo tablas nuevas (allocations, rules)")
         print("  --mode update : Solo actualizar campos en tablas existentes")
         exit(1)
+
+    if args.mode == 'list':
+        list_tables(token, base_id)
+        return
 
     if args.mode in ['all', 'base']:
         create_tables(token, base_id)
