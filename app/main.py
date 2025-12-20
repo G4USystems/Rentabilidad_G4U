@@ -13,6 +13,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api.excel_api import router as excel_router
+from app.api.transactions import router as transactions_router
+from app.api.projects import router as projects_router
+from app.api.clients import router as clients_router
+from app.api.categories import router as categories_router
+from app.api.reports import router as reports_router
+from app.api.kpis import router as kpis_router
+from app.api.assignment_rules import router as assignment_rules_router
+from app.api.scenarios import router as scenarios_router
 
 # Configure logging
 logging.basicConfig(
@@ -62,8 +70,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Excel-based API routes
+# Include Excel-based API routes (storage-agnostic)
 app.include_router(excel_router, prefix="/api/v1")
+
+# Include SQLAlchemy-based API routes (database-backed)
+app.include_router(transactions_router, prefix="/api/v2/transactions", tags=["transactions"])
+app.include_router(projects_router, prefix="/api/v2/projects", tags=["projects"])
+app.include_router(clients_router, prefix="/api/v2/clients", tags=["clients"])
+app.include_router(categories_router, prefix="/api/v2/categories", tags=["categories"])
+app.include_router(reports_router, prefix="/api/v2/reports", tags=["reports"])
+app.include_router(kpis_router, prefix="/api/v2/kpis", tags=["kpis"])
+app.include_router(assignment_rules_router, prefix="/api/v2/assignment-rules", tags=["assignment-rules"])
+app.include_router(scenarios_router, prefix="/api/v2/scenarios", tags=["scenarios"])
 
 
 @app.get("/")

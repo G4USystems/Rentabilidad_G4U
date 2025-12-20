@@ -5,12 +5,14 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, List, Dict, Any
 import logging
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_, case, literal_column
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
-from app.models.transaction import Transaction, TransactionSide
+from app.models.transaction import Transaction, TransactionSide, ReviewStatus
 from app.models.category import Category, CategoryType
 from app.models.project import Project
+from app.models.transaction_allocation import TransactionAllocation
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +42,22 @@ class FinancialService:
         start_date: date,
         end_date: date,
         project_id: Optional[int] = None,
+        client_name: Optional[str] = None,
     ) -> Decimal:
-        """Get total revenue for period."""
+        """
+        Get total revenue for period.
+
+        If project_id or client_name is specified, uses allocations when they exist,
+        falling back to direct transaction.project_id when no allocations exist.
+        """
+        if project_id or client_name:
+            return await self._get_allocated_amount(
+                start_date, end_date, TransactionSide.CREDIT,
+                project_id=project_id, client_name=client_name,
+                category_filter="revenue"
+            )
+
+        # No project/client filter - standard query
         query = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             and_(
                 Transaction.side == TransactionSide.CREDIT,
@@ -50,9 +66,6 @@ class FinancialService:
                 Transaction.is_excluded_from_reports == False,
             )
         )
-
-        if project_id:
-            query = query.where(Transaction.project_id == project_id)
 
         # Only include revenue categories
         query = query.join(Category, isouter=True).where(
@@ -68,8 +81,21 @@ class FinancialService:
         start_date: date,
         end_date: date,
         project_id: Optional[int] = None,
+        client_name: Optional[str] = None,
     ) -> Decimal:
-        """Get total expenses for period."""
+        """
+        Get total expenses for period.
+
+        If project_id or client_name is specified, uses allocations when they exist,
+        falling back to direct transaction.project_id when no allocations exist.
+        """
+        if project_id or client_name:
+            return await self._get_allocated_amount(
+                start_date, end_date, TransactionSide.DEBIT,
+                project_id=project_id, client_name=client_name
+            )
+
+        # No project/client filter - standard query
         query = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             and_(
                 Transaction.side == TransactionSide.DEBIT,
@@ -79,11 +105,95 @@ class FinancialService:
             )
         )
 
-        if project_id:
-            query = query.where(Transaction.project_id == project_id)
-
         result = await self.db.execute(query)
         return Decimal(str(result.scalar() or 0))
+
+    async def _get_allocated_amount(
+        self,
+        start_date: date,
+        end_date: date,
+        side: TransactionSide,
+        project_id: Optional[int] = None,
+        client_name: Optional[str] = None,
+        category_filter: Optional[str] = None,
+    ) -> Decimal:
+        """
+        Get amounts considering allocations for project/client filtering.
+
+        Logic:
+        1. Sum amount_allocated from allocations matching project_id/client_name
+        2. For transactions without allocations, use full amount if they match
+           the project_id (fallback behavior)
+        """
+        # Part 1: Sum from allocations
+        alloc_query = (
+            select(func.coalesce(func.sum(TransactionAllocation.amount_allocated), 0))
+            .join(Transaction, TransactionAllocation.transaction_id == Transaction.id)
+            .where(
+                and_(
+                    Transaction.transaction_date >= start_date,
+                    Transaction.transaction_date <= end_date,
+                    Transaction.is_excluded_from_reports == False,
+                    Transaction.side == side,
+                )
+            )
+        )
+
+        # Apply category filter for revenue if needed
+        if category_filter == "revenue":
+            alloc_query = alloc_query.join(Category, Transaction.category_id == Category.id, isouter=True).where(
+                or_(
+                    Category.type.in_([CategoryType.REVENUE, CategoryType.OTHER_INCOME]),
+                    Transaction.category_id.is_(None)
+                )
+            )
+
+        # Filter by project_id and/or client_name
+        allocation_conditions = []
+        if project_id:
+            allocation_conditions.append(TransactionAllocation.project_id == project_id)
+        if client_name:
+            allocation_conditions.append(TransactionAllocation.client_name == client_name)
+
+        if allocation_conditions:
+            alloc_query = alloc_query.where(or_(*allocation_conditions))
+
+        result = await self.db.execute(alloc_query)
+        allocated_total = Decimal(str(result.scalar() or 0))
+
+        # Part 2: Fallback - transactions with project_id but NO allocations
+        if project_id:
+            # Get IDs of transactions that have allocations
+            subquery = (
+                select(TransactionAllocation.transaction_id)
+                .distinct()
+            )
+
+            fallback_query = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+                and_(
+                    Transaction.project_id == project_id,
+                    Transaction.transaction_date >= start_date,
+                    Transaction.transaction_date <= end_date,
+                    Transaction.is_excluded_from_reports == False,
+                    Transaction.side == side,
+                    ~Transaction.id.in_(subquery),  # Not in allocations table
+                )
+            )
+
+            if category_filter == "revenue":
+                fallback_query = fallback_query.join(Category, isouter=True).where(
+                    or_(
+                        Category.type.in_([CategoryType.REVENUE, CategoryType.OTHER_INCOME]),
+                        Transaction.category_id.is_(None)
+                    )
+                )
+
+            result = await self.db.execute(fallback_query)
+            fallback_total = Decimal(str(result.scalar() or 0))
+        else:
+            fallback_total = Decimal("0")
+
+        return allocated_total + fallback_total
 
     async def get_amounts_by_category_type(
         self,
@@ -91,8 +201,15 @@ class FinancialService:
         end_date: date,
         category_type: CategoryType,
         project_id: Optional[int] = None,
+        client_name: Optional[str] = None,
     ) -> Decimal:
-        """Get total amount for a specific category type."""
+        """Get total amount for a specific category type, considering allocations."""
+        if project_id or client_name:
+            # Use allocation-aware calculation
+            return await self._get_allocated_category_amount(
+                start_date, end_date, category_type, project_id, client_name
+            )
+
         query = (
             select(func.coalesce(func.sum(Transaction.amount), 0))
             .join(Category)
@@ -106,11 +223,70 @@ class FinancialService:
             )
         )
 
-        if project_id:
-            query = query.where(Transaction.project_id == project_id)
-
         result = await self.db.execute(query)
         return Decimal(str(result.scalar() or 0))
+
+    async def _get_allocated_category_amount(
+        self,
+        start_date: date,
+        end_date: date,
+        category_type: CategoryType,
+        project_id: Optional[int] = None,
+        client_name: Optional[str] = None,
+    ) -> Decimal:
+        """Get category amount considering allocations."""
+        # Part 1: Sum from allocations
+        alloc_query = (
+            select(func.coalesce(func.sum(TransactionAllocation.amount_allocated), 0))
+            .join(Transaction, TransactionAllocation.transaction_id == Transaction.id)
+            .join(Category, Transaction.category_id == Category.id)
+            .where(
+                and_(
+                    Category.type == category_type,
+                    Transaction.transaction_date >= start_date,
+                    Transaction.transaction_date <= end_date,
+                    Transaction.is_excluded_from_reports == False,
+                )
+            )
+        )
+
+        allocation_conditions = []
+        if project_id:
+            allocation_conditions.append(TransactionAllocation.project_id == project_id)
+        if client_name:
+            allocation_conditions.append(TransactionAllocation.client_name == client_name)
+
+        if allocation_conditions:
+            alloc_query = alloc_query.where(or_(*allocation_conditions))
+
+        result = await self.db.execute(alloc_query)
+        allocated_total = Decimal(str(result.scalar() or 0))
+
+        # Part 2: Fallback for transactions without allocations
+        if project_id:
+            subquery = select(TransactionAllocation.transaction_id).distinct()
+
+            fallback_query = (
+                select(func.coalesce(func.sum(Transaction.amount), 0))
+                .join(Category)
+                .where(
+                    and_(
+                        Category.type == category_type,
+                        Transaction.project_id == project_id,
+                        Transaction.transaction_date >= start_date,
+                        Transaction.transaction_date <= end_date,
+                        Transaction.is_excluded_from_reports == False,
+                        ~Transaction.id.in_(subquery),
+                    )
+                )
+            )
+
+            result = await self.db.execute(fallback_query)
+            fallback_total = Decimal(str(result.scalar() or 0))
+        else:
+            fallback_total = Decimal("0")
+
+        return allocated_total + fallback_total
 
     async def get_breakdown_by_category(
         self,
@@ -376,3 +552,143 @@ class FinancialService:
 
         # Monthly average
         return self._round_decimal(net_burn / months)
+
+    # =========================================================================
+    # Client Aggregation Methods (using allocations)
+    # =========================================================================
+
+    async def get_all_clients_summary(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get financial summary aggregated by client_name from allocations.
+
+        Returns clients with their total revenue, expenses, and profit.
+        """
+        # Get unique client names from allocations
+        client_query = (
+            select(TransactionAllocation.client_name)
+            .join(Transaction, TransactionAllocation.transaction_id == Transaction.id)
+            .where(
+                and_(
+                    TransactionAllocation.client_name.isnot(None),
+                    Transaction.transaction_date >= start_date,
+                    Transaction.transaction_date <= end_date,
+                    Transaction.is_excluded_from_reports == False,
+                )
+            )
+            .distinct()
+        )
+
+        result = await self.db.execute(client_query)
+        client_names = [row[0] for row in result.fetchall()]
+
+        # Also get clients from projects that have no allocations (fallback)
+        project_client_query = (
+            select(Project.client_name)
+            .join(Transaction, Transaction.project_id == Project.id)
+            .where(
+                and_(
+                    Project.client_name.isnot(None),
+                    Transaction.transaction_date >= start_date,
+                    Transaction.transaction_date <= end_date,
+                    Transaction.is_excluded_from_reports == False,
+                    ~Transaction.id.in_(
+                        select(TransactionAllocation.transaction_id).distinct()
+                    ),
+                )
+            )
+            .distinct()
+        )
+
+        result = await self.db.execute(project_client_query)
+        for row in result.fetchall():
+            if row[0] and row[0] not in client_names:
+                client_names.append(row[0])
+
+        # Get summary for each client
+        summaries = []
+        for client_name in sorted(client_names):
+            revenue = await self.get_total_revenue(start_date, end_date, client_name=client_name)
+            expenses = await self.get_total_expenses(start_date, end_date, client_name=client_name)
+            profit = revenue - expenses
+            margin = self._calculate_percentage(profit, revenue)
+
+            summaries.append({
+                "client_name": client_name,
+                "total_revenue": revenue,
+                "total_expenses": expenses,
+                "net_profit": profit,
+                "profit_margin": margin,
+            })
+
+        return summaries
+
+    async def get_client_projects_summary(
+        self,
+        client_name: str,
+        start_date: date,
+        end_date: date,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get project breakdown for a specific client.
+
+        Returns all projects with allocations for this client.
+        """
+        # Get projects from allocations
+        project_query = (
+            select(
+                TransactionAllocation.project_id,
+                Project.name,
+                Project.code,
+                func.sum(
+                    case(
+                        (Transaction.side == TransactionSide.CREDIT,
+                         TransactionAllocation.amount_allocated),
+                        else_=Decimal("0")
+                    )
+                ).label("revenue"),
+                func.sum(
+                    case(
+                        (Transaction.side == TransactionSide.DEBIT,
+                         TransactionAllocation.amount_allocated),
+                        else_=Decimal("0")
+                    )
+                ).label("expenses"),
+            )
+            .join(Transaction, TransactionAllocation.transaction_id == Transaction.id)
+            .join(Project, TransactionAllocation.project_id == Project.id, isouter=True)
+            .where(
+                and_(
+                    TransactionAllocation.client_name == client_name,
+                    Transaction.transaction_date >= start_date,
+                    Transaction.transaction_date <= end_date,
+                    Transaction.is_excluded_from_reports == False,
+                )
+            )
+            .group_by(TransactionAllocation.project_id, Project.name, Project.code)
+        )
+
+        result = await self.db.execute(project_query)
+        rows = result.fetchall()
+
+        projects = []
+        for row in rows:
+            revenue = Decimal(str(row.revenue or 0))
+            expenses = Decimal(str(row.expenses or 0))
+            profit = revenue - expenses
+            margin = self._calculate_percentage(profit, revenue)
+
+            projects.append({
+                "project_id": row.project_id,
+                "project_name": row.name,
+                "project_code": row.code,
+                "total_revenue": revenue,
+                "total_expenses": expenses,
+                "net_profit": profit,
+                "profit_margin": margin,
+            })
+
+        return projects
