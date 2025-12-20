@@ -119,3 +119,21 @@ class TransactionFilter(BaseModel):
     max_amount: Optional[Decimal] = None
     search: Optional[str] = None
     include_excluded: bool = False
+
+
+class ProjectSuggestion(BaseModel):
+    """Schema for project suggestion response."""
+
+    project_id: int
+    project_name: str
+    project_code: str
+    client_name: Optional[str] = None
+    score: int
+    matched_terms: List[str]
+
+
+class TransactionProjectSuggestion(BaseModel):
+    """Schema for project suggestion for a transaction."""
+
+    transaction_id: int
+    suggestion: Optional[ProjectSuggestion] = None

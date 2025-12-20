@@ -1,10 +1,11 @@
 """API endpoints for projects."""
 
-from typing import Optional, List
+from typing import Optional, List, Dict
 from decimal import Decimal
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -15,6 +16,9 @@ from app.schemas.project import (
     ProjectUpdate,
     ProjectResponse,
     ProjectSummary,
+    ClientFinancialSummaryResponse,
+    ClientFinancialSummary,
+    ProjectFinancialSummary,
 )
 
 router = APIRouter()
@@ -143,6 +147,91 @@ async def list_projects_with_summary(
         )
 
     return summaries
+
+
+@router.get("/clients/summary", response_model=ClientFinancialSummaryResponse)
+async def list_clients_summary(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    active_only: bool = True,
+    db: AsyncSession = Depends(get_db),
+):
+    """List client summaries with project breakdown."""
+    join_conditions = [
+        Transaction.project_id == Project.id,
+        Transaction.is_excluded_from_reports == False,
+    ]
+    if start_date:
+        join_conditions.append(Transaction.transaction_date >= start_date)
+    if end_date:
+        join_conditions.append(Transaction.transaction_date <= end_date)
+
+    income_case = case(
+        (Transaction.side == TransactionSide.CREDIT, Transaction.amount),
+        else_=0,
+    )
+    expense_case = case(
+        (Transaction.side == TransactionSide.DEBIT, Transaction.amount),
+        else_=0,
+    )
+
+    query = (
+        select(
+            Project.id,
+            Project.name,
+            Project.code,
+            Project.client_name,
+            func.coalesce(func.sum(income_case), 0).label("total_income"),
+            func.coalesce(func.sum(expense_case), 0).label("total_expenses"),
+            func.count(Transaction.id).label("transaction_count"),
+        )
+        .join(Transaction, and_(*join_conditions), isouter=True)
+        .group_by(Project.id)
+        .order_by(Project.client_name.asc().nulls_last(), Project.name.asc())
+    )
+
+    if active_only:
+        query = query.where(Project.is_active == True)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    clients: Dict[str, ClientFinancialSummary] = {}
+    for row in rows:
+        client_name = row.client_name or "Sin Cliente"
+        total_income = Decimal(str(row.total_income or 0))
+        total_expenses = Decimal(str(row.total_expenses or 0))
+        net_profit = total_income - total_expenses
+        project_summary = ProjectFinancialSummary(
+            project_id=row.id,
+            project_name=row.name,
+            project_code=row.code,
+            total_income=total_income,
+            total_expenses=total_expenses,
+            net_profit=net_profit,
+            transaction_count=row.transaction_count or 0,
+        )
+
+        if client_name not in clients:
+            clients[client_name] = ClientFinancialSummary(
+                client_name=client_name,
+                total_income=Decimal("0.00"),
+                total_expenses=Decimal("0.00"),
+                net_profit=Decimal("0.00"),
+                project_count=0,
+                projects=[],
+            )
+
+        client_summary = clients[client_name]
+        client_summary.projects.append(project_summary)
+        client_summary.project_count += 1
+        client_summary.total_income += total_income
+        client_summary.total_expenses += total_expenses
+        client_summary.net_profit += net_profit
+
+    return ClientFinancialSummaryResponse(
+        clients=list(clients.values())
+    )
 
 
 @router.get("/{project_id}", response_model=ProjectSummary)

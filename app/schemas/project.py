@@ -80,3 +80,32 @@ class ProjectSummary(ProjectResponse):
     net_profit: Decimal = Decimal("0.00")
     transaction_count: int = 0
     budget_used_percentage: Optional[Decimal] = None
+
+
+class ProjectFinancialSummary(BaseModel):
+    """Project financial summary for client grouping."""
+
+    project_id: int
+    project_name: str
+    project_code: str
+    total_income: Decimal = Decimal("0.00")
+    total_expenses: Decimal = Decimal("0.00")
+    net_profit: Decimal = Decimal("0.00")
+    transaction_count: int = 0
+
+
+class ClientFinancialSummary(BaseModel):
+    """Client summary with aggregated project data."""
+
+    client_name: str
+    total_income: Decimal = Decimal("0.00")
+    total_expenses: Decimal = Decimal("0.00")
+    net_profit: Decimal = Decimal("0.00")
+    project_count: int = 0
+    projects: List[ProjectFinancialSummary]
+
+
+class ClientFinancialSummaryResponse(BaseModel):
+    """Response schema for client summaries."""
+
+    clients: List[ClientFinancialSummary]
