@@ -1,11 +1,14 @@
 """API endpoints for assignment rules."""
 
 from typing import Optional, List
+import csv
+import io
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.models.assignment_rule import AssignmentRule
@@ -346,3 +349,161 @@ async def bulk_suggest_for_transactions(
         )
 
     return results
+
+
+class BatchImportResult(BaseModel):
+    """Result of batch import."""
+    total_rows: int
+    imported: int
+    skipped: int
+    errors: List[dict]
+
+
+@router.post("/import/csv", response_model=BatchImportResult)
+async def import_rules_from_csv(
+    file: UploadFile = File(...),
+    skip_duplicates: bool = Query(True),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Import assignment rules from a CSV file.
+
+    CSV format:
+    name,keywords,counterparty,counterparty_pattern,client_name_suggested,project_code,priority
+
+    Example:
+    AWS Services,aws amazon ec2,,aws.*,TechCorp,PROJ-001,100
+    Google Ads,google ads advertising,Google Ireland,,Marketing Client,,90
+    """
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+
+    content = await file.read()
+    try:
+        text = content.decode('utf-8')
+    except UnicodeDecodeError:
+        text = content.decode('latin-1')
+
+    reader = csv.DictReader(io.StringIO(text))
+
+    result = BatchImportResult(
+        total_rows=0,
+        imported=0,
+        skipped=0,
+        errors=[],
+    )
+
+    # Get projects for lookup by code
+    project_result = await db.execute(select(Project))
+    projects = {p.code: p for p in project_result.scalars().all() if p.code}
+
+    for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
+        result.total_rows += 1
+
+        try:
+            name = row.get('name', '').strip()
+            if not name:
+                result.errors.append({
+                    "row": row_num,
+                    "error": "Name is required",
+                    "data": row,
+                })
+                continue
+
+            # Check for duplicate
+            if skip_duplicates:
+                existing = await db.execute(
+                    select(AssignmentRule).where(AssignmentRule.name == name)
+                )
+                if existing.scalar_one_or_none():
+                    result.skipped += 1
+                    continue
+
+            # Lookup project by code
+            project_id = None
+            project_code = row.get('project_code', '').strip()
+            if project_code and project_code in projects:
+                project_id = projects[project_code].id
+
+            # Parse priority
+            priority = 0
+            if row.get('priority'):
+                try:
+                    priority = int(row['priority'])
+                except ValueError:
+                    pass
+
+            # Create rule
+            rule = AssignmentRule(
+                name=name,
+                keywords=row.get('keywords', '').strip() or None,
+                counterparty=row.get('counterparty', '').strip() or None,
+                counterparty_pattern=row.get('counterparty_pattern', '').strip() or None,
+                client_name_suggested=row.get('client_name_suggested', '').strip() or None,
+                project_id_suggested=project_id,
+                priority=priority,
+                is_active=True,
+            )
+            db.add(rule)
+            result.imported += 1
+
+        except Exception as e:
+            result.errors.append({
+                "row": row_num,
+                "error": str(e),
+                "data": row,
+            })
+
+    await db.commit()
+    return result
+
+
+@router.get("/export/csv")
+async def export_rules_to_csv(
+    active_only: bool = True,
+    db: AsyncSession = Depends(get_db),
+):
+    """Export all assignment rules to CSV format."""
+    from fastapi.responses import StreamingResponse
+
+    query = (
+        select(AssignmentRule)
+        .options(joinedload(AssignmentRule.project))
+        .order_by(AssignmentRule.priority.desc())
+    )
+
+    if active_only:
+        query = query.where(AssignmentRule.is_active == True)
+
+    result = await db.execute(query)
+    rules = result.unique().scalars().all()
+
+    # Create CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([
+        'name', 'keywords', 'counterparty', 'counterparty_pattern',
+        'client_name_suggested', 'project_code', 'priority', 'is_active'
+    ])
+
+    # Data
+    for rule in rules:
+        writer.writerow([
+            rule.name,
+            rule.keywords or '',
+            rule.counterparty or '',
+            rule.counterparty_pattern or '',
+            rule.client_name_suggested or '',
+            rule.project.code if rule.project else '',
+            rule.priority,
+            rule.is_active,
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=assignment_rules.csv"},
+    )

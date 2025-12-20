@@ -21,6 +21,11 @@ from app.api.reports import router as reports_router
 from app.api.kpis import router as kpis_router
 from app.api.assignment_rules import router as assignment_rules_router
 from app.api.scenarios import router as scenarios_router
+from app.api.alerts import router as alerts_router
+from app.api.audit import router as audit_router
+from app.api.dashboard import router as dashboard_router
+from app.api.forecasting import router as forecasting_router
+from app.api.jobs import router as jobs_router
 
 # Configure logging
 logging.basicConfig(
@@ -82,6 +87,11 @@ app.include_router(reports_router, prefix="/api/v2/reports", tags=["reports"])
 app.include_router(kpis_router, prefix="/api/v2/kpis", tags=["kpis"])
 app.include_router(assignment_rules_router, prefix="/api/v2/assignment-rules", tags=["assignment-rules"])
 app.include_router(scenarios_router, prefix="/api/v2/scenarios", tags=["scenarios"])
+app.include_router(alerts_router, prefix="/api/v2/alerts", tags=["alerts"])
+app.include_router(audit_router, prefix="/api/v2/audit", tags=["audit"])
+app.include_router(dashboard_router, prefix="/api/v2/dashboard", tags=["dashboard"])
+app.include_router(forecasting_router, prefix="/api/v2/forecasting", tags=["forecasting"])
+app.include_router(jobs_router, prefix="/api/v2/jobs", tags=["jobs"])
 
 
 @app.get("/")
