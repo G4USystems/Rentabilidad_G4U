@@ -564,7 +564,8 @@ def api_data():
                 for t in tables:
                     name = t.get("name", "")
                     name_lower = name.lower()
-                    if "trans" in name_lower or "movimiento" in name_lower:
+                    # Exclude "allocation" tables from being matched as transactions
+                    if ("trans" in name_lower or "movimiento" in name_lower) and "alloc" not in name_lower:
                         table_map["transactions"] = name
                     elif "categ" in name_lower:
                         table_map["categories"] = name
@@ -707,10 +708,10 @@ def api_sync():
             )
             if r.status_code == 200:
                 tables = r.json().get("tables", [])
-                # Find a transactions-like table
+                # Find a transactions-like table (exclude allocation tables)
                 for t in tables:
                     name_lower = t.get("name", "").lower()
-                    if "trans" in name_lower or "movimiento" in name_lower or "operacion" in name_lower:
+                    if ("trans" in name_lower or "movimiento" in name_lower or "operacion" in name_lower) and "alloc" not in name_lower:
                         table_info = t
                         table_name = t.get("name")
                         break
@@ -1954,7 +1955,7 @@ def api_qonto_update_transaction_labels():
                 tables = r.json().get("tables", [])
                 for t in tables:
                     name_lower = t.get("name", "").lower()
-                    if "trans" in name_lower or "movimiento" in name_lower:
+                    if ("trans" in name_lower or "movimiento" in name_lower) and "alloc" not in name_lower:
                         table_name = t.get("name")
                         break
                 if not table_name and tables:
