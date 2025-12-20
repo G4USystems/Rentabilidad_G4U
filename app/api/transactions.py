@@ -16,7 +16,9 @@ from app.schemas.transaction import (
     TransactionResponse,
     TransactionListResponse,
     TransactionUpdate,
+    TransactionProjectSuggestion,
 )
+from app.services.project_assignment_service import ProjectAssignmentService
 
 router = APIRouter()
 
@@ -374,3 +376,54 @@ async def bulk_assign_project(
         "status": "success",
         "updated_count": len(transactions),
     }
+
+
+@router.get("/{transaction_id}/project-suggestion", response_model=TransactionProjectSuggestion)
+async def get_project_suggestion(
+    transaction_id: int,
+    min_score: int = Query(3, ge=1),
+    db: AsyncSession = Depends(get_db),
+):
+    """Suggest a project for a transaction based on project metadata."""
+    result = await db.execute(
+        select(Transaction).where(Transaction.id == transaction_id)
+    )
+    tx = result.scalar_one_or_none()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    service = ProjectAssignmentService(db)
+    suggestion = await service.suggest_project_for_transaction(tx, min_score=min_score)
+
+    return TransactionProjectSuggestion(
+        transaction_id=transaction_id,
+        suggestion=suggestion,
+    )
+
+
+@router.post("/bulk/suggest-projects", response_model=List[TransactionProjectSuggestion])
+async def bulk_suggest_projects(
+    transaction_ids: List[int],
+    min_score: int = Query(3, ge=1),
+    db: AsyncSession = Depends(get_db),
+):
+    """Suggest projects for multiple transactions."""
+    result = await db.execute(
+        select(Transaction).where(Transaction.id.in_(transaction_ids))
+    )
+    transactions = result.scalars().all()
+    if not transactions:
+        return []
+
+    service = ProjectAssignmentService(db)
+    suggestions = []
+    for tx in transactions:
+        suggestion = await service.suggest_project_for_transaction(tx, min_score=min_score)
+        suggestions.append(
+            TransactionProjectSuggestion(
+                transaction_id=tx.id,
+                suggestion=suggestion,
+            )
+        )
+
+    return suggestions
