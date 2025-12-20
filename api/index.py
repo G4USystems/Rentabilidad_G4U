@@ -986,6 +986,10 @@ def api_schema_check():
                 "fields": ["Team Member ID", "Team Member Name", "Project ID", "Project Name", "Percentage", "Month", "Amount"],
                 "description": "Asignacion de salarios a proyectos por mes"
             },
+            "Transaction Allocations": {
+                "fields": ["Transaction", "Project", "Client", "Percentage"],
+                "description": "Asignacion de transacciones a proyectos/clientes en porcentaje"
+            },
             "Projects": {
                 "fields": ["Name", "Client", "Status"],
                 "description": "Proyectos para tracking de rentabilidad"
@@ -1638,6 +1642,119 @@ def api_delete_salary_allocation(allocation_id):
     try:
         airtable = Airtable()
         airtable.delete_batch("Salary Allocations", [allocation_id])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ==================== Transaction Allocations ====================
+
+@app.route("/api/transaction-allocations")
+def api_transaction_allocations():
+    """Get all transaction allocations."""
+    try:
+        airtable = Airtable()
+        records = airtable.get_all("Transaction Allocations")
+        allocations = []
+        for r in records:
+            # Transaction is a linked record - returns array
+            tx_field = r.get("Transaction") or []
+            tx_id = tx_field[0] if isinstance(tx_field, list) and tx_field else ""
+            # Project is a linked record
+            proj_field = r.get("Project") or []
+            proj_id = proj_field[0] if isinstance(proj_field, list) and proj_field else ""
+            # Client is a linked record
+            client_field = r.get("Client") or []
+            client_id = client_field[0] if isinstance(client_field, list) and client_field else ""
+
+            allocations.append({
+                "id": r.get("id"),
+                "transaction_id": tx_id,
+                "project_id": proj_id,
+                "client_id": client_id,
+                "percentage": float(r.get("Percentage") or 0)
+            })
+        return jsonify({"allocations": allocations})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/transaction-allocations/<transaction_id>")
+def api_transaction_allocations_by_tx(transaction_id):
+    """Get allocations for a specific transaction."""
+    try:
+        airtable = Airtable()
+        records = airtable.get_all("Transaction Allocations")
+        allocations = []
+        for r in records:
+            tx_field = r.get("Transaction") or []
+            tx_id = tx_field[0] if isinstance(tx_field, list) and tx_field else ""
+            if tx_id != transaction_id:
+                continue
+            proj_field = r.get("Project") or []
+            proj_id = proj_field[0] if isinstance(proj_field, list) and proj_field else ""
+            client_field = r.get("Client") or []
+            client_id = client_field[0] if isinstance(client_field, list) and client_field else ""
+
+            allocations.append({
+                "id": r.get("id"),
+                "transaction_id": tx_id,
+                "project_id": proj_id,
+                "client_id": client_id,
+                "percentage": float(r.get("Percentage") or 0)
+            })
+        return jsonify({"allocations": allocations})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/transaction-allocation", methods=["POST"])
+def api_create_transaction_allocation():
+    """Create a new transaction allocation."""
+    try:
+        data = request.json
+        airtable = Airtable()
+
+        record = {
+            "Transaction": [data.get("transaction_id")] if data.get("transaction_id") else [],
+            "Project": [data.get("project_id")] if data.get("project_id") else [],
+            "Client": [data.get("client_id")] if data.get("client_id") else [],
+            "Percentage": float(data.get("percentage", 0))
+        }
+
+        # Remove empty arrays
+        record = {k: v for k, v in record.items() if v}
+
+        result = airtable.create("Transaction Allocations", record)
+        return jsonify({"ok": True, "id": result.get("id")})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/transaction-allocation/<allocation_id>", methods=["PUT"])
+def api_update_transaction_allocation(allocation_id):
+    """Update a transaction allocation."""
+    try:
+        data = request.json
+        airtable = Airtable()
+
+        record = {}
+        if "project_id" in data:
+            record["Project"] = [data["project_id"]] if data["project_id"] else []
+        if "client_id" in data:
+            record["Client"] = [data["client_id"]] if data["client_id"] else []
+        if "percentage" in data:
+            record["Percentage"] = float(data["percentage"])
+
+        airtable.update("Transaction Allocations", allocation_id, record)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/transaction-allocation/<allocation_id>", methods=["DELETE"])
+def api_delete_transaction_allocation(allocation_id):
+    """Delete a transaction allocation."""
+    try:
+        airtable = Airtable()
+        airtable.delete_batch("Transaction Allocations", [allocation_id])
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

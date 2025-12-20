@@ -347,10 +347,11 @@
                                     <th>Cliente</th>
                                     <th class="sortable" onclick="sortTransactions('vat_amount')" style="text-align:right">IVA <span id="sort-vat_amount"></span></th>
                                     <th class="sortable" onclick="sortTransactions('amount')" style="text-align:right">Monto <span id="sort-amount"></span></th>
+                                    <th style="width:60px;"></th>
                                 </tr>
                             </thead>
                             <tbody id="transactions-table">
-                                <tr><td colspan="8" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                <tr><td colspan="9" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -862,6 +863,54 @@
         </div>
     </div>
 
+    <!-- Transaction Allocation Modal -->
+    <div class="modal-overlay" id="modal-tx-allocation">
+        <div class="modal" style="max-width:600px;">
+            <div class="modal-header">
+                <h2>Asignar a Proyectos/Clientes</h2>
+                <span class="modal-close" onclick="closeModal('tx-allocation')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="tx-alloc-info" style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;">
+                    <strong id="tx-alloc-desc">-</strong><br>
+                    <span class="text-muted">Monto: </span><span id="tx-alloc-amount">-</span>
+                </div>
+                <div id="tx-alloc-list" style="margin-bottom:16px;">
+                    <!-- Allocations will be rendered here -->
+                </div>
+                <div id="tx-alloc-total" style="margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:8px;display:flex;justify-content:space-between;">
+                    <span>Total asignado:</span>
+                    <strong id="tx-alloc-total-pct">0%</strong>
+                </div>
+                <div style="border-top:1px solid var(--border);padding-top:16px;">
+                    <h4 style="margin-bottom:12px;">Agregar asignacion</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Proyecto</label>
+                            <select id="tx-alloc-project" style="width:100%;">
+                                <option value="">Sin proyecto</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cliente</label>
+                            <select id="tx-alloc-client" style="width:100%;">
+                                <option value="">Sin cliente</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:0 0 80px;">
+                            <label>%</label>
+                            <input type="number" id="tx-alloc-pct" min="0" max="100" value="100" style="width:100%;">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="addTransactionAllocation()" style="width:100%;">+ Agregar Asignacion</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('tx-allocation')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // State
         var transactions = [];
@@ -871,6 +920,8 @@
         var filteredTransactions = [];
         var teamMembers = [];
         var salaryAllocations = [];
+        var transactionAllocations = [];
+        var currentAllocTxId = null;
         var sortField = 'settled_at';
         var sortDirection = 'desc';
 
@@ -1166,18 +1217,24 @@
                     clientOptions += '<option value="' + c.id + '"' + sel + '>' + c.name + '</option>';
                 });
 
+                // Check if has allocations
+                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
+                var allocPct = txAllocs.reduce(function(sum, a) { return sum + a.percentage; }, 0);
+                var allocBadge = allocPct > 0 ? '<span style="background:#10b981;color:white;padding:2px 6px;border-radius:10px;font-size:10px;margin-left:4px;">' + allocPct + '%</span>' : '';
+
                 html += '<tr>';
                 html += '<td style="white-space:nowrap;">' + formatDate(t.settled_at) + '</td>';
-                html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
+                html += '<td>' + (t.counterparty_name || t.label || '-') + allocBadge + '</td>';
                 html += '<td style="font-size:12px;color:#666;">' + (qontoCategory || '<span class="text-muted">-</span>') + '</td>';
                 html += '<td><select onchange="updateTransactionCategory(\'' + t.id + '\', this.value)" style="width:100px;padding:4px 6px;font-size:12px;">' + catOptions + '</select></td>';
                 html += '<td><select onchange="updateTransactionProject(\'' + t.id + '\', this.value)" style="width:100px;padding:4px 6px;font-size:12px;">' + projOptions + '</select></td>';
                 html += '<td><select onchange="updateTransactionClient(\'' + t.id + '\', this.value)" style="width:100px;padding:4px 6px;font-size:12px;">' + clientOptions + '</select></td>';
                 html += '<td style="text-align:right;font-size:12px;color:#666;">' + (vatAmount ? fmt(vatAmount) : '-') + '</td>';
                 html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
+                html += '<td><button onclick="openTxAllocation(\'' + t.id + '\')" class="btn btn-sm btn-outline" style="padding:4px 8px;font-size:11px;">%</button></td>';
                 html += '</tr>';
             });
-            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
+            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="9" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
         function renderPL() {
@@ -2010,6 +2067,137 @@
             });
         }
 
+        // ==================== Transaction Allocations ====================
+
+        function loadTransactionAllocations() {
+            fetch('/api/transaction-allocations').then(function(r) { return r.json(); }).then(function(data) {
+                transactionAllocations = data.allocations || [];
+                renderTransactions();
+            }).catch(function(e) {
+                console.error('Error loading transaction allocations:', e);
+            });
+        }
+
+        function openTxAllocation(txId) {
+            currentAllocTxId = txId;
+            var tx = transactions.find(function(t) { return t.id === txId; });
+            if (!tx) return;
+
+            // Set transaction info
+            document.getElementById('tx-alloc-desc').textContent = tx.counterparty_name || tx.label || '-';
+            document.getElementById('tx-alloc-amount').textContent = fmt(tx.amount);
+
+            // Populate project and client selects
+            var projHtml = '<option value="">Sin proyecto</option>';
+            projects.forEach(function(p) {
+                projHtml += '<option value="' + p.id + '">' + p.name + '</option>';
+            });
+            document.getElementById('tx-alloc-project').innerHTML = projHtml;
+
+            var clientHtml = '<option value="">Sin cliente</option>';
+            clients.forEach(function(c) {
+                clientHtml += '<option value="' + c.id + '">' + c.name + '</option>';
+            });
+            document.getElementById('tx-alloc-client').innerHTML = clientHtml;
+
+            // Reset form
+            document.getElementById('tx-alloc-pct').value = '100';
+
+            // Render current allocations
+            renderTxAllocations();
+
+            openModal('tx-allocation');
+        }
+
+        function renderTxAllocations() {
+            var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === currentAllocTxId; });
+            var container = document.getElementById('tx-alloc-list');
+
+            if (txAllocs.length === 0) {
+                container.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">Sin asignaciones. La transaccion se asigna 100% a proyecto/cliente seleccionados arriba.</div>';
+                document.getElementById('tx-alloc-total-pct').textContent = '0%';
+                return;
+            }
+
+            var html = '<table style="font-size:13px;"><thead><tr><th>Proyecto</th><th>Cliente</th><th style="text-align:right">%</th><th></th></tr></thead><tbody>';
+            var totalPct = 0;
+            txAllocs.forEach(function(a) {
+                var projName = '-';
+                var clientName = '-';
+                if (a.project_id) {
+                    var proj = projects.find(function(p) { return p.id === a.project_id; });
+                    if (proj) projName = proj.name;
+                }
+                if (a.client_id) {
+                    var client = clients.find(function(c) { return c.id === a.client_id; });
+                    if (client) clientName = client.name;
+                }
+                totalPct += a.percentage;
+                html += '<tr>';
+                html += '<td>' + projName + '</td>';
+                html += '<td>' + clientName + '</td>';
+                html += '<td style="text-align:right">' + a.percentage + '%</td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="deleteTxAllocation(\'' + a.id + '\')" style="color:var(--danger);padding:2px 6px;">X</button></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            document.getElementById('tx-alloc-total-pct').textContent = totalPct + '%';
+            document.getElementById('tx-alloc-total-pct').style.color = totalPct === 100 ? 'var(--success)' : (totalPct > 100 ? 'var(--danger)' : 'inherit');
+        }
+
+        function addTransactionAllocation() {
+            var projectId = document.getElementById('tx-alloc-project').value;
+            var clientId = document.getElementById('tx-alloc-client').value;
+            var percentage = parseFloat(document.getElementById('tx-alloc-pct').value) || 0;
+
+            if (!projectId && !clientId) {
+                alert('Selecciona al menos un proyecto o cliente');
+                return;
+            }
+            if (percentage <= 0 || percentage > 100) {
+                alert('El porcentaje debe estar entre 1 y 100');
+                return;
+            }
+
+            fetch('/api/transaction-allocation', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    transaction_id: currentAllocTxId,
+                    project_id: projectId || null,
+                    client_id: clientId || null,
+                    percentage: percentage
+                })
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    loadTransactionAllocations();
+                    setTimeout(renderTxAllocations, 300);
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
+        function deleteTxAllocation(id) {
+            if (!confirm('Eliminar esta asignacion?')) return;
+
+            fetch('/api/transaction-allocation/' + id, {
+                method: 'DELETE'
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    loadTransactionAllocations();
+                    setTimeout(renderTxAllocations, 300);
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
+        }
+
         // ==================== Qonto Extended Sync ====================
 
         function syncQontoMembers() {
@@ -2063,6 +2251,7 @@
         loadProjectsSettings();
         loadCategories();
         loadSalaryAllocations();
+        loadTransactionAllocations();
     </script>
 </body>
 </html>
