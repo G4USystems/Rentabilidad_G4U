@@ -240,3 +240,171 @@ class AirtableStorage:
             return True
         except:
             return False
+
+    # ==================== Transaction Allocations ====================
+
+    def get_allocations(
+        self,
+        transaction_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        client_name: Optional[str] = None,
+    ) -> List[Dict]:
+        """Get transaction allocations with filters."""
+        filters = []
+
+        if transaction_id:
+            filters.append(f"{{transaction_id}} = '{transaction_id}'")
+        if project_id:
+            filters.append(f"{{project_id}} = '{project_id}'")
+        if client_name:
+            filters.append(f"{{client_name}} = '{client_name}'")
+
+        formula = None
+        if filters:
+            formula = "AND(" + ", ".join(filters) + ")"
+
+        records = self._get_all_records("Transaction Allocations", formula)
+
+        return [{"id": r["id"], **r["fields"]} for r in records]
+
+    def add_allocation(self, allocation: Dict[str, Any]) -> str:
+        """Add a new transaction allocation."""
+        result = self._create_record("Transaction Allocations", allocation)
+        return result["id"]
+
+    def update_allocation(self, record_id: str, updates: Dict[str, Any]) -> bool:
+        """Update a transaction allocation."""
+        try:
+            self._update_record("Transaction Allocations", record_id, updates)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update allocation: {e}")
+            return False
+
+    def delete_allocation(self, record_id: str) -> bool:
+        """Delete a transaction allocation."""
+        try:
+            self._request("DELETE", "Transaction Allocations", record_id=record_id)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete allocation: {e}")
+            return False
+
+    def get_allocations_for_transaction(self, transaction_id: str) -> List[Dict]:
+        """Get all allocations for a specific transaction."""
+        return self.get_allocations(transaction_id=transaction_id)
+
+    # ==================== Assignment Rules ====================
+
+    def get_assignment_rules(self, active_only: bool = True) -> List[Dict]:
+        """Get all assignment rules."""
+        formula = "{is_active} = TRUE()" if active_only else None
+        records = self._get_all_records("AssignmentRules", formula)
+
+        # Sort by priority (lower number = higher priority)
+        sorted_records = sorted(
+            records,
+            key=lambda r: r["fields"].get("priority", 999)
+        )
+
+        return [{"id": r["id"], **r["fields"]} for r in sorted_records]
+
+    def add_assignment_rule(self, rule: Dict[str, Any]) -> str:
+        """Add a new assignment rule."""
+        # Add timestamps
+        now = datetime.utcnow().isoformat()
+        rule["created_at"] = now
+        rule["updated_at"] = now
+
+        result = self._create_record("AssignmentRules", rule)
+        return result["id"]
+
+    def update_assignment_rule(self, record_id: str, updates: Dict[str, Any]) -> bool:
+        """Update an assignment rule."""
+        try:
+            updates["updated_at"] = datetime.utcnow().isoformat()
+            self._update_record("AssignmentRules", record_id, updates)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update assignment rule: {e}")
+            return False
+
+    def delete_assignment_rule(self, record_id: str) -> bool:
+        """Delete an assignment rule."""
+        try:
+            self._request("DELETE", "AssignmentRules", record_id=record_id)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete assignment rule: {e}")
+            return False
+
+    def get_assignment_rule(self, record_id: str) -> Optional[Dict]:
+        """Get a specific assignment rule by ID."""
+        try:
+            result = self._request("GET", "AssignmentRules", record_id=record_id)
+            return {"id": result["id"], **result["fields"]}
+        except:
+            return None
+
+    def find_matching_rules(self, transaction: Dict) -> List[Dict]:
+        """Find assignment rules that match a transaction."""
+        import re
+
+        rules = self.get_assignment_rules(active_only=True)
+        matching = []
+
+        counterparty = transaction.get("counterparty_name", "").lower()
+        label = transaction.get("label", "").lower()
+        full_text = f"{counterparty} {label}"
+
+        for rule in rules:
+            # Check exact counterparty match
+            rule_counterparty = rule.get("counterparty", "")
+            if rule_counterparty and rule_counterparty.lower() == counterparty:
+                matching.append(rule)
+                continue
+
+            # Check counterparty pattern (regex)
+            pattern = rule.get("counterparty_pattern", "")
+            if pattern:
+                try:
+                    if re.search(pattern, counterparty, re.IGNORECASE):
+                        matching.append(rule)
+                        continue
+                except re.error:
+                    pass
+
+            # Check keywords
+            keywords_str = rule.get("keywords", "")
+            if keywords_str:
+                keywords = [k.strip().lower() for k in keywords_str.split(",")]
+                if any(kw in full_text for kw in keywords if kw):
+                    matching.append(rule)
+
+        return matching
+
+    # ==================== Review Status Helpers ====================
+
+    def get_pending_review_transactions(self) -> List[Dict]:
+        """Get transactions pending review."""
+        formula = "{review_status} = 'pending'"
+        records = self._get_all_records("Transactions", formula)
+        return [{"id": r["id"], **r["fields"]} for r in records]
+
+    def set_review_status(self, record_id: str, status: str) -> bool:
+        """Set review status for a transaction (pending/confirmed)."""
+        if status not in ("pending", "confirmed"):
+            raise ValueError("Status must be 'pending' or 'confirmed'")
+        return self.update_transaction(record_id, {"review_status": status})
+
+    def get_unallocated_transactions(self) -> List[Dict]:
+        """Get transactions without allocations."""
+        # Get all transactions
+        all_transactions = self.get_transactions()
+
+        # Get all allocations and group by transaction_id
+        all_allocations = self.get_allocations()
+        allocated_tx_ids = {a.get("transaction_id") for a in all_allocations}
+
+        # Filter transactions without allocations
+        return [tx for tx in all_transactions if tx.get("id") not in allocated_tx_ids]
