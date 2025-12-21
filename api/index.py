@@ -1686,7 +1686,7 @@ def api_transaction_allocations():
                 "transaction_id": tx_id,
                 "project_id": proj_id,
                 "client_id": client_id,
-                "category": "",  # No category field in table
+                "category": r.get("Category") or "",
                 "percentage": float(r.get("Percentage") or 0)
             })
         return jsonify({"allocations": allocations})
@@ -1716,7 +1716,7 @@ def api_transaction_allocations_by_tx(transaction_id):
                 "transaction_id": tx_id,
                 "project_id": proj_id,
                 "client_id": client_id,
-                "category": "",
+                "category": r.get("Category") or "",
                 "percentage": float(r.get("Percentage") or 0)
             })
         return jsonify({"allocations": allocations})
@@ -1740,6 +1740,9 @@ def api_create_transaction_allocation():
             record["Project"] = [data["project_id"]]
         if data.get("client_id"):
             record["Client"] = [data["client_id"]]
+        # Category is a text field
+        if data.get("category"):
+            record["Category"] = data["category"]
 
         result = airtable.create("Transaction Allocations", record)
         return jsonify({"ok": True, "id": result.get("id")})
