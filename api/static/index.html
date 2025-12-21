@@ -587,25 +587,73 @@
 
                 <!-- Unassigned Transactions Section -->
                 <div id="settings-unassigned" class="settings-section hidden">
+                    <!-- Resumen de sin asignar -->
+                    <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom:20px;">
+                        <div class="kpi">
+                            <div class="kpi-label">Ingresos Sin Asignar</div>
+                            <div class="kpi-value positive" id="unassigned-income">-</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="kpi-label">Egresos Sin Asignar</div>
+                            <div class="kpi-value negative" id="unassigned-expenses">-</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="kpi-label">Transacciones</div>
+                            <div class="kpi-value" id="unassigned-count">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Distribucion por proyectos -->
                     <div class="card">
                         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-                            <span>Transacciones Sin Asignar</span>
-                            <div style="display:flex;gap:12px;align-items:center;">
-                                <select id="unassigned-type" onchange="renderUnassigned()" style="width:auto;">
-                                    <option value="all">Todas</option>
-                                    <option value="income">Solo Ingresos</option>
-                                    <option value="expense">Solo Egresos</option>
-                                </select>
-                                <span id="unassigned-count" class="text-muted"></span>
+                            <span>Distribuir como Gastos Indirectos</span>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <button class="btn btn-sm btn-outline" onclick="distributeEqual()">Igual para Todos</button>
+                                <button class="btn btn-sm btn-primary" onclick="applyDistribution()">Aplicar</button>
                             </div>
                         </div>
-                        <div class="card-body" style="padding:0;max-height:500px;overflow-y:auto;">
+                        <div class="card-body" style="padding:0;">
                             <table>
                                 <thead>
-                                    <tr><th>Fecha</th><th>Descripcion</th><th>Tipo</th><th style="text-align:right">Monto</th><th style="width:80px;"></th></tr>
+                                    <tr>
+                                        <th>Proyecto</th>
+                                        <th style="width:100px;text-align:center;">%</th>
+                                        <th style="text-align:right;">Ingresos</th>
+                                        <th style="text-align:right;">Egresos</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="distribution-table">
+                                    <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando proyectos...</td></tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr style="background:#f8fafc;font-weight:600;">
+                                        <td>Total Distribuido</td>
+                                        <td style="text-align:center;" id="dist-total-pct">0%</td>
+                                        <td style="text-align:right;" id="dist-total-income">-</td>
+                                        <td style="text-align:right;" id="dist-total-expenses">-</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Lista de transacciones sin asignar -->
+                    <div class="card" style="margin-top:20px;">
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>Detalle de Transacciones</span>
+                            <select id="unassigned-type" onchange="renderUnassigned()" style="width:auto;">
+                                <option value="all">Todas</option>
+                                <option value="income">Solo Ingresos</option>
+                                <option value="expense">Solo Egresos</option>
+                            </select>
+                        </div>
+                        <div class="card-body" style="padding:0;max-height:250px;overflow-y:auto;">
+                            <table>
+                                <thead>
+                                    <tr><th>Fecha</th><th>Descripcion</th><th>Tipo</th><th style="text-align:right">Monto</th></tr>
                                 </thead>
                                 <tbody id="unassigned-table">
-                                    <tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                    <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -2516,29 +2564,149 @@
         });
 
         // ==================== Unassigned Transactions ====================
+        // Store unassigned data globally for distribution
+        var unassignedData = { transactions: [], totalIncome: 0, totalExpenses: 0 };
+        var projectDistribution = {};
+
         function renderUnassigned() {
+            // Get all unassigned transactions
+            var allUnassigned = transactions.filter(function(tx) {
+                var hasAlloc = transactionAllocations.some(function(a) { return a.transaction_id === tx.id; });
+                return !hasAlloc;
+            });
+
+            // Calculate totals
+            var totalIncome = 0, totalExpenses = 0;
+            allUnassigned.forEach(function(tx) {
+                var amt = parseFloat(tx.amount) || 0;
+                if (tx.side === 'credit') totalIncome += amt;
+                else totalExpenses += amt;
+            });
+
+            unassignedData = { transactions: allUnassigned, totalIncome: totalIncome, totalExpenses: totalExpenses };
+
+            // Update KPIs
+            document.getElementById('unassigned-income').textContent = fmt(totalIncome);
+            document.getElementById('unassigned-expenses').textContent = fmt(totalExpenses);
+            document.getElementById('unassigned-count').textContent = allUnassigned.length;
+
+            // Render distribution table
+            renderDistributionTable();
+
+            // Render transaction list (filtered)
             var typeFilter = document.getElementById('unassigned-type').value;
-            var unassigned = transactions.filter(function(tx) {
-                var hasAlloc = allocations.some(function(a) { return a.transaction_id === tx.id; });
-                if (hasAlloc) return false;
-                if (typeFilter === 'income') return tx.type === 'Income';
-                if (typeFilter === 'expense') return tx.type === 'Expense';
+            var filtered = allUnassigned.filter(function(tx) {
+                if (typeFilter === 'income') return tx.side === 'credit';
+                if (typeFilter === 'expense') return tx.side === 'debit';
                 return true;
             });
-            document.getElementById('unassigned-count').textContent = unassigned.length + ' transacciones';
+
             var html = '';
-            unassigned.forEach(function(tx) {
-                var typeClass = tx.type === 'Income' ? 'ingreso' : 'egreso';
-                var sign = tx.type === 'Income' ? '+' : '-';
+            filtered.forEach(function(tx) {
+                var typeClass = tx.side === 'credit' ? 'ingreso' : 'egreso';
+                var sign = tx.side === 'credit' ? '+' : '-';
+                var typeLabel = tx.side === 'credit' ? 'Ingreso' : 'Egreso';
                 html += '<tr>';
-                html += '<td>' + formatDate(tx.date) + '</td>';
-                html += '<td>' + (tx.description || '-') + '</td>';
-                html += '<td><span class="type-badge ' + typeClass + '">' + (tx.type === 'Income' ? 'Ingreso' : 'Egreso') + '</span></td>';
-                html += '<td style="text-align:right;font-weight:600;">' + sign + formatCurrency(Math.abs(tx.amount)) + '</td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="openAllocationModal(\'' + tx.id + '\')">Asignar</button></td>';
+                html += '<td>' + formatDate(tx.settled_at) + '</td>';
+                html += '<td>' + (tx.counterparty_name || tx.label || '-') + '</td>';
+                html += '<td><span class="type-badge ' + typeClass + '">' + typeLabel + '</span></td>';
+                html += '<td style="text-align:right;font-weight:600;">' + sign + fmt(Math.abs(tx.amount)) + '</td>';
                 html += '</tr>';
             });
-            document.getElementById('unassigned-table').innerHTML = html || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">No hay transacciones sin asignar</td></tr>';
+            document.getElementById('unassigned-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay transacciones sin asignar</td></tr>';
+        }
+
+        function renderDistributionTable() {
+            var activeProjects = projects.filter(function(p) { return p.status === 'Active'; });
+
+            // Initialize distribution if empty
+            if (Object.keys(projectDistribution).length === 0) {
+                activeProjects.forEach(function(p) {
+                    projectDistribution[p.id] = 0;
+                });
+            }
+
+            var html = '';
+            var totalPct = 0;
+            activeProjects.forEach(function(p) {
+                var pct = projectDistribution[p.id] || 0;
+                totalPct += pct;
+                var incomeShare = unassignedData.totalIncome * pct / 100;
+                var expenseShare = unassignedData.totalExpenses * pct / 100;
+                html += '<tr>';
+                html += '<td>' + p.name + '</td>';
+                html += '<td style="text-align:center;"><input type="number" min="0" max="100" value="' + pct + '" onchange="updateDistribution(\'' + p.id + '\', this.value)" style="width:70px;text-align:center;padding:4px;"></td>';
+                html += '<td style="text-align:right;color:#10b981;">' + fmt(incomeShare) + '</td>';
+                html += '<td style="text-align:right;color:#ef4444;">' + fmt(expenseShare) + '</td>';
+                html += '</tr>';
+            });
+
+            document.getElementById('distribution-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay proyectos activos</td></tr>';
+
+            // Update footer totals
+            var pctClass = totalPct === 100 ? 'positive' : (totalPct > 100 ? 'negative' : '');
+            document.getElementById('dist-total-pct').innerHTML = '<span class="' + pctClass + '">' + totalPct + '%</span>';
+            document.getElementById('dist-total-income').textContent = fmt(unassignedData.totalIncome * totalPct / 100);
+            document.getElementById('dist-total-expenses').textContent = fmt(unassignedData.totalExpenses * totalPct / 100);
+        }
+
+        function updateDistribution(projectId, value) {
+            projectDistribution[projectId] = parseFloat(value) || 0;
+            renderDistributionTable();
+        }
+
+        function distributeEqual() {
+            var activeProjects = projects.filter(function(p) { return p.status === 'Active'; });
+            if (activeProjects.length === 0) return;
+
+            var equalPct = Math.floor(100 / activeProjects.length);
+            var remainder = 100 - (equalPct * activeProjects.length);
+
+            activeProjects.forEach(function(p, i) {
+                projectDistribution[p.id] = equalPct + (i === 0 ? remainder : 0);
+            });
+            renderDistributionTable();
+        }
+
+        function applyDistribution() {
+            var totalPct = Object.values(projectDistribution).reduce(function(sum, v) { return sum + v; }, 0);
+
+            if (totalPct === 0) {
+                alert('Ingresa al menos un porcentaje para distribuir');
+                return;
+            }
+
+            if (!confirm('Se crearan asignaciones para ' + unassignedData.transactions.length + ' transacciones. Continuar?')) {
+                return;
+            }
+
+            var promises = [];
+            unassignedData.transactions.forEach(function(tx) {
+                Object.keys(projectDistribution).forEach(function(projectId) {
+                    var pct = projectDistribution[projectId];
+                    if (pct > 0) {
+                        promises.push(
+                            fetch('/api/transaction-allocation', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    transaction_id: tx.id,
+                                    project_id: projectId,
+                                    percentage: pct
+                                })
+                            })
+                        );
+                    }
+                });
+            });
+
+            Promise.all(promises).then(function() {
+                alert('Distribucion aplicada correctamente');
+                projectDistribution = {};
+                loadTransactionAllocations();
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
         }
 
         function saveClient() {
