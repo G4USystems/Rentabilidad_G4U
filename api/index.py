@@ -805,10 +805,19 @@ def api_sync():
                 record[reference_field] = tx.get("reference", "")
             if note_field and tx.get("note"):
                 record[note_field] = tx.get("note", "")
-            if vat_amount_field and tx.get("vat_amount"):
-                record[vat_amount_field] = float(tx.get("vat_amount", 0))
-            if vat_rate_field and tx.get("vat_rate"):
-                record[vat_rate_field] = float(tx.get("vat_rate", 0))
+            # VAT - check multiple field names (Qonto may use vat_amount or vat_amount_cents)
+            if vat_amount_field:
+                vat_val = tx.get("vat_amount") or tx.get("vat_amount_cents")
+                if vat_val:
+                    # If it's in cents, convert to euros
+                    vat_float = float(vat_val)
+                    if vat_float > 1000 and tx.get("vat_amount_cents"):  # Likely cents
+                        vat_float = vat_float / 100
+                    record[vat_amount_field] = vat_float
+            if vat_rate_field:
+                vat_rate_val = tx.get("vat_rate") or tx.get("vat_rate_cents")
+                if vat_rate_val:
+                    record[vat_rate_field] = float(vat_rate_val)
             if attachment_ids_field and tx.get("attachment_ids"):
                 record[attachment_ids_field] = ",".join(tx.get("attachment_ids", []))
             if label_ids_field and tx.get("label_ids"):
@@ -1917,6 +1926,109 @@ def api_qonto_sync_labels():
             "qonto_labels": len(qonto_labels),
             "created": created,
             "skipped": skipped
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/qonto/update-vat", methods=["POST"])
+def api_qonto_update_vat():
+    """Update existing transactions with VAT amount from Qonto."""
+    try:
+        qonto = Qonto()
+        airtable = Airtable()
+
+        slug = qonto.get_bank_account_id()
+        if not slug:
+            return jsonify({"error": "Could not get bank account slug"})
+
+        qonto_txs = qonto.get_all_transactions(slug)
+        if not qonto_txs:
+            return jsonify({"error": "No transactions from Qonto"})
+
+        # Build map of Qonto transaction_id -> vat_amount
+        qonto_vat_map = {}
+        for tx in qonto_txs:
+            tx_id = tx.get("transaction_id", "")
+            vat = tx.get("vat_amount") or tx.get("vat_amount_cents") or 0
+            if tx_id and vat:
+                vat_float = float(vat)
+                # Convert cents to euros if needed
+                if vat_float > 1000 and tx.get("vat_amount_cents"):
+                    vat_float = vat_float / 100
+                qonto_vat_map[tx_id] = vat_float
+
+        # Find transactions table
+        table_name = None
+        vat_field = None
+        with httpx.Client(timeout=30) as client:
+            r = client.get(
+                f"https://api.airtable.com/v0/meta/bases/{airtable.base_id}/tables",
+                headers=airtable.headers
+            )
+            if r.status_code == 200:
+                tables = r.json().get("tables", [])
+                for t in tables:
+                    name_lower = t.get("name", "").lower()
+                    if ("trans" in name_lower or "movimiento" in name_lower) and "alloc" not in name_lower:
+                        table_name = t.get("name")
+                        # Find VAT field
+                        for f in t.get("fields", []):
+                            if f.get("name", "").lower() in ["vat amount", "vat_amount", "iva"]:
+                                vat_field = f.get("name")
+                                break
+                        break
+
+        if not table_name:
+            return jsonify({"error": "No transactions table found"})
+        if not vat_field:
+            return jsonify({"error": "No VAT field found in table. Create a number field called 'VAT Amount' or 'IVA'"})
+
+        # Get all Airtable transactions
+        airtable_txs = airtable.get_all(table_name)
+
+        updated = 0
+        skipped = 0
+        no_vat = 0
+
+        for atx in airtable_txs:
+            record_id = atx.get("id")
+            qonto_id = None
+            for key in ["Qonto Transaction ID", "qonto_id", "transaction_id", "ID", "Name"]:
+                if atx.get(key):
+                    qonto_id = atx.get(key)
+                    break
+
+            if not qonto_id:
+                skipped += 1
+                continue
+
+            # Check if already has VAT
+            current_vat = atx.get(vat_field) or atx.get("VAT Amount") or atx.get("IVA") or 0
+            if current_vat:
+                skipped += 1
+                continue
+
+            # Find VAT from Qonto
+            new_vat = qonto_vat_map.get(qonto_id, 0)
+            if not new_vat:
+                no_vat += 1
+                continue
+
+            # Update record
+            try:
+                airtable.update(table_name, record_id, {vat_field: new_vat})
+                updated += 1
+            except Exception:
+                pass
+
+        return jsonify({
+            "qonto_transactions": len(qonto_txs),
+            "transactions_with_vat": len(qonto_vat_map),
+            "airtable_transactions": len(airtable_txs),
+            "updated": updated,
+            "skipped": skipped,
+            "no_vat_in_qonto": no_vat
         })
     except Exception as e:
         import traceback
