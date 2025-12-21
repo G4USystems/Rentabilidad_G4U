@@ -291,22 +291,22 @@
                     </div>
                 </div>
 
-                <!-- Graficos y tops -->
+                <!-- Graficos de distribucion -->
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-                    <!-- Grafico torta gastos -->
+                    <!-- Grafico gastos -->
                     <div class="card">
                         <div class="card-header">Distribucion de Gastos</div>
-                        <div class="card-body" style="display:flex;align-items:center;gap:16px;">
-                            <div style="width:140px;height:140px;"><canvas id="chart-expenses"></canvas></div>
-                            <div id="chart-expenses-legend" style="font-size:11px;flex:1;"></div>
+                        <div class="card-body">
+                            <canvas id="chart-expenses" height="200"></canvas>
+                            <div id="chart-expenses-legend"></div>
                         </div>
                     </div>
-                    <!-- Grafico torta ingresos -->
+                    <!-- Grafico ingresos -->
                     <div class="card">
                         <div class="card-header">Distribucion de Ingresos</div>
-                        <div class="card-body" style="display:flex;align-items:center;gap:16px;">
-                            <div style="width:140px;height:140px;"><canvas id="chart-income"></canvas></div>
-                            <div id="chart-income-legend" style="font-size:11px;flex:1;"></div>
+                        <div class="card-body">
+                            <canvas id="chart-income" height="200"></canvas>
+                            <div id="chart-income-legend"></div>
                         </div>
                     </div>
                 </div>
@@ -375,6 +375,12 @@
 
                 <!-- Vista por Proyecto -->
                 <div id="pl-projects" class="pl-tab-content hidden">
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                            <input type="checkbox" id="pl-projects-exclude-unassigned" checked onchange="renderPLProjects()">
+                            Excluir sin asignar
+                        </label>
+                    </div>
                     <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom:20px;">
                         <div class="kpi">
                             <div class="kpi-label">Proyectos Activos</div>
@@ -397,8 +403,8 @@
                                 <option value="income-expense">Ingresos vs Egresos</option>
                             </select>
                         </div>
-                        <div class="card-body">
-                            <canvas id="chart-projects" height="250"></canvas>
+                        <div class="card-body" style="padding:12px;">
+                            <canvas id="chart-projects" height="150"></canvas>
                         </div>
                     </div>
                     <div class="project-grid" id="pl-projects-grid">
@@ -408,6 +414,12 @@
 
                 <!-- Vista por Cliente -->
                 <div id="pl-clients" class="pl-tab-content hidden">
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                            <input type="checkbox" id="pl-clients-exclude-unassigned" checked onchange="renderPLClients()">
+                            Excluir sin asignar
+                        </label>
+                    </div>
                     <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom:20px;">
                         <div class="kpi">
                             <div class="kpi-label">Clientes Activos</div>
@@ -430,8 +442,8 @@
                                 <option value="income-expense">Ingresos vs Egresos</option>
                             </select>
                         </div>
-                        <div class="card-body">
-                            <canvas id="chart-clients" height="250"></canvas>
+                        <div class="card-body" style="padding:12px;">
+                            <canvas id="chart-clients" height="150"></canvas>
                         </div>
                     </div>
                     <div id="pl-clients-grid">
@@ -1295,8 +1307,8 @@
 
             var colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
 
-            // Expenses chart (bar)
-            var expLabels = Object.keys(expensesByCategory).sort(function(a,b) { return expensesByCategory[b] - expensesByCategory[a]; }).slice(0,8);
+            // Expenses chart (vertical bar)
+            var expLabels = Object.keys(expensesByCategory).sort(function(a,b) { return expensesByCategory[b] - expensesByCategory[a]; }).slice(0,10);
             var expData = expLabels.map(function(k) { return expensesByCategory[k]; });
 
             if (expensesChart) expensesChart.destroy();
@@ -1304,19 +1316,22 @@
             if (expCtx && expLabels.length > 0) {
                 expensesChart = new Chart(expCtx, {
                     type: 'bar',
-                    data: { labels: expLabels, datasets: [{ label: 'Gastos', data: expData, backgroundColor: '#ef4444' }] },
+                    data: { labels: expLabels, datasets: [{ label: 'Gastos', data: expData, backgroundColor: '#ef4444', borderRadius: 4 }] },
                     options: {
-                        indexAxis: 'y',
                         responsive: true,
+                        maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
-                        scales: { x: { ticks: { callback: function(v) { return fmt(v); } } } }
+                        scales: {
+                            x: { ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } } },
+                            y: { ticks: { callback: function(v) { return fmt(v); } }, beginAtZero: true }
+                        }
                     }
                 });
             }
             document.getElementById('chart-expenses-legend').innerHTML = '';
 
-            // Income chart (bar)
-            var incLabels = Object.keys(incomeByCategory).sort(function(a,b) { return incomeByCategory[b] - incomeByCategory[a]; }).slice(0,8);
+            // Income chart (vertical bar)
+            var incLabels = Object.keys(incomeByCategory).sort(function(a,b) { return incomeByCategory[b] - incomeByCategory[a]; }).slice(0,10);
             var incData = incLabels.map(function(k) { return incomeByCategory[k]; });
 
             if (incomeChart) incomeChart.destroy();
@@ -1324,12 +1339,15 @@
             if (incCtx && incLabels.length > 0) {
                 incomeChart = new Chart(incCtx, {
                     type: 'bar',
-                    data: { labels: incLabels, datasets: [{ label: 'Ingresos', data: incData, backgroundColor: '#10b981' }] },
+                    data: { labels: incLabels, datasets: [{ label: 'Ingresos', data: incData, backgroundColor: '#10b981', borderRadius: 4 }] },
                     options: {
-                        indexAxis: 'y',
                         responsive: true,
+                        maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
-                        scales: { x: { ticks: { callback: function(v) { return fmt(v); } } } }
+                        scales: {
+                            x: { ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } } },
+                            y: { ticks: { callback: function(v) { return fmt(v); } }, beginAtZero: true }
+                        }
                     }
                 });
             }
@@ -1741,6 +1759,8 @@
                 }
             });
 
+            var excludeUnassigned = document.getElementById('pl-projects-exclude-unassigned').checked;
+
             var projectList = Object.keys(byProject).map(function(id) {
                 var p = byProject[id];
                 p.id = id;
@@ -1749,18 +1769,20 @@
                 p.margin = p.income > 0 ? (p.net / p.income * 100) : 0;
                 return p;
             }).filter(function(p) {
+                if (excludeUnassigned && p.id === '_none') return false;
                 return p.income > 0 || p.expense > 0 || p.salaries > 0;
             }).sort(function(a, b) {
                 return b.income - a.income;
             });
 
-            // KPIs - Margen global (no promedio)
+            // KPIs - Margen global (recalcular sin asignar si filtrado)
+            var filteredIncome = projectList.reduce(function(sum, p) { return sum + p.income; }, 0);
             var totalExpenses = projectList.reduce(function(sum, p) { return sum + p.totalCosts; }, 0);
-            var globalNet = totalIncome - totalExpenses;
-            var globalMargin = totalIncome > 0 ? (globalNet / totalIncome * 100) : 0;
+            var globalNet = filteredIncome - totalExpenses;
+            var globalMargin = filteredIncome > 0 ? (globalNet / filteredIncome * 100) : 0;
 
             document.getElementById('pl-projects-count').textContent = projectList.filter(function(p) { return p.id !== '_none'; }).length;
-            document.getElementById('pl-projects-income').textContent = fmt(totalIncome);
+            document.getElementById('pl-projects-income').textContent = fmt(filteredIncome);
             document.getElementById('pl-projects-margin').textContent = globalMargin.toFixed(1) + '%';
             document.getElementById('pl-projects-margin').className = 'kpi-value ' + (globalMargin >= 0 ? 'positive' : 'negative');
 
@@ -1887,19 +1909,25 @@
                 if (t.side === 'credit') totalIncome += amt;
             });
 
-            var clientList = Object.values(byClient).filter(function(c) { return c.income > 0 || c.expense > 0; }).map(function(c) {
+            var excludeUnassigned = document.getElementById('pl-clients-exclude-unassigned').checked;
+
+            var clientList = Object.values(byClient).filter(function(c) {
+                if (excludeUnassigned && c.id === '_none') return false;
+                return c.income > 0 || c.expense > 0;
+            }).map(function(c) {
                 c.net = c.income - c.expense;
                 c.margin = c.income > 0 ? (c.net / c.income * 100) : 0;
                 return c;
             }).sort(function(a,b) { return b.margin - a.margin; });
 
-            // KPIs - Margen global (no promedio)
+            // KPIs - Margen global (recalcular con filtro)
+            var filteredIncome = clientList.reduce(function(sum, c) { return sum + c.income; }, 0);
             var totalExpenses = clientList.reduce(function(sum, c) { return sum + c.expense; }, 0);
-            var globalNet = totalIncome - totalExpenses;
-            var globalMargin = totalIncome > 0 ? (globalNet / totalIncome * 100) : 0;
+            var globalNet = filteredIncome - totalExpenses;
+            var globalMargin = filteredIncome > 0 ? (globalNet / filteredIncome * 100) : 0;
 
             document.getElementById('pl-clients-count').textContent = clientList.filter(function(c) { return c.id !== '_none'; }).length;
-            document.getElementById('pl-clients-income').textContent = fmt(totalIncome);
+            document.getElementById('pl-clients-income').textContent = fmt(filteredIncome);
             document.getElementById('pl-clients-margin').textContent = globalMargin.toFixed(1) + '%';
             document.getElementById('pl-clients-margin').className = 'kpi-value ' + (globalMargin >= 0 ? 'positive' : 'negative');
 
