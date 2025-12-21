@@ -629,6 +629,8 @@
                                         <div><strong>Airtable:</strong> <span id="status-airtable">-</span></div>
                                     </div>
                                     <p class="text-sm text-muted">Las transacciones se sincronizan automaticamente al cargar la pagina.</p>
+                                    <button class="btn btn-sm btn-outline" onclick="syncVAT()" style="margin-top:12px;">Sincronizar IVA desde Qonto</button>
+                                    <span id="vat-sync-status" style="margin-left:8px;font-size:12px;"></span>
                                 </div>
                                 <div id="qonto-org-info" style="padding:16px;background:var(--bg);border-radius:8px;">
                                     <h4 style="margin-bottom:12px;">Organizacion Qonto</h4>
@@ -1083,7 +1085,10 @@
             </div>
             <div class="modal-body">
                 <div id="tx-alloc-info" style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;">
-                    <strong id="tx-alloc-desc">-</strong><br>
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label style="font-size:11px;color:var(--text-muted);">Descripcion</label>
+                        <input type="text" id="tx-alloc-desc-input" style="width:100%;font-weight:600;" onchange="saveTxDescription()">
+                    </div>
                     <span class="text-muted">Monto: </span><span id="tx-alloc-amount">-</span>
                 </div>
                 <div id="tx-alloc-list" style="margin-bottom:16px;">
@@ -3412,7 +3417,7 @@
             if (!tx) return;
 
             // Set transaction info
-            document.getElementById('tx-alloc-desc').textContent = tx.counterparty_name || tx.label || '-';
+            document.getElementById('tx-alloc-desc-input').value = tx.counterparty_name || tx.label || '';
             document.getElementById('tx-alloc-amount').textContent = fmt(tx.amount);
 
             // Populate category select
@@ -3446,6 +3451,28 @@
             renderTxAllocations();
 
             openModal('tx-allocation');
+        }
+
+        function saveTxDescription() {
+            var newDesc = document.getElementById('tx-alloc-desc-input').value.trim();
+            if (!newDesc || !currentAllocTxId) return;
+
+            fetch('/api/transaction/' + currentAllocTxId, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ counterparty_name: newDesc })
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    // Update local data
+                    var tx = transactions.find(function(t) { return t.id === currentAllocTxId; });
+                    if (tx) tx.counterparty_name = newDesc;
+                    renderTransactions();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
         }
 
         function renderTxAllocations() {
@@ -3585,6 +3612,30 @@
         }
 
         // Auto sync on load
+        function syncVAT() {
+            var statusEl = document.getElementById('vat-sync-status');
+            statusEl.textContent = 'Sincronizando...';
+            statusEl.style.color = 'var(--primary)';
+
+            fetch('/api/qonto/update-vat', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        statusEl.textContent = 'Error: ' + data.error;
+                        statusEl.style.color = 'var(--danger)';
+                    } else {
+                        statusEl.textContent = 'Actualizado: ' + data.updated + ' transacciones';
+                        statusEl.style.color = 'var(--success)';
+                        // Reload data to show updated VAT
+                        loadData();
+                    }
+                })
+                .catch(function(e) {
+                    statusEl.textContent = 'Error: ' + e.message;
+                    statusEl.style.color = 'var(--danger)';
+                });
+        }
+
         function autoSync() {
             document.getElementById('last-sync').textContent = 'Sincronizando...';
             fetch('/api/sync', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {

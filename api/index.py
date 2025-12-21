@@ -1562,6 +1562,10 @@ def api_update_transaction(tx_id):
             record["Client"] = [client_id] if client_id else []
         if "description" in data:
             record["Description"] = data["description"]
+        if "counterparty_name" in data:
+            # Try multiple possible field names
+            record["Counterparty Name"] = data["counterparty_name"]
+            record["Description"] = data["counterparty_name"]  # Also update Description
 
         if record:
             airtable.update("Transactions", tx_id, record)
