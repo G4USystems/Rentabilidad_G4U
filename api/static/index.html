@@ -3462,8 +3462,14 @@
                 if (result.error) {
                     alert('Error: ' + result.error);
                 } else {
+                    // Remove from local array immediately for instant UI feedback
+                    transactionAllocations = transactionAllocations.filter(function(a) {
+                        return a.id !== id;
+                    });
+                    renderTxAllocations();
+                    renderTransactions();
+                    // Also reload from server to ensure sync
                     loadTransactionAllocations();
-                    setTimeout(renderTxAllocations, 300);
                 }
             }).catch(function(e) {
                 alert('Error: ' + e.message);
