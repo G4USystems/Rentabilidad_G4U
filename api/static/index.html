@@ -474,6 +474,7 @@
                                     <th class="sortable" onclick="sortTransactions('settled_at')">Fecha <span id="sort-settled_at"></span></th>
                                     <th class="sortable" onclick="sortTransactions('counterparty_name')">Descripcion <span id="sort-counterparty_name"></span></th>
                                     <th>Tipo</th>
+                                    <th>Cat. Qonto</th>
                                     <th>Categoria</th>
                                     <th>Proyecto</th>
                                     <th>Cliente</th>
@@ -483,7 +484,7 @@
                                 </tr>
                             </thead>
                             <tbody id="transactions-table">
-                                <tr><td colspan="9" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                <tr><td colspan="10" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1426,6 +1427,7 @@
                 html += '<td style="white-space:nowrap;">' + formatDate(t.settled_at) + '</td>';
                 html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
                 html += '<td><span class="type-badge ' + typeCls + '">' + typeLabel + '</span></td>';
+                html += '<td style="font-size:12px;color:#666;">' + (t.qonto_category || '-') + '</td>';
                 html += '<td style="font-size:12px;">' + category + '</td>';
                 html += '<td style="font-size:12px;">' + projectName + '</td>';
                 html += '<td style="font-size:12px;">' + clientName + '</td>';
@@ -1434,7 +1436,7 @@
                 html += '<td><button onclick="openTxAllocation(\'' + t.id + '\')" class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;">Asignar</button></td>';
                 html += '</tr>';
             });
-            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="9" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
+            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="10" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
         function renderPL() {

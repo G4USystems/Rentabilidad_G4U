@@ -1719,16 +1719,24 @@ def api_create_transaction_allocation():
         data = request.json
         airtable = Airtable()
 
-        record = {
-            "Transaction": [data.get("transaction_id")] if data.get("transaction_id") else [],
-            "Project": [data.get("project_id")] if data.get("project_id") else [],
-            "Client": [data.get("client_id")] if data.get("client_id") else [],
-            "Category": data.get("category", ""),
-            "Percentage": float(data.get("percentage", 0))
-        }
+        record = {}
 
-        # Remove empty values
-        record = {k: v for k, v in record.items() if v}
+        # Transaction is required
+        if data.get("transaction_id"):
+            record["Transaction"] = [data["transaction_id"]]
+
+        # Project and Client are optional linked records
+        if data.get("project_id"):
+            record["Project"] = [data["project_id"]]
+        if data.get("client_id"):
+            record["Client"] = [data["client_id"]]
+
+        # Category is optional text
+        if data.get("category"):
+            record["Category"] = data["category"]
+
+        # Percentage is required
+        record["Percentage"] = float(data.get("percentage", 100))
 
         result = airtable.create("Transaction Allocations", record)
         return jsonify({"ok": True, "id": result.get("id")})
