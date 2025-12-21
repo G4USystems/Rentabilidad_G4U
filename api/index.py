@@ -1687,7 +1687,7 @@ def api_transaction_allocations():
                 "project_id": proj_id,
                 "client_id": client_id,
                 "category": r.get("Category") or "",
-                "percentage": float(r.get("Percentage") or 0)
+                "percentage": (float(r.get("Percentage") or 0) * 100) if (float(r.get("Percentage") or 0) <= 1) else float(r.get("Percentage") or 0)
             })
         return jsonify({"allocations": allocations})
     except Exception as e:
@@ -1717,7 +1717,7 @@ def api_transaction_allocations_by_tx(transaction_id):
                 "project_id": proj_id,
                 "client_id": client_id,
                 "category": r.get("Category") or "",
-                "percentage": float(r.get("Percentage") or 0)
+                "percentage": (float(r.get("Percentage") or 0) * 100) if (float(r.get("Percentage") or 0) <= 1) else float(r.get("Percentage") or 0)
             })
         return jsonify({"allocations": allocations})
     except Exception as e:
@@ -1730,8 +1730,10 @@ def api_create_transaction_allocation():
         data = request.json
         airtable = Airtable()
 
+        # Airtable Percent field expects decimal (0.5 = 50%)
+        pct_value = float(data.get("percentage", 100)) / 100
         record = {
-            "Percentage": float(data.get("percentage", 100))
+            "Percentage": pct_value
         }
         # Linked records must be arrays
         if data.get("transaction_id"):
@@ -1763,7 +1765,8 @@ def api_update_transaction_allocation(allocation_id):
         if "client_id" in data:
             record["Client"] = [data["client_id"]] if data["client_id"] else []
         if "percentage" in data:
-            record["Percentage"] = float(data["percentage"])
+            # Airtable Percent field expects decimal (0.5 = 50%)
+            record["Percentage"] = float(data["percentage"]) / 100
 
         airtable.update("Transaction Allocations", allocation_id, record)
         return jsonify({"ok": True})
