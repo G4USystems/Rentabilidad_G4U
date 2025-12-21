@@ -1256,7 +1256,9 @@
 
         // Utilities
         function fmt(n) {
-            return new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR', minimumFractionDigits:0, maximumFractionDigits:0}).format(n || 0);
+            var val = n || 0;
+            var decimals = Math.abs(val) < 10 ? 1 : 0;
+            return new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR', minimumFractionDigits:decimals, maximumFractionDigits:decimals}).format(val);
         }
 
         function formatDate(d) {
