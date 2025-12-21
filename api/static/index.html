@@ -1,1067 +1,726 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <title>G4U Finance - Dashboard Ejecutivo</title>
+    <title>G4U Profitability - Executive Dashboard</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Dashboard financiero ejecutivo para G4U">
-
-    <!-- Stylesheets -->
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="stylesheet" href="/static/css/components.css">
-    <link rel="stylesheet" href="/static/css/dashboard.css">
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+    <link rel="stylesheet" href="/static/css/executive.css">
 </head>
 <body>
-    <div class="app">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <div class="logo-icon">G4</div>
-                    <span>G4U Finance</span>
-                </div>
+    <div class="app-container">
+        <!-- Compact Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">G4U</div>
             </div>
 
             <nav class="sidebar-nav">
-                <div class="nav-item active" data-view="dashboard">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                <a class="nav-link active" data-view="dashboard" title="Dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1"/>
                     </svg>
-                    Dashboard
-                </div>
-
-                <div class="nav-item" data-view="clients">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    <span>Dashboard</span>
+                </a>
+                <a class="nav-link" data-view="profitability" title="Rentabilidad">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
                     </svg>
-                    Clientes
-                </div>
-
-                <div class="nav-item" data-view="projects">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    <span>Rentabilidad</span>
+                </a>
+                <a class="nav-link" data-view="transactions" title="Transacciones">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v18h18"/>
+                        <path d="M7 16l4-4 4 4 5-6"/>
                     </svg>
-                    Proyectos
-                </div>
-
-                <div class="nav-item" data-view="transactions">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                    <span>Transacciones</span>
+                </a>
+                <a class="nav-link" data-view="review" title="Revision">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"/>
+                        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
                     </svg>
-                    Transacciones
-                </div>
-
-                <div class="nav-section">Workflow</div>
-
-                <div class="nav-item" data-view="review">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    <span>Revision</span>
+                    <span class="nav-badge" id="review-badge">0</span>
+                </a>
+                <a class="nav-link" data-view="simulator" title="Simulador AI">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a4 4 0 014 4c0 1.1-.9 2-2 2h-4a2 2 0 01-2-2 4 4 0 014-4z"/>
+                        <path d="M12 8v8"/>
+                        <path d="M8 12h8"/>
+                        <circle cx="12" cy="19" r="2"/>
+                        <path d="M12 16v1"/>
                     </svg>
-                    Revision
-                    <span class="badge" id="review-badge" style="display:none;">0</span>
-                </div>
-
-                <div class="nav-section">Sistema</div>
-
-                <div class="nav-item" data-view="settings">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                    Configuracion
-                </div>
+                    <span>Simulador AI</span>
+                </a>
             </nav>
+
+            <div class="sidebar-footer">
+                <a class="nav-link" data-view="settings" title="Configuracion">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                    </svg>
+                    <span>Config</span>
+                </a>
+            </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="main">
-            <!-- Top Header Bar -->
-            <header class="top-header">
-                <div class="search-box">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
-                    <input type="text" id="global-search" placeholder="Buscar transacciones, clientes, proyectos...">
-                    <kbd>Ctrl+K</kbd>
-                </div>
-
-                <div class="header-actions">
-                    <div class="sync-status" id="sync-status">
-                        <span class="dot"></span>
-                        <span>Conectado</span>
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <h1 class="page-title" id="page-title">Dashboard Ejecutivo</h1>
+                    <div class="sync-indicator" id="sync-indicator">
+                        <span class="sync-dot"></span>
+                        <span class="sync-text">Actualizado</span>
                     </div>
-
-                    <button class="notification-btn" onclick="App.navigateTo('review')">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </div>
+                <div class="top-bar-right">
+                    <div class="period-tabs" id="period-tabs">
+                        <button class="period-tab" data-period="week">7D</button>
+                        <button class="period-tab active" data-period="month">30D</button>
+                        <button class="period-tab" data-period="quarter">90D</button>
+                        <button class="period-tab" data-period="year">1A</button>
+                    </div>
+                    <button class="btn-icon" id="btn-sync" title="Sincronizar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
                         </svg>
-                        <span class="badge" id="notification-badge" style="display:none;">0</span>
-                    </button>
-
-                    <button class="btn btn-secondary btn-sm" onclick="App.syncQonto()">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                        </svg>
-                        Sync
                     </button>
                 </div>
             </header>
 
-            <!-- Content Area -->
-            <div class="content">
-                <!-- ==================== DASHBOARD VIEW ==================== -->
-                <div id="view-dashboard" class="view active">
-                    <div class="page-header">
-                        <h1>Dashboard Financiero</h1>
-                        <div class="page-header-actions">
-                            <div class="period-selector">
-                                <button class="period-btn" data-period="week" onclick="App.setPeriod('week')">Semana</button>
-                                <button class="period-btn active" data-period="month" onclick="App.setPeriod('month')">Mes</button>
-                                <button class="period-btn" data-period="quarter" onclick="App.setPeriod('quarter')">Trimestre</button>
-                                <button class="period-btn" data-period="year" onclick="App.setPeriod('year')">Año</button>
-                                <button class="period-btn" data-period="all" onclick="App.setPeriod('all')">Todo</button>
-                            </div>
-                            <div class="export-buttons">
-                                <button class="export-btn" onclick="App.exportPDF()">
-                                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z"/></svg>
-                                    PDF
-                                </button>
-                                <button class="export-btn" onclick="App.exportExcel()">
-                                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/></svg>
-                                    Excel
-                                </button>
+            <!-- Views Container -->
+            <div class="views-container">
+
+                <!-- ============ DASHBOARD VIEW ============ -->
+                <section class="view active" id="view-dashboard">
+                    <!-- Hero Metrics -->
+                    <div class="hero-metrics">
+                        <div class="hero-metric primary">
+                            <div class="hero-metric-label">Margen Neto</div>
+                            <div class="hero-metric-value" id="hero-margin">--%</div>
+                            <div class="hero-metric-trend up" id="hero-margin-trend">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l5-5 5 5"/><path d="M7 7l5 5 5-5"/></svg>
+                                <span>+0% vs mes anterior</span>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- KPI Cards -->
-                    <div class="kpi-grid">
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Margen Neto</span>
-                                <div class="kpi-icon blue">
-                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"/></svg>
-                                </div>
-                            </div>
-                            <div class="kpi-value positive" id="kpi-margin">--</div>
-                            <div class="kpi-footer">
-                                <span class="kpi-change up">-- vs anterior</span>
-                            </div>
-                            <div class="kpi-sparkline"></div>
+                        <div class="hero-metric">
+                            <div class="hero-metric-label">Ingresos</div>
+                            <div class="hero-metric-value positive" id="hero-income">0€</div>
+                            <div class="hero-metric-sub" id="hero-income-count">0 transacciones</div>
                         </div>
-
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Resultado Neto</span>
-                                <div class="kpi-icon green">
-                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z"/></svg>
-                                </div>
-                            </div>
-                            <div class="kpi-value" id="kpi-ebitda">--</div>
-                            <div class="kpi-footer">
-                                <span class="kpi-change">-- vs anterior</span>
-                            </div>
-                            <div class="kpi-sparkline"></div>
+                        <div class="hero-metric">
+                            <div class="hero-metric-label">Gastos</div>
+                            <div class="hero-metric-value negative" id="hero-expenses">0€</div>
+                            <div class="hero-metric-sub" id="hero-expenses-count">0 transacciones</div>
                         </div>
-
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Ingresos</span>
-                                <div class="kpi-icon green">
-                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/></svg>
-                                </div>
-                            </div>
-                            <div class="kpi-value positive" id="kpi-income">--</div>
-                            <div class="kpi-footer">
-                                <span class="kpi-change up">-- vs anterior</span>
-                            </div>
-                            <div class="kpi-sparkline"></div>
-                        </div>
-
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Gastos</span>
-                                <div class="kpi-icon red">
-                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"/></svg>
-                                </div>
-                            </div>
-                            <div class="kpi-value negative" id="kpi-expenses">--</div>
-                            <div class="kpi-footer">
-                                <span class="kpi-change">-- vs anterior</span>
-                            </div>
-                            <div class="kpi-sparkline"></div>
-                        </div>
-
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Margen Bruto</span>
-                                <div class="kpi-icon yellow">
-                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z"/></svg>
-                                </div>
-                            </div>
-                            <div class="kpi-value" id="kpi-gross-margin">--</div>
-                            <div class="kpi-footer">
-                                <span class="kpi-change neutral">--</span>
-                            </div>
-                            <div class="kpi-sparkline"></div>
+                        <div class="hero-metric">
+                            <div class="hero-metric-label">Resultado Neto</div>
+                            <div class="hero-metric-value" id="hero-net">0€</div>
+                            <div class="hero-metric-sub" id="hero-net-trend">--</div>
                         </div>
                     </div>
 
                     <!-- Dashboard Grid -->
                     <div class="dashboard-grid">
-                        <!-- Main Chart -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Evolucion Mensual</h3>
-                                <div class="chart-legend">
-                                    <span class="chart-legend-item">
-                                        <span class="chart-legend-dot" style="background: var(--success);"></span>
-                                        Ingresos
-                                    </span>
-                                    <span class="chart-legend-item">
-                                        <span class="chart-legend-dot" style="background: var(--danger);"></span>
-                                        Gastos
-                                    </span>
+                        <!-- Left Column: Charts -->
+                        <div class="dashboard-col-main">
+                            <!-- Cash Flow Chart -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Evolucion de Cash Flow</h3>
+                                    <div class="chart-legend">
+                                        <span class="legend-item"><span class="legend-dot income"></span>Ingresos</span>
+                                        <span class="legend-item"><span class="legend-dot expense"></span>Gastos</span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-area" id="chart-cashflow"></div>
                                 </div>
                             </div>
-                            <div class="card-body">
-                                <div class="chart-container">
-                                    <canvas id="chart-evolution"></canvas>
+
+                            <!-- Profitability by Category -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Gastos por Categoria</h3>
+                                    <a href="#" class="card-link" onclick="App.navigateTo('transactions'); return false;">Ver todo</a>
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- Alerts Panel -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Alertas</h3>
-                            </div>
-                            <div class="card-body" id="alerts-panel">
-                                <div class="text-muted text-sm">Cargando alertas...</div>
-                            </div>
-                        </div>
-
-                        <!-- Top Clients -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Top Clientes</h3>
-                                <a href="#" onclick="App.navigateTo('clients'); return false;" class="text-sm" style="color: var(--primary);">Ver todos</a>
-                            </div>
-                            <div class="card-body" id="top-clients-list">
-                                <div class="skeleton skeleton-text"></div>
-                                <div class="skeleton skeleton-text"></div>
-                                <div class="skeleton skeleton-text sm"></div>
-                            </div>
-                        </div>
-
-                        <!-- Top Projects -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Top Proyectos</h3>
-                                <a href="#" onclick="App.navigateTo('projects'); return false;" class="text-sm" style="color: var(--primary);">Ver todos</a>
-                            </div>
-                            <div class="card-body" id="top-projects-list">
-                                <div class="skeleton skeleton-text"></div>
-                                <div class="skeleton skeleton-text"></div>
-                                <div class="skeleton skeleton-text sm"></div>
-                            </div>
-                        </div>
-
-                        <!-- Recent Transactions -->
-                        <div class="card dashboard-full">
-                            <div class="card-header">
-                                <h3>Transacciones Recientes</h3>
-                                <a href="#" onclick="App.navigateTo('transactions'); return false;" class="text-sm" style="color: var(--primary);">Ver todas</a>
-                            </div>
-                            <div class="card-body" style="padding: 0;">
-                                <div class="table-container">
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th>Fecha</th>
-                                                <th>Descripcion</th>
-                                                <th>Categoria</th>
-                                                <th>Proyecto</th>
-                                                <th style="text-align: right;">Monto</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="recent-transactions">
-                                            <tr><td colspan="5" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
-                                        </tbody>
-                                    </table>
+                                <div class="card-body">
+                                    <div class="category-bars" id="category-bars">
+                                        <div class="loading-placeholder">Cargando...</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- ==================== CLIENTS VIEW ==================== -->
-                <div id="view-clients" class="view">
-                    <div class="page-header">
-                        <div>
-                            <div class="breadcrumbs" id="clients-breadcrumbs">
-                                <span class="current">Clientes</span>
+                        <!-- Right Column: Lists -->
+                        <div class="dashboard-col-side">
+                            <!-- Top Clients by Profitability -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Top Clientes por Rentabilidad</h3>
+                                    <a href="#" class="card-link" onclick="App.navigateTo('profitability'); return false;">Ver todos</a>
+                                </div>
+                                <div class="card-body compact">
+                                    <div class="ranking-list" id="top-clients">
+                                        <div class="loading-placeholder">Cargando...</div>
+                                    </div>
+                                </div>
                             </div>
-                            <h1 id="clients-title">Clientes</h1>
+
+                            <!-- Top Projects by Profitability -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Top Proyectos por Rentabilidad</h3>
+                                    <a href="#" class="card-link" onclick="App.navigateTo('profitability'); return false;">Ver todos</a>
+                                </div>
+                                <div class="card-body compact">
+                                    <div class="ranking-list" id="top-projects">
+                                        <div class="loading-placeholder">Cargando...</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Pending Review Alert -->
+                            <div class="card alert-card" id="pending-alert" style="display:none;">
+                                <div class="alert-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 8v4M12 16h.01"/>
+                                    </svg>
+                                </div>
+                                <div class="alert-content">
+                                    <div class="alert-title"><span id="pending-count">0</span> transacciones pendientes</div>
+                                    <div class="alert-desc">Requieren asignacion a proyecto/cliente</div>
+                                </div>
+                                <button class="btn btn-primary btn-sm" onclick="App.navigateTo('review')">Revisar</button>
+                            </div>
                         </div>
-                        <div class="page-header-actions">
-                            <button class="btn btn-primary" onclick="App.openModal('add-client')">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                Nuevo Cliente
-                            </button>
+                    </div>
+                </section>
+
+                <!-- ============ PROFITABILITY VIEW ============ -->
+                <section class="view" id="view-profitability">
+                    <div class="view-header">
+                        <div class="view-tabs">
+                            <button class="view-tab active" data-subtab="clients">Por Cliente</button>
+                            <button class="view-tab" data-subtab="projects">Por Proyecto</button>
                         </div>
                     </div>
 
-                    <!-- Client Filters -->
-                    <div class="filters">
+                    <!-- Profitability by Client -->
+                    <div class="subtab-content active" id="subtab-clients">
+                        <div class="profitability-grid" id="clients-profitability">
+                            <div class="loading-placeholder">Cargando rentabilidad por cliente...</div>
+                        </div>
+                    </div>
+
+                    <!-- Profitability by Project -->
+                    <div class="subtab-content" id="subtab-projects">
+                        <div class="profitability-grid" id="projects-profitability">
+                            <div class="loading-placeholder">Cargando rentabilidad por proyecto...</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============ TRANSACTIONS VIEW ============ -->
+                <section class="view" id="view-transactions">
+                    <!-- Filters -->
+                    <div class="filters-bar">
                         <div class="filter-group">
-                            <label>Buscar:</label>
-                            <input type="text" id="client-search" placeholder="Nombre del cliente..." onkeyup="App.filterClients()">
-                        </div>
-                        <div class="filter-group">
-                            <label>Periodo:</label>
-                            <select id="client-period" onchange="App.filterClients()">
-                                <option value="all">Todo el tiempo</option>
-                                <option value="month" selected>Este mes</option>
-                                <option value="quarter">Este trimestre</option>
-                                <option value="year">Este año</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Clients KPIs -->
-                    <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Total Clientes</span>
-                            </div>
-                            <div class="kpi-value" id="clients-count">--</div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Ingresos Totales</span>
-                            </div>
-                            <div class="kpi-value positive" id="clients-income">--</div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Margen Promedio</span>
-                            </div>
-                            <div class="kpi-value" id="clients-margin">--</div>
-                        </div>
-                    </div>
-
-                    <!-- Clients List -->
-                    <div class="card">
-                        <div class="card-body" style="padding: 0;">
-                            <div class="table-container">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Cliente</th>
-                                            <th>Proyectos</th>
-                                            <th style="text-align: right;">Ingresos</th>
-                                            <th style="text-align: right;">Gastos</th>
-                                            <th style="text-align: right;">Margen</th>
-                                            <th>Tendencia</th>
-                                            <th style="width: 100px;"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="clients-table-body">
-                                        <tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Client Detail Panel (hidden by default) -->
-                    <div id="client-detail" class="hidden">
-                        <!-- Client detail content will be rendered here -->
-                    </div>
-                </div>
-
-                <!-- ==================== PROJECTS VIEW ==================== -->
-                <div id="view-projects" class="view">
-                    <div class="page-header">
-                        <div>
-                            <div class="breadcrumbs" id="projects-breadcrumbs">
-                                <span class="current">Proyectos</span>
-                            </div>
-                            <h1 id="projects-title">Proyectos</h1>
-                        </div>
-                        <div class="page-header-actions">
-                            <button class="btn btn-primary" onclick="App.openModal('add-project')">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                Nuevo Proyecto
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Project Filters -->
-                    <div class="filters">
-                        <div class="filter-group">
-                            <label>Cliente:</label>
-                            <select id="project-filter-client" onchange="App.filterProjects()">
-                                <option value="">Todos</option>
+                            <select id="filter-type" class="filter-select">
+                                <option value="">Todos los tipos</option>
+                                <option value="income">Ingresos</option>
+                                <option value="expense">Gastos</option>
                             </select>
                         </div>
                         <div class="filter-group">
-                            <label>Estado:</label>
-                            <select id="project-filter-status" onchange="App.filterProjects()">
-                                <option value="">Todos</option>
-                                <option value="Active">Activo</option>
-                                <option value="Completed">Completado</option>
-                                <option value="On Hold">En Pausa</option>
+                            <select id="filter-category" class="filter-select">
+                                <option value="">Todas las categorias</option>
                             </select>
                         </div>
                         <div class="filter-group">
-                            <label>Buscar:</label>
-                            <input type="text" id="project-search" placeholder="Nombre del proyecto..." onkeyup="App.filterProjects()">
-                        </div>
-                    </div>
-
-                    <!-- Projects KPIs -->
-                    <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr);">
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Proyectos Activos</span>
-                            </div>
-                            <div class="kpi-value" id="projects-active">--</div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Ingresos Totales</span>
-                            </div>
-                            <div class="kpi-value positive" id="projects-income">--</div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Gastos Totales</span>
-                            </div>
-                            <div class="kpi-value negative" id="projects-expenses">--</div>
-                        </div>
-                        <div class="kpi-card">
-                            <div class="kpi-header">
-                                <span class="kpi-label">Margen Promedio</span>
-                            </div>
-                            <div class="kpi-value" id="projects-margin">--</div>
-                        </div>
-                    </div>
-
-                    <!-- Projects Grid -->
-                    <div class="project-grid" id="projects-grid">
-                        <div class="text-muted" style="padding:40px;text-align:center;">Cargando proyectos...</div>
-                    </div>
-                </div>
-
-                <!-- ==================== TRANSACTIONS VIEW ==================== -->
-                <div id="view-transactions" class="view">
-                    <div class="page-header">
-                        <h1>Transacciones</h1>
-                        <div class="page-header-actions">
-                            <button class="btn btn-secondary" onclick="App.exportTransactions()">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                Exportar
-                            </button>
-                            <button class="btn btn-primary" onclick="App.openModal('add-transaction')">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                Nueva
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Transaction Filters -->
-                    <div class="filters">
-                        <div class="filter-group">
-                            <label>Tipo:</label>
-                            <select id="tx-filter-type" onchange="App.applyTransactionFilters()">
-                                <option value="">Todos</option>
-                                <option value="credit">Ingresos</option>
-                                <option value="debit">Gastos</option>
+                            <select id="filter-project" class="filter-select">
+                                <option value="">Todos los proyectos</option>
                             </select>
                         </div>
                         <div class="filter-group">
-                            <label>Categoria:</label>
-                            <select id="tx-filter-category" onchange="App.applyTransactionFilters()">
-                                <option value="">Todas</option>
+                            <select id="filter-client" class="filter-select">
+                                <option value="">Todos los clientes</option>
                             </select>
                         </div>
                         <div class="filter-group">
-                            <label>Proyecto:</label>
-                            <select id="tx-filter-project" onchange="App.applyTransactionFilters()">
-                                <option value="">Todos</option>
-                            </select>
+                            <input type="text" id="filter-search" class="filter-input" placeholder="Buscar...">
                         </div>
-                        <div class="filter-group">
-                            <label>Cliente:</label>
-                            <select id="tx-filter-client" onchange="App.applyTransactionFilters()">
-                                <option value="">Todos</option>
-                            </select>
-                        </div>
-                        <div class="filter-separator"></div>
-                        <div class="filter-group">
-                            <label>Desde:</label>
-                            <input type="date" id="tx-filter-from" onchange="App.applyTransactionFilters()">
-                        </div>
-                        <div class="filter-group">
-                            <label>Hasta:</label>
-                            <input type="date" id="tx-filter-to" onchange="App.applyTransactionFilters()">
-                        </div>
-                        <div class="filter-group">
-                            <label>Buscar:</label>
-                            <input type="text" id="tx-search" placeholder="Descripcion..." onkeyup="App.applyTransactionFilters()">
-                        </div>
-                        <div class="filter-actions">
-                            <button class="btn btn-ghost btn-sm" onclick="App.clearTransactionFilters()">Limpiar</button>
-                        </div>
+                        <button class="btn btn-ghost btn-sm" onclick="App.clearFilters()">Limpiar</button>
                     </div>
 
-                    <!-- Quick Filters -->
-                    <div class="quick-filters">
-                        <button class="quick-filter" data-filter="assigned" onclick="App.toggleQuickFilter('assigned')">Asignadas</button>
-                        <button class="quick-filter" data-filter="unassigned" onclick="App.toggleQuickFilter('unassigned')">Sin asignar</button>
-                        <button class="quick-filter" data-filter="high-value" onclick="App.toggleQuickFilter('high-value')">Alto valor</button>
+                    <!-- Quick Stats -->
+                    <div class="quick-stats">
+                        <div class="quick-stat">
+                            <span class="quick-stat-value" id="tx-total">0</span>
+                            <span class="quick-stat-label">Total</span>
+                        </div>
+                        <div class="quick-stat">
+                            <span class="quick-stat-value positive" id="tx-income">0€</span>
+                            <span class="quick-stat-label">Ingresos</span>
+                        </div>
+                        <div class="quick-stat">
+                            <span class="quick-stat-value negative" id="tx-expenses">0€</span>
+                            <span class="quick-stat-label">Gastos</span>
+                        </div>
+                        <div class="quick-stat">
+                            <span class="quick-stat-value" id="tx-unassigned">0</span>
+                            <span class="quick-stat-label">Sin asignar</span>
+                        </div>
                     </div>
 
                     <!-- Transactions Table -->
-                    <div class="card">
-                        <div class="card-body" style="padding: 0; overflow-x: auto;">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th style="width: 40px;">
-                                            <input type="checkbox" class="table-checkbox" id="select-all-tx" onchange="App.toggleAllTransactions()">
-                                        </th>
-                                        <th class="sortable" onclick="App.sortTransactions('settled_at')">Fecha <span class="sort-icon" id="sort-settled_at"></span></th>
-                                        <th class="sortable" onclick="App.sortTransactions('counterparty_name')">Descripcion <span class="sort-icon" id="sort-counterparty_name"></span></th>
-                                        <th>Categoria</th>
-                                        <th>Proyecto / Cliente</th>
-                                        <th class="sortable" style="text-align: right;" onclick="App.sortTransactions('amount')">Monto <span class="sort-icon" id="sort-amount"></span></th>
-                                        <th style="width: 80px;"></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="transactions-table-body">
-                                    <tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                    <div class="table-card">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-date">Fecha</th>
+                                    <th class="col-desc">Descripcion</th>
+                                    <th class="col-category">Categoria</th>
+                                    <th class="col-project">Proyecto</th>
+                                    <th class="col-client">Cliente</th>
+                                    <th class="col-amount">Monto</th>
+                                    <th class="col-actions"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-table">
+                                <tr><td colspan="7" class="empty-cell">Cargando transacciones...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
+                </section>
 
-                    <!-- Bulk Actions Bar (shown when items selected) -->
-                    <div class="bulk-actions-bar hidden" id="bulk-actions-bar">
-                        <span class="count"><span id="selected-count">0</span> seleccionadas</span>
-                        <button class="btn btn-sm" onclick="App.bulkAssignProject()">Asignar Proyecto</button>
-                        <button class="btn btn-sm" onclick="App.bulkAssignClient()">Asignar Cliente</button>
-                        <button class="btn btn-sm" onclick="App.bulkExclude()">Excluir</button>
-                        <span class="close-btn" onclick="App.clearSelection()">✕</span>
-                    </div>
-                </div>
-
-                <!-- ==================== REVIEW VIEW ==================== -->
-                <div id="view-review" class="view">
-                    <div class="page-header">
-                        <h1>Revision de Transacciones</h1>
-                        <div class="page-header-actions">
-                            <span class="text-muted text-sm" id="review-count">-- pendientes</span>
-                        </div>
-                    </div>
-
-                    <div class="review-layout">
-                        <!-- Transaction List -->
-                        <div class="review-list-container">
+                <!-- ============ REVIEW VIEW ============ -->
+                <section class="view" id="view-review">
+                    <div class="review-container">
+                        <!-- Pending List -->
+                        <div class="review-list-panel">
                             <div class="review-list-header">
-                                <div class="filter-group">
-                                    <select id="review-sort" onchange="App.sortReview()">
-                                        <option value="date-desc">Mas recientes</option>
-                                        <option value="date-asc">Mas antiguas</option>
-                                        <option value="amount-desc">Mayor monto</option>
-                                        <option value="amount-asc">Menor monto</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <button class="btn btn-sm btn-ghost" onclick="App.selectAllReview()">Seleccionar todas</button>
-                                </div>
+                                <span class="review-count"><span id="review-total">0</span> pendientes</span>
+                                <select id="review-sort" class="filter-select compact">
+                                    <option value="date-desc">Mas recientes</option>
+                                    <option value="date-asc">Mas antiguas</option>
+                                    <option value="amount-desc">Mayor monto</option>
+                                    <option value="amount-asc">Menor monto</option>
+                                </select>
                             </div>
                             <div class="review-list" id="review-list">
-                                <div class="text-muted" style="padding:40px;text-align:center;">Cargando transacciones...</div>
+                                <div class="loading-placeholder">Cargando transacciones...</div>
                             </div>
                         </div>
 
-                        <!-- Review Panel -->
-                        <div class="review-panel">
-                            <div class="review-panel-header">
-                                <div class="review-panel-title" id="review-panel-title">Selecciona una transaccion</div>
-                                <div class="review-panel-subtitle" id="review-panel-subtitle">--</div>
-                            </div>
-                            <div class="review-panel-body" id="review-panel-body">
-                                <div class="text-muted">Selecciona una transaccion de la lista para revisar y asignar.</div>
-                            </div>
-                            <div class="review-panel-footer" id="review-panel-footer" style="display:none;">
-                                <button class="btn btn-secondary" onclick="App.excludeTransaction()">Excluir</button>
-                                <button class="btn btn-success" onclick="App.confirmAssignment()">Confirmar</button>
+                        <!-- Assignment Panel -->
+                        <div class="assignment-panel" id="assignment-panel">
+                            <div class="assignment-empty">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                                    <rect x="9" y="3" width="6" height="4" rx="1"/>
+                                    <path d="M9 14l2 2 4-4"/>
+                                </svg>
+                                <p>Selecciona una transaccion para asignar</p>
                             </div>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- ==================== SETTINGS VIEW ==================== -->
-                <div id="view-settings" class="view">
-                    <div class="page-header">
-                        <h1>Configuracion</h1>
-                    </div>
-
-                    <div class="tabs">
-                        <div class="tab active" onclick="App.showSettingsTab('connections', this)">Conexiones</div>
-                        <div class="tab" onclick="App.showSettingsTab('team', this)">Equipo</div>
-                        <div class="tab" onclick="App.showSettingsTab('clients-settings', this)">Clientes</div>
-                        <div class="tab" onclick="App.showSettingsTab('projects-settings', this)">Proyectos</div>
-                        <div class="tab" onclick="App.showSettingsTab('categories', this)">Categorias</div>
-                        <div class="tab" onclick="App.showSettingsTab('salaries', this)">Salarios</div>
-                    </div>
-
-                    <!-- Connections Tab -->
-                    <div id="settings-connections" class="settings-section">
-                        <div class="card">
+                <!-- ============ AI SIMULATOR VIEW ============ -->
+                <section class="view" id="view-simulator">
+                    <div class="simulator-container">
+                        <!-- Simulator Form -->
+                        <div class="simulator-form card">
                             <div class="card-header">
-                                <h3>Integraciones</h3>
+                                <h3>Simulador de Escenarios</h3>
+                                <div class="ai-badge">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2a4 4 0 014 4c0 1.1-.9 2-2 2h-4a2 2 0 01-2-2 4 4 0 014-4z"/>
+                                        <path d="M12 8v8M8 12h8"/>
+                                        <circle cx="12" cy="19" r="2"/>
+                                    </svg>
+                                    Potenciado por IA
+                                </div>
                             </div>
                             <div class="card-body">
-                                <div class="grid-2 mb-6">
-                                    <div style="padding:16px;background:var(--bg);border-radius:var(--radius-lg);border:1px solid var(--border);">
-                                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-                                            <div style="width:40px;height:40px;background:var(--primary-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                                <span style="font-weight:bold;color:var(--primary);">Q</span>
-                                            </div>
-                                            <div>
-                                                <div class="font-semibold">Qonto</div>
-                                                <div class="text-sm text-muted">Cuenta bancaria</div>
-                                            </div>
-                                            <span class="status success" style="margin-left:auto;" id="status-qonto">Conectado</span>
+                                <div class="form-section">
+                                    <label class="form-label">Tipo de Escenario</label>
+                                    <div class="scenario-options">
+                                        <label class="scenario-option">
+                                            <input type="radio" name="scenario-type" value="growth" checked>
+                                            <span class="scenario-option-content">
+                                                <span class="scenario-icon">📈</span>
+                                                <span class="scenario-name">Crecimiento</span>
+                                                <span class="scenario-desc">Proyectar crecimiento de ingresos</span>
+                                            </span>
+                                        </label>
+                                        <label class="scenario-option">
+                                            <input type="radio" name="scenario-type" value="cost_reduction">
+                                            <span class="scenario-option-content">
+                                                <span class="scenario-icon">💰</span>
+                                                <span class="scenario-name">Reduccion Costos</span>
+                                                <span class="scenario-desc">Simular reduccion de gastos</span>
+                                            </span>
+                                        </label>
+                                        <label class="scenario-option">
+                                            <input type="radio" name="scenario-type" value="new_project">
+                                            <span class="scenario-option-content">
+                                                <span class="scenario-icon">🚀</span>
+                                                <span class="scenario-name">Nuevo Proyecto</span>
+                                                <span class="scenario-desc">Impacto de nuevo proyecto</span>
+                                            </span>
+                                        </label>
+                                        <label class="scenario-option">
+                                            <input type="radio" name="scenario-type" value="custom">
+                                            <span class="scenario-option-content">
+                                                <span class="scenario-icon">⚙️</span>
+                                                <span class="scenario-name">Personalizado</span>
+                                                <span class="scenario-desc">Definir parametros custom</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Periodo de Proyeccion</label>
+                                        <select id="sim-period" class="form-select">
+                                            <option value="3">3 meses</option>
+                                            <option value="6" selected>6 meses</option>
+                                            <option value="12">12 meses</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Variacion (%)</label>
+                                        <input type="number" id="sim-variation" class="form-input" value="10" min="-100" max="100">
+                                    </div>
+                                </div>
+
+                                <div class="form-group" id="sim-project-group" style="display:none;">
+                                    <label class="form-label">Proyecto</label>
+                                    <select id="sim-project" class="form-select">
+                                        <option value="">Seleccionar proyecto...</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group" id="sim-custom-group" style="display:none;">
+                                    <label class="form-label">Describe tu escenario</label>
+                                    <textarea id="sim-custom" class="form-textarea" rows="3" placeholder="Ej: Que pasaria si aumentamos el precio un 15% y perdemos 10% de clientes?"></textarea>
+                                </div>
+
+                                <button class="btn btn-primary btn-lg btn-full" id="btn-simulate" onclick="App.runSimulation()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="5 3 19 12 5 21 5 3"/>
+                                    </svg>
+                                    Ejecutar Simulacion
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Simulation Results -->
+                        <div class="simulator-results card" id="simulator-results" style="display:none;">
+                            <div class="card-header">
+                                <h3>Resultados de la Simulacion</h3>
+                                <button class="btn btn-ghost btn-sm" onclick="App.compareScenarios()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M16 3h5v5M8 3H3v5M3 16v5h5M21 16v5h-5"/>
+                                    </svg>
+                                    Comparar
+                                </button>
+                            </div>
+                            <div class="card-body" id="simulation-output">
+                                <!-- Results rendered here -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ============ SETTINGS VIEW ============ -->
+                <section class="view" id="view-settings">
+                    <div class="settings-grid">
+                        <div class="settings-menu">
+                            <a class="settings-menu-item active" data-settings="general">General</a>
+                            <a class="settings-menu-item" data-settings="clients">Clientes</a>
+                            <a class="settings-menu-item" data-settings="projects">Proyectos</a>
+                            <a class="settings-menu-item" data-settings="team">Equipo</a>
+                            <a class="settings-menu-item" data-settings="categories">Categorias</a>
+                            <a class="settings-menu-item" data-settings="integrations">Integraciones</a>
+                        </div>
+
+                        <div class="settings-content">
+                            <!-- General Settings -->
+                            <div class="settings-panel active" id="settings-general">
+                                <h3>Configuracion General</h3>
+                                <div class="settings-section">
+                                    <div class="setting-item">
+                                        <div class="setting-info">
+                                            <div class="setting-label">Actualizacion automatica</div>
+                                            <div class="setting-desc">Sincronizar datos cada 30 segundos</div>
+                                        </div>
+                                        <label class="toggle">
+                                            <input type="checkbox" id="setting-auto-sync" checked>
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Clients Settings -->
+                            <div class="settings-panel" id="settings-clients">
+                                <div class="settings-panel-header">
+                                    <h3>Clientes</h3>
+                                    <button class="btn btn-primary btn-sm" onclick="App.openModal('add-client')">+ Nuevo</button>
+                                </div>
+                                <div class="settings-table" id="clients-table-container">
+                                    <div class="loading-placeholder">Cargando...</div>
+                                </div>
+                            </div>
+
+                            <!-- Projects Settings -->
+                            <div class="settings-panel" id="settings-projects">
+                                <div class="settings-panel-header">
+                                    <h3>Proyectos</h3>
+                                    <button class="btn btn-primary btn-sm" onclick="App.openModal('add-project')">+ Nuevo</button>
+                                </div>
+                                <div class="settings-table" id="projects-table-container">
+                                    <div class="loading-placeholder">Cargando...</div>
+                                </div>
+                            </div>
+
+                            <!-- Team Settings -->
+                            <div class="settings-panel" id="settings-team">
+                                <div class="settings-panel-header">
+                                    <h3>Equipo</h3>
+                                    <button class="btn btn-primary btn-sm" onclick="App.openModal('add-member')">+ Nuevo</button>
+                                </div>
+                                <div class="settings-table" id="team-table-container">
+                                    <div class="loading-placeholder">Cargando...</div>
+                                </div>
+                            </div>
+
+                            <!-- Categories Settings -->
+                            <div class="settings-panel" id="settings-categories">
+                                <div class="settings-panel-header">
+                                    <h3>Categorias</h3>
+                                    <button class="btn btn-primary btn-sm" onclick="App.openModal('add-category')">+ Nueva</button>
+                                </div>
+                                <div class="settings-table" id="categories-table-container">
+                                    <div class="loading-placeholder">Cargando...</div>
+                                </div>
+                            </div>
+
+                            <!-- Integrations -->
+                            <div class="settings-panel" id="settings-integrations">
+                                <h3>Integraciones</h3>
+                                <div class="integrations-grid">
+                                    <div class="integration-card">
+                                        <div class="integration-icon qonto">Q</div>
+                                        <div class="integration-info">
+                                            <div class="integration-name">Qonto</div>
+                                            <div class="integration-status connected">Conectado</div>
                                         </div>
                                         <button class="btn btn-secondary btn-sm" onclick="App.syncQonto()">Sincronizar</button>
                                     </div>
-                                    <div style="padding:16px;background:var(--bg);border-radius:var(--radius-lg);border:1px solid var(--border);">
-                                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-                                            <div style="width:40px;height:40px;background:var(--warning-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                                                <span style="font-weight:bold;color:var(--warning);">A</span>
-                                            </div>
-                                            <div>
-                                                <div class="font-semibold">Airtable</div>
-                                                <div class="text-sm text-muted">Base de datos</div>
-                                            </div>
-                                            <span class="status success" style="margin-left:auto;" id="status-airtable">Conectado</span>
+                                    <div class="integration-card">
+                                        <div class="integration-icon airtable">A</div>
+                                        <div class="integration-info">
+                                            <div class="integration-name">Airtable</div>
+                                            <div class="integration-status connected">Conectado</div>
                                         </div>
-                                        <button class="btn btn-secondary btn-sm" onclick="App.testAirtable()">Probar conexion</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="App.testAirtable()">Probar</button>
                                     </div>
                                 </div>
-
-                                <div id="qonto-org-info" class="hidden" style="padding:16px;background:var(--bg);border-radius:var(--radius);margin-top:16px;">
-                                    <strong>Organizacion:</strong> <span id="qonto-org-name">-</span><br>
-                                    <strong>Saldo:</strong> <span id="qonto-balance">-</span>
-                                </div>
-
-                                <div class="mt-4" style="display:flex;gap:12px;flex-wrap:wrap;">
-                                    <button class="btn btn-primary" onclick="App.syncQonto()">Sincronizar Transacciones</button>
-                                    <button class="btn btn-secondary" onclick="App.syncQontoMembers()">Importar Miembros</button>
-                                    <button class="btn btn-secondary" onclick="App.loadQontoOrganization()">Ver Info Organizacion</button>
-                                </div>
                             </div>
                         </div>
                     </div>
+                </section>
 
-                    <!-- Team Tab -->
-                    <div id="settings-team" class="settings-section hidden">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Equipo</h3>
-                                <button class="btn btn-primary btn-sm" onclick="App.openModal('add-member')">+ Nuevo Miembro</button>
-                            </div>
-                            <div class="card-body" style="padding:0;">
-                                <table>
-                                    <thead>
-                                        <tr><th>Nombre</th><th>Rol</th><th style="text-align:right">Salario Mensual</th><th style="width:100px;"></th></tr>
-                                    </thead>
-                                    <tbody id="team-members-table">
-                                        <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Clients Settings Tab -->
-                    <div id="settings-clients-settings" class="settings-section hidden">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Clientes</h3>
-                                <button class="btn btn-primary btn-sm" onclick="App.openModal('add-client')">+ Nuevo Cliente</button>
-                            </div>
-                            <div class="card-body" style="padding:0;">
-                                <table>
-                                    <thead>
-                                        <tr><th>Nombre</th><th>Contacto</th><th>Email</th><th>Telefono</th><th style="width:100px;"></th></tr>
-                                    </thead>
-                                    <tbody id="settings-clients-table">
-                                        <tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Projects Settings Tab -->
-                    <div id="settings-projects-settings" class="settings-section hidden">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Proyectos</h3>
-                                <button class="btn btn-primary btn-sm" onclick="App.openModal('add-project')">+ Nuevo Proyecto</button>
-                            </div>
-                            <div class="card-body" style="padding:0;">
-                                <table>
-                                    <thead>
-                                        <tr><th>Nombre</th><th>Cliente</th><th>Estado</th><th style="width:100px;"></th></tr>
-                                    </thead>
-                                    <tbody id="settings-projects-table">
-                                        <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Categories Tab -->
-                    <div id="settings-categories" class="settings-section hidden">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Categorias</h3>
-                                <button class="btn btn-primary btn-sm" onclick="App.openModal('add-category')">+ Nueva Categoria</button>
-                            </div>
-                            <div class="card-body" style="padding:0;">
-                                <table>
-                                    <thead>
-                                        <tr><th>Nombre</th><th>Tipo</th><th style="width:100px;"></th></tr>
-                                    </thead>
-                                    <tbody id="categories-table">
-                                        <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Salaries Tab -->
-                    <div id="settings-salaries" class="settings-section hidden">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Asignacion de Salarios por Proyecto</h3>
-                                <div style="display:flex;gap:12px;align-items:center;">
-                                    <select id="allocation-month" onchange="App.loadSalaryAllocations()"></select>
-                                    <button class="btn btn-primary btn-sm" onclick="App.openModal('add-allocation')">+ Asignar</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <p class="text-sm text-muted mb-4">Las asignaciones se guardan por mes. Cambiar un mes no afecta meses anteriores.</p>
-                                <div id="allocations-container">
-                                    <div class="text-muted" style="text-align:center;padding:20px;">Selecciona un mes</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </main>
     </div>
 
-    <!-- Notifications Container -->
-    <div id="notifications" style="position:fixed;top:80px;right:24px;z-index:1001;display:flex;flex-direction:column;gap:8px;"></div>
+    <!-- Modals -->
+    <div class="modal-overlay" id="modal-overlay"></div>
 
-    <!-- ==================== MODALS ==================== -->
+    <!-- Assignment Modal (for % allocation) -->
+    <div class="modal" id="modal-assignment">
+        <div class="modal-header">
+            <h3>Asignar Transaccion</h3>
+            <button class="modal-close" onclick="App.closeModal('assignment')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="tx-detail-card" id="modal-tx-detail">
+                <!-- Transaction details -->
+            </div>
 
-    <!-- Add Transaction Modal -->
-    <div class="modal-overlay" id="modal-add-transaction">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Nueva Transaccion</h3>
-                <button class="modal-close" onclick="App.closeModal('add-transaction')">&times;</button>
+            <!-- AI Suggestion -->
+            <div class="ai-suggestion" id="ai-suggestion" style="display:none;">
+                <div class="ai-suggestion-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a4 4 0 014 4c0 1.1-.9 2-2 2h-4a2 2 0 01-2-2 4 4 0 014-4z"/>
+                        <path d="M12 8v8M8 12h8"/>
+                        <circle cx="12" cy="19" r="2"/>
+                    </svg>
+                    <span>Sugerencia IA</span>
+                </div>
+                <div class="ai-suggestion-content" id="ai-suggestion-content"></div>
+                <button class="btn btn-secondary btn-sm" onclick="App.applySuggestion()">Aplicar sugerencia</button>
             </div>
-            <div class="modal-body">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Tipo</label>
-                        <select id="new-tx-type">
-                            <option value="Expense">Gasto</option>
-                            <option value="Income">Ingreso</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Fecha</label>
-                        <input type="date" id="new-tx-date">
-                    </div>
+
+            <!-- Allocations -->
+            <div class="allocations-section">
+                <div class="allocations-header">
+                    <h4>Asignaciones</h4>
+                    <button class="btn btn-ghost btn-sm" onclick="App.addAllocationRow()">+ Agregar</button>
                 </div>
-                <div class="form-group">
-                    <label>Monto (EUR)</label>
-                    <input type="number" step="0.01" id="new-tx-amount" placeholder="0.00">
+                <div class="allocations-list" id="allocations-list">
+                    <!-- Allocation rows -->
                 </div>
-                <div class="form-group">
-                    <label>Descripcion</label>
-                    <input type="text" id="new-tx-description" placeholder="Descripcion del movimiento">
-                </div>
-                <div class="form-group">
-                    <label>Contraparte</label>
-                    <input type="text" id="new-tx-counterparty" placeholder="Nombre del cliente/proveedor">
+                <div class="allocations-total" id="allocations-total">
+                    <span>Total asignado:</span>
+                    <span class="total-pct">0%</span>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="App.closeModal('add-transaction')">Cancelar</button>
-                <button class="btn btn-primary" onclick="App.saveTransaction()">Guardar</button>
-            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="App.closeModal('assignment')">Cancelar</button>
+            <button class="btn btn-danger" onclick="App.excludeTransaction()">Excluir</button>
+            <button class="btn btn-primary" onclick="App.saveAssignment()" id="btn-save-assignment">Guardar</button>
         </div>
     </div>
 
     <!-- Add Client Modal -->
-    <div class="modal-overlay" id="modal-add-client">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Nuevo Cliente</h3>
-                <button class="modal-close" onclick="App.closeModal('add-client')">&times;</button>
+    <div class="modal" id="modal-add-client">
+        <div class="modal-header">
+            <h3>Nuevo Cliente</h3>
+            <button class="modal-close" onclick="App.closeModal('add-client')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre *</label>
+                <input type="text" id="new-client-name" class="form-input" placeholder="Nombre de la empresa">
             </div>
-            <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Contacto</label>
+                <input type="text" id="new-client-contact" class="form-input" placeholder="Persona de contacto">
+            </div>
+            <div class="form-row">
                 <div class="form-group">
-                    <label>Nombre</label>
-                    <input type="text" id="new-client-name" placeholder="Nombre de la empresa">
-                </div>
-                <div class="form-group">
-                    <label>Contacto</label>
-                    <input type="text" id="new-client-contact" placeholder="Persona de contacto">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="new-client-email" placeholder="email@ejemplo.com">
-                    </div>
-                    <div class="form-group">
-                        <label>Telefono</label>
-                        <input type="text" id="new-client-phone" placeholder="+34...">
-                    </div>
+                    <label class="form-label">Email</label>
+                    <input type="email" id="new-client-email" class="form-input" placeholder="email@ejemplo.com">
                 </div>
                 <div class="form-group">
-                    <label>Notas</label>
-                    <textarea id="new-client-notes" rows="3" placeholder="Notas adicionales..." style="width:100%;"></textarea>
+                    <label class="form-label">Telefono</label>
+                    <input type="text" id="new-client-phone" class="form-input" placeholder="+34...">
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="App.closeModal('add-client')">Cancelar</button>
-                <button class="btn btn-primary" onclick="App.saveClient()">Guardar</button>
-            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="App.closeModal('add-client')">Cancelar</button>
+            <button class="btn btn-primary" onclick="App.saveClient()">Guardar</button>
         </div>
     </div>
 
     <!-- Add Project Modal -->
-    <div class="modal-overlay" id="modal-add-project">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Nuevo Proyecto</h3>
-                <button class="modal-close" onclick="App.closeModal('add-project')">&times;</button>
+    <div class="modal" id="modal-add-project">
+        <div class="modal-header">
+            <h3>Nuevo Proyecto</h3>
+            <button class="modal-close" onclick="App.closeModal('add-project')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre *</label>
+                <input type="text" id="new-project-name" class="form-input" placeholder="Nombre del proyecto">
             </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Nombre del Proyecto</label>
-                    <input type="text" id="new-project-name" placeholder="Nombre del proyecto">
-                </div>
-                <div class="form-group">
-                    <label>Cliente</label>
-                    <select id="new-project-client">
-                        <option value="">Sin cliente</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Estado</label>
-                    <select id="new-project-status">
-                        <option value="Active">Activo</option>
-                        <option value="Completed">Completado</option>
-                        <option value="On Hold">En Pausa</option>
-                    </select>
-                </div>
+            <div class="form-group">
+                <label class="form-label">Cliente</label>
+                <select id="new-project-client" class="form-select">
+                    <option value="">Sin cliente</option>
+                </select>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="App.closeModal('add-project')">Cancelar</button>
-                <button class="btn btn-primary" onclick="App.saveProject()">Guardar</button>
+            <div class="form-group">
+                <label class="form-label">Estado</label>
+                <select id="new-project-status" class="form-select">
+                    <option value="Active">Activo</option>
+                    <option value="Completed">Completado</option>
+                    <option value="On Hold">En Pausa</option>
+                </select>
             </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="App.closeModal('add-project')">Cancelar</button>
+            <button class="btn btn-primary" onclick="App.saveProject()">Guardar</button>
         </div>
     </div>
 
     <!-- Add Team Member Modal -->
-    <div class="modal-overlay" id="modal-add-member">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Nuevo Miembro</h3>
-                <button class="modal-close" onclick="App.closeModal('add-member')">&times;</button>
+    <div class="modal" id="modal-add-member">
+        <div class="modal-header">
+            <h3>Nuevo Miembro</h3>
+            <button class="modal-close" onclick="App.closeModal('add-member')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre *</label>
+                <input type="text" id="new-member-name" class="form-input" placeholder="Nombre completo">
             </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Nombre</label>
-                    <input type="text" id="new-member-name" placeholder="Nombre completo">
-                </div>
-                <div class="form-group">
-                    <label>Rol</label>
-                    <input type="text" id="new-member-role" placeholder="Ej: Desarrollador">
-                </div>
-                <div class="form-group">
-                    <label>Salario Mensual (EUR)</label>
-                    <input type="number" step="0.01" id="new-member-salary" placeholder="0.00">
-                </div>
+            <div class="form-group">
+                <label class="form-label">Rol</label>
+                <input type="text" id="new-member-role" class="form-input" placeholder="Ej: Desarrollador">
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="App.closeModal('add-member')">Cancelar</button>
-                <button class="btn btn-primary" onclick="App.saveTeamMember()">Guardar</button>
+            <div class="form-group">
+                <label class="form-label">Salario Mensual (EUR)</label>
+                <input type="number" id="new-member-salary" class="form-input" placeholder="0.00" step="0.01">
             </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="App.closeModal('add-member')">Cancelar</button>
+            <button class="btn btn-primary" onclick="App.saveTeamMember()">Guardar</button>
         </div>
     </div>
 
     <!-- Add Category Modal -->
-    <div class="modal-overlay" id="modal-add-category">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Nueva Categoria</h3>
-                <button class="modal-close" onclick="App.closeModal('add-category')">&times;</button>
+    <div class="modal" id="modal-add-category">
+        <div class="modal-header">
+            <h3>Nueva Categoria</h3>
+            <button class="modal-close" onclick="App.closeModal('add-category')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nombre *</label>
+                <input type="text" id="new-category-name" class="form-input" placeholder="Nombre de la categoria">
             </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Nombre</label>
-                    <input type="text" id="new-category-name" placeholder="Nombre de la categoria">
-                </div>
-                <div class="form-group">
-                    <label>Tipo</label>
-                    <select id="new-category-type">
-                        <option value="Expense">Gasto</option>
-                        <option value="Income">Ingreso</option>
-                    </select>
-                </div>
+            <div class="form-group">
+                <label class="form-label">Tipo</label>
+                <select id="new-category-type" class="form-select">
+                    <option value="Expense">Gasto</option>
+                    <option value="Income">Ingreso</option>
+                </select>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="App.closeModal('add-category')">Cancelar</button>
-                <button class="btn btn-primary" onclick="App.saveCategory()">Guardar</button>
-            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="App.closeModal('add-category')">Cancelar</button>
+            <button class="btn btn-primary" onclick="App.saveCategory()">Guardar</button>
         </div>
     </div>
 
-    <!-- Add Salary Allocation Modal -->
-    <div class="modal-overlay" id="modal-add-allocation">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Asignar Salario a Proyecto</h3>
-                <button class="modal-close" onclick="App.closeModal('add-allocation')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Miembro</label>
-                    <select id="alloc-member" onchange="App.calculateAllocationAmount()">
-                        <option value="">Seleccionar...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Proyecto</label>
-                    <select id="alloc-project">
-                        <option value="">Seleccionar...</option>
-                    </select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Porcentaje (%)</label>
-                        <input type="number" min="0" max="100" id="alloc-percentage" value="100" onchange="App.calculateAllocationAmount()">
-                    </div>
-                    <div class="form-group">
-                        <label>Monto (EUR)</label>
-                        <input type="number" step="0.01" id="alloc-amount" readonly style="background:var(--bg);">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="App.closeModal('add-allocation')">Cancelar</button>
-                <button class="btn btn-primary" onclick="App.saveSalaryAllocation()">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Transaction Assignment Modal -->
-    <div class="modal-overlay" id="modal-tx-assignment">
-        <div class="modal lg">
-            <div class="modal-header">
-                <h3>Asignar Transaccion</h3>
-                <button class="modal-close" onclick="App.closeModal('tx-assignment')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="tx-assignment-info" style="padding:16px;background:var(--bg);border-radius:var(--radius);margin-bottom:20px;">
-                    <strong id="tx-assignment-desc">-</strong><br>
-                    <span class="text-muted">Monto: </span><span id="tx-assignment-amount">-</span>
-                </div>
-
-                <!-- AI Suggestion -->
-                <div class="suggestion-box" id="tx-suggestion-box" style="display:none;">
-                    <div class="suggestion-header">
-                        <svg class="suggestion-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z"/></svg>
-                        <span class="suggestion-label">Sugerencia IA</span>
-                    </div>
-                    <div class="suggestion-content" id="tx-suggestion-content">-</div>
-                    <div class="suggestion-action">
-                        <button class="btn btn-primary btn-sm" onclick="App.applySuggestion()">Aplicar sugerencia</button>
-                    </div>
-                </div>
-
-                <!-- Allocations List -->
-                <div id="tx-allocations-list" style="margin-bottom:20px;">
-                    <!-- Current allocations rendered here -->
-                </div>
-
-                <!-- Allocation Total -->
-                <div class="allocation-total" id="tx-allocation-total">
-                    <span>Total asignado:</span>
-                    <strong id="tx-allocation-pct">0%</strong>
-                </div>
-
-                <!-- Add New Allocation -->
-                <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px;">
-                    <h4 style="margin-bottom:16px;">Agregar asignacion</h4>
-                    <div class="form-row form-row-3">
-                        <div class="form-group">
-                            <label>Categoria</label>
-                            <select id="tx-alloc-category"></select>
-                        </div>
-                        <div class="form-group">
-                            <label>Proyecto</label>
-                            <select id="tx-alloc-project"></select>
-                        </div>
-                        <div class="form-group">
-                            <label>Cliente</label>
-                            <select id="tx-alloc-client"></select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group" style="max-width:120px;">
-                            <label>Porcentaje</label>
-                            <input type="number" id="tx-alloc-pct" min="0" max="100" value="100">
-                        </div>
-                        <div class="form-group" style="display:flex;align-items:flex-end;">
-                            <button class="btn btn-primary" onclick="App.addTransactionAllocation()">Agregar</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="App.closeModal('tx-assignment')">Cerrar</button>
-            </div>
-        </div>
-    </div>
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="/static/js/utils.js"></script>
-    <script src="/static/js/charts.js"></script>
-    <script src="/static/js/api.js"></script>
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/views.js"></script>
+    <script src="/static/js/executive-app.js"></script>
 </body>
 </html>
