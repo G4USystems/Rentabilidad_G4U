@@ -287,17 +287,17 @@
                     <!-- Grafico torta gastos -->
                     <div class="card">
                         <div class="card-header">Distribucion de Gastos</div>
-                        <div class="card-body">
-                            <canvas id="chart-expenses" height="200"></canvas>
-                            <div id="chart-expenses-legend" style="margin-top:12px;font-size:12px;"></div>
+                        <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+                            <div style="width:140px;height:140px;"><canvas id="chart-expenses"></canvas></div>
+                            <div id="chart-expenses-legend" style="font-size:11px;flex:1;"></div>
                         </div>
                     </div>
                     <!-- Grafico torta ingresos -->
                     <div class="card">
                         <div class="card-header">Distribucion de Ingresos</div>
-                        <div class="card-body">
-                            <canvas id="chart-income" height="200"></canvas>
-                            <div id="chart-income-legend" style="margin-top:12px;font-size:12px;"></div>
+                        <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+                            <div style="width:140px;height:140px;"><canvas id="chart-income"></canvas></div>
+                            <div id="chart-income-legend" style="font-size:11px;flex:1;"></div>
                         </div>
                     </div>
                 </div>
@@ -864,9 +864,18 @@
                         <input type="text" id="new-client-phone" placeholder="+34...">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Notas</label>
-                    <textarea id="new-client-notes" rows="3" placeholder="Notas adicionales..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;"></textarea>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Notas</label>
+                        <textarea id="new-client-notes" rows="2" placeholder="Notas adicionales..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select id="new-client-status">
+                            <option value="Activo">Activo</option>
+                            <option value="Inactivo">Inactivo</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1151,7 +1160,8 @@
             document.getElementById('kpi-margin').className = 'kpi-value ' + (margin >= 0 ? 'positive' : 'negative');
 
             // Counters
-            document.getElementById('kpi-clients').textContent = clients.length;
+            var activeClients = clients.filter(function(c) { return c.status !== 'Inactivo'; });
+            document.getElementById('kpi-clients').textContent = activeClients.length;
             document.getElementById('kpi-projects').textContent = projects.length;
             document.getElementById('kpi-transactions').textContent = filteredTransactions.length;
             document.getElementById('kpi-team').textContent = teamMembers.length;
@@ -2123,7 +2133,8 @@
                 contact: document.getElementById('new-client-contact').value,
                 email: document.getElementById('new-client-email').value,
                 phone: document.getElementById('new-client-phone').value,
-                notes: document.getElementById('new-client-notes').value
+                notes: document.getElementById('new-client-notes').value,
+                status: document.getElementById('new-client-status').value
             };
 
             if (!data.name) {
