@@ -681,6 +681,46 @@ def api_data():
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+@app.route("/api/qonto/debug-vat")
+def api_debug_vat():
+    """Debug endpoint to check VAT data from Qonto."""
+    try:
+        qonto = Qonto()
+        slug = qonto.get_bank_account_id()
+        if not slug:
+            return jsonify({"error": "Could not get bank account slug"})
+
+        qonto_txs = qonto.get_all_transactions(slug)
+
+        # Check what VAT fields exist in transactions
+        sample_txs = []
+        vat_count = 0
+        for tx in qonto_txs[:20]:  # First 20 transactions as sample
+            has_vat = tx.get("vat_amount") or tx.get("vat_amount_cents") or tx.get("vat_rate")
+            if has_vat:
+                vat_count += 1
+            sample_txs.append({
+                "transaction_id": tx.get("transaction_id"),
+                "label": tx.get("label"),
+                "amount": tx.get("amount"),
+                "vat_amount": tx.get("vat_amount"),
+                "vat_amount_cents": tx.get("vat_amount_cents"),
+                "vat_rate": tx.get("vat_rate"),
+                "category": tx.get("category")
+            })
+
+        # Count total with VAT
+        total_with_vat = sum(1 for tx in qonto_txs if tx.get("vat_amount") or tx.get("vat_amount_cents"))
+
+        return jsonify({
+            "total_transactions": len(qonto_txs),
+            "transactions_with_vat": total_with_vat,
+            "sample_transactions": sample_txs
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 @app.route("/api/sync", methods=["POST"])
 def api_sync():
     try:
