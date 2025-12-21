@@ -561,10 +561,10 @@
                         <div class="card-body" style="padding:0;">
                             <table>
                                 <thead>
-                                    <tr><th>Nombre</th><th>Contacto</th><th>Email</th><th>Telefono</th><th style="width:100px;"></th></tr>
+                                    <tr><th>Nombre</th><th>Contacto</th><th>Email</th><th>Telefono</th><th>Estado</th><th style="width:100px;"></th></tr>
                                 </thead>
                                 <tbody id="clients-table">
-                                    <tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                    <tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -2115,16 +2115,35 @@
         function renderClientsSettings() {
             var html = '';
             clients.forEach(function(c) {
+                var status = c.status || 'Activo';
+                var statusCls = status === 'Activo' ? 'ingreso' : 'egreso';
                 html += '<tr>';
                 html += '<td>' + (c.name || '-') + '</td>';
                 html += '<td>' + (c.contact || '-') + '</td>';
                 html += '<td>' + (c.email || '-') + '</td>';
                 html += '<td>' + (c.phone || '-') + '</td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="editClient(\'' + c.id + '\')">Editar</button> ';
-                html += '<button class="btn btn-sm btn-outline" onclick="deleteClient(\'' + c.id + '\')" style="color:var(--danger);">X</button></td>';
+                html += '<td><span class="type-badge ' + statusCls + '" style="cursor:pointer;" onclick="toggleClientStatus(\'' + c.id + '\',\'' + status + '\')">' + status + '</span></td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="deleteClient(\'' + c.id + '\')" style="color:var(--danger);">X</button></td>';
                 html += '</tr>';
             });
-            document.getElementById('clients-table').innerHTML = html || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">No hay clientes</td></tr>';
+            document.getElementById('clients-table').innerHTML = html || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px;">No hay clientes</td></tr>';
+        }
+
+        function toggleClientStatus(clientId, currentStatus) {
+            var newStatus = currentStatus === 'Activo' ? 'Inactivo' : 'Activo';
+            fetch('/api/client/' + clientId, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ status: newStatus })
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                } else {
+                    loadClients();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
         }
 
         function saveClient() {

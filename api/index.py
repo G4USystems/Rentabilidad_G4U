@@ -1446,14 +1446,19 @@ def api_update_client(client_id):
     try:
         data = request.json
         airtable = Airtable()
-        record = {
-            "Name": data.get("name", ""),
-            "Contact": data.get("contact", ""),
-            "Email": data.get("email", ""),
-            "Phone": data.get("phone", ""),
-            "Notes": data.get("notes", "")
-        }
-        record = {k: v for k, v in record.items() if v is not None}
+        record = {}
+        if "name" in data:
+            record["Name"] = data["name"]
+        if "contact" in data:
+            record["Contact"] = data["contact"]
+        if "email" in data:
+            record["Email"] = data["email"]
+        if "phone" in data:
+            record["Phone"] = data["phone"]
+        if "notes" in data:
+            record["Notes"] = data["notes"]
+        if "status" in data:
+            record["Status"] = data["status"]
         airtable.update("Clients", client_id, record)
         return jsonify({"ok": True})
     except Exception as e:
