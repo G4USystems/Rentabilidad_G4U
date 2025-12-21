@@ -585,75 +585,60 @@
                     </div>
                 </div>
 
-                <!-- Unassigned Transactions Section -->
+                <!-- Unassigned Expenses Section -->
                 <div id="settings-unassigned" class="settings-section hidden">
-                    <!-- Resumen de sin asignar -->
-                    <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom:20px;">
-                        <div class="kpi">
-                            <div class="kpi-label">Ingresos Sin Asignar</div>
-                            <div class="kpi-value positive" id="unassigned-income">-</div>
-                        </div>
-                        <div class="kpi">
-                            <div class="kpi-label">Egresos Sin Asignar</div>
-                            <div class="kpi-value negative" id="unassigned-expenses">-</div>
-                        </div>
-                        <div class="kpi">
-                            <div class="kpi-label">Transacciones</div>
-                            <div class="kpi-value" id="unassigned-count">-</div>
-                        </div>
+                    <!-- Total de egresos sin asignar -->
+                    <div class="card" style="margin-bottom:20px;text-align:center;padding:24px;">
+                        <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px;">Total Egresos Sin Asignar</div>
+                        <div style="font-size:36px;font-weight:700;color:#ef4444;" id="unassigned-total">$0</div>
+                        <div style="font-size:13px;color:var(--text-muted);margin-top:8px;"><span id="unassigned-count">0</span> transacciones</div>
                     </div>
 
                     <!-- Distribucion por proyectos -->
                     <div class="card">
                         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-                            <span>Distribuir como Gastos Indirectos</span>
+                            <span>Distribuir entre Proyectos</span>
                             <div style="display:flex;gap:8px;align-items:center;">
-                                <button class="btn btn-sm btn-outline" onclick="distributeEqual()">Igual para Todos</button>
-                                <button class="btn btn-sm btn-primary" onclick="applyDistribution()">Aplicar</button>
+                                <button class="btn btn-sm btn-outline" onclick="distributeEqual()">Repartir Igual</button>
+                                <button class="btn btn-sm btn-primary" onclick="applyDistribution()">Aplicar Distribucion</button>
                             </div>
                         </div>
-                        <div class="card-body" style="padding:0;">
+                        <div class="card-body" style="padding:16px;">
+                            <div style="margin-bottom:16px;padding:12px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e;">
+                                Asigna el porcentaje que cada proyecto absorbe de los gastos indirectos. El total debe sumar 100%.
+                            </div>
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>Proyecto</th>
-                                        <th style="width:100px;text-align:center;">%</th>
-                                        <th style="text-align:right;">Ingresos</th>
-                                        <th style="text-align:right;">Egresos</th>
+                                        <th style="text-align:left;">Proyecto</th>
+                                        <th style="width:120px;text-align:center;">Porcentaje</th>
+                                        <th style="width:150px;text-align:right;">Monto Asignado</th>
                                     </tr>
                                 </thead>
                                 <tbody id="distribution-table">
-                                    <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando proyectos...</td></tr>
+                                    <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
                                 </tbody>
                                 <tfoot>
-                                    <tr style="background:#f8fafc;font-weight:600;">
-                                        <td>Total Distribuido</td>
+                                    <tr style="background:#f1f5f9;font-weight:600;">
+                                        <td>TOTAL</td>
                                         <td style="text-align:center;" id="dist-total-pct">0%</td>
-                                        <td style="text-align:right;" id="dist-total-income">-</td>
-                                        <td style="text-align:right;" id="dist-total-expenses">-</td>
+                                        <td style="text-align:right;" id="dist-total-amount">$0</td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
                     </div>
 
-                    <!-- Lista de transacciones sin asignar -->
+                    <!-- Detalle de egresos -->
                     <div class="card" style="margin-top:20px;">
-                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-                            <span>Detalle de Transacciones</span>
-                            <select id="unassigned-type" onchange="renderUnassigned()" style="width:auto;">
-                                <option value="all">Todas</option>
-                                <option value="income">Solo Ingresos</option>
-                                <option value="expense">Solo Egresos</option>
-                            </select>
-                        </div>
+                        <div class="card-header">Detalle de Egresos Sin Asignar</div>
                         <div class="card-body" style="padding:0;max-height:250px;overflow-y:auto;">
                             <table>
                                 <thead>
-                                    <tr><th>Fecha</th><th>Descripcion</th><th>Tipo</th><th style="text-align:right">Monto</th></tr>
+                                    <tr><th>Fecha</th><th>Descripcion</th><th style="text-align:right">Monto</th></tr>
                                 </thead>
                                 <tbody id="unassigned-table">
-                                    <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                    <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -2563,91 +2548,70 @@
             }
         });
 
-        // ==================== Unassigned Transactions ====================
-        // Store unassigned data globally for distribution
-        var unassignedData = { transactions: [], totalIncome: 0, totalExpenses: 0 };
+        // ==================== Egresos Sin Asignar ====================
+        var unassignedExpenses = [];
+        var totalUnassignedAmount = 0;
         var projectDistribution = {};
 
         function renderUnassigned() {
-            // Get all unassigned transactions
-            var allUnassigned = transactions.filter(function(tx) {
+            // Solo egresos sin asignar
+            unassignedExpenses = transactions.filter(function(tx) {
+                if (tx.side === 'credit') return false; // No incluir ingresos
                 var hasAlloc = transactionAllocations.some(function(a) { return a.transaction_id === tx.id; });
                 return !hasAlloc;
             });
 
-            // Calculate totals
-            var totalIncome = 0, totalExpenses = 0;
-            allUnassigned.forEach(function(tx) {
-                var amt = parseFloat(tx.amount) || 0;
-                if (tx.side === 'credit') totalIncome += amt;
-                else totalExpenses += amt;
-            });
+            // Calcular total
+            totalUnassignedAmount = unassignedExpenses.reduce(function(sum, tx) {
+                return sum + (parseFloat(tx.amount) || 0);
+            }, 0);
 
-            unassignedData = { transactions: allUnassigned, totalIncome: totalIncome, totalExpenses: totalExpenses };
+            // Actualizar resumen
+            document.getElementById('unassigned-total').textContent = fmt(totalUnassignedAmount);
+            document.getElementById('unassigned-count').textContent = unassignedExpenses.length;
 
-            // Update KPIs
-            document.getElementById('unassigned-income').textContent = fmt(totalIncome);
-            document.getElementById('unassigned-expenses').textContent = fmt(totalExpenses);
-            document.getElementById('unassigned-count').textContent = allUnassigned.length;
-
-            // Render distribution table
+            // Renderizar tabla de distribucion
             renderDistributionTable();
 
-            // Render transaction list (filtered)
-            var typeFilter = document.getElementById('unassigned-type').value;
-            var filtered = allUnassigned.filter(function(tx) {
-                if (typeFilter === 'income') return tx.side === 'credit';
-                if (typeFilter === 'expense') return tx.side === 'debit';
-                return true;
-            });
-
+            // Renderizar lista de egresos
             var html = '';
-            filtered.forEach(function(tx) {
-                var typeClass = tx.side === 'credit' ? 'ingreso' : 'egreso';
-                var sign = tx.side === 'credit' ? '+' : '-';
-                var typeLabel = tx.side === 'credit' ? 'Ingreso' : 'Egreso';
+            unassignedExpenses.forEach(function(tx) {
                 html += '<tr>';
-                html += '<td>' + formatDate(tx.settled_at) + '</td>';
+                html += '<td style="white-space:nowrap;">' + formatDate(tx.settled_at) + '</td>';
                 html += '<td>' + (tx.counterparty_name || tx.label || '-') + '</td>';
-                html += '<td><span class="type-badge ' + typeClass + '">' + typeLabel + '</span></td>';
-                html += '<td style="text-align:right;font-weight:600;">' + sign + fmt(Math.abs(tx.amount)) + '</td>';
+                html += '<td style="text-align:right;font-weight:600;color:#ef4444;">' + fmt(tx.amount) + '</td>';
                 html += '</tr>';
             });
-            document.getElementById('unassigned-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay transacciones sin asignar</td></tr>';
+            document.getElementById('unassigned-table').innerHTML = html || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">No hay egresos sin asignar</td></tr>';
         }
 
         function renderDistributionTable() {
             var activeProjects = projects.filter(function(p) { return p.status === 'Active'; });
 
-            // Initialize distribution if empty
-            if (Object.keys(projectDistribution).length === 0) {
-                activeProjects.forEach(function(p) {
-                    projectDistribution[p.id] = 0;
-                });
-            }
+            // Inicializar distribucion
+            activeProjects.forEach(function(p) {
+                if (projectDistribution[p.id] === undefined) projectDistribution[p.id] = 0;
+            });
 
             var html = '';
             var totalPct = 0;
             activeProjects.forEach(function(p) {
                 var pct = projectDistribution[p.id] || 0;
                 totalPct += pct;
-                var incomeShare = unassignedData.totalIncome * pct / 100;
-                var expenseShare = unassignedData.totalExpenses * pct / 100;
+                var montoAsignado = totalUnassignedAmount * pct / 100;
                 html += '<tr>';
                 html += '<td>' + p.name + '</td>';
-                html += '<td style="text-align:center;"><input type="number" min="0" max="100" value="' + pct + '" onchange="updateDistribution(\'' + p.id + '\', this.value)" style="width:70px;text-align:center;padding:4px;"></td>';
-                html += '<td style="text-align:right;color:#10b981;">' + fmt(incomeShare) + '</td>';
-                html += '<td style="text-align:right;color:#ef4444;">' + fmt(expenseShare) + '</td>';
+                html += '<td style="text-align:center;"><input type="number" min="0" max="100" value="' + pct + '" onchange="updateDistribution(\'' + p.id + '\', this.value)" style="width:80px;text-align:center;padding:6px;border:1px solid #ddd;border-radius:4px;"></td>';
+                html += '<td style="text-align:right;color:#ef4444;font-weight:500;">' + fmt(montoAsignado) + '</td>';
                 html += '</tr>';
             });
 
-            document.getElementById('distribution-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay proyectos activos</td></tr>';
+            document.getElementById('distribution-table').innerHTML = html || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">No hay proyectos activos</td></tr>';
 
-            // Update footer totals
-            var pctClass = totalPct === 100 ? 'positive' : (totalPct > 100 ? 'negative' : '');
-            document.getElementById('dist-total-pct').innerHTML = '<span class="' + pctClass + '">' + totalPct + '%</span>';
-            document.getElementById('dist-total-income').textContent = fmt(unassignedData.totalIncome * totalPct / 100);
-            document.getElementById('dist-total-expenses').textContent = fmt(unassignedData.totalExpenses * totalPct / 100);
+            // Total
+            var pctColor = totalPct === 100 ? '#10b981' : (totalPct > 100 ? '#ef4444' : '#f59e0b');
+            document.getElementById('dist-total-pct').innerHTML = '<span style="color:' + pctColor + ';">' + totalPct + '%</span>';
+            document.getElementById('dist-total-amount').textContent = fmt(totalUnassignedAmount * totalPct / 100);
         }
 
         function updateDistribution(projectId, value) {
@@ -2672,16 +2636,27 @@
             var totalPct = Object.values(projectDistribution).reduce(function(sum, v) { return sum + v; }, 0);
 
             if (totalPct === 0) {
-                alert('Ingresa al menos un porcentaje para distribuir');
+                alert('Asigna al menos un porcentaje');
                 return;
             }
 
-            if (!confirm('Se crearan asignaciones para ' + unassignedData.transactions.length + ' transacciones. Continuar?')) {
+            if (totalPct !== 100) {
+                if (!confirm('El total es ' + totalPct + '% (no 100%). Continuar de todos modos?')) {
+                    return;
+                }
+            }
+
+            var numAllocations = 0;
+            Object.keys(projectDistribution).forEach(function(pid) {
+                if (projectDistribution[pid] > 0) numAllocations++;
+            });
+
+            if (!confirm('Se asignaran ' + unassignedExpenses.length + ' egresos a ' + numAllocations + ' proyectos. Continuar?')) {
                 return;
             }
 
             var promises = [];
-            unassignedData.transactions.forEach(function(tx) {
+            unassignedExpenses.forEach(function(tx) {
                 Object.keys(projectDistribution).forEach(function(projectId) {
                     var pct = projectDistribution[projectId];
                     if (pct > 0) {
@@ -2701,7 +2676,7 @@
             });
 
             Promise.all(promises).then(function() {
-                alert('Distribucion aplicada correctamente');
+                alert('Distribucion aplicada: ' + promises.length + ' asignaciones creadas');
                 projectDistribution = {};
                 loadTransactionAllocations();
             }).catch(function(e) {
