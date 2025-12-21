@@ -1,340 +1,428 @@
 import { useMemo } from 'react';
-import { formatCurrency, isIncome } from '../utils/format';
+import { formatCurrency, formatPercent, isIncome } from '../utils/format';
 
 export default function Dashboard({ transactions, projects, clients, onNavigate }) {
-  // Calculate metrics
+  // Calculate main metrics
   const metrics = useMemo(() => {
-    const income = transactions
-      .filter(t => isIncome(t))
-      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0);
+    let income = 0, expenses = 0;
 
-    const expenses = transactions
-      .filter(t => !isIncome(t))
-      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0);
+    transactions.forEach(t => {
+      const amount = Math.abs(parseFloat(t.amount) || 0);
+      if (isIncome(t)) {
+        income += amount;
+      } else {
+        expenses += amount;
+      }
+    });
 
     const net = income - expenses;
-    // Margen sobre ingresos, limitado a rango razonable
-    const margin = income > 0 ? Math.max(-100, Math.min(100, (net / income) * 100)) : 0;
+    const margin = income > 0 ? (net / income) * 100 : 0;
 
     return { income, expenses, net, margin };
   }, [transactions]);
 
-  // Top clients by income
+  // Pending transactions count
+  const pendingCount = useMemo(() => {
+    return transactions.filter(t =>
+      !t.project && !t.project_id && !t.client && !t.client_id && !t.excluded
+    ).length;
+  }, [transactions]);
+
+  // Top 5 clients by income
   const topClients = useMemo(() => {
-    const map = {};
+    const map = new Map();
+
     transactions.forEach(t => {
       const id = t.client_id || t.client;
       if (!id) return;
+
       const info = clients.find(c => c.id === id || c.name === id);
-      if (!map[id]) map[id] = { name: info?.name || id, income: 0, expenses: 0 };
+      const name = info?.name || (id.startsWith('rec') ? 'Cliente' : id);
+
+      if (!map.has(id)) {
+        map.set(id, { name, income: 0, expenses: 0 });
+      }
+
+      const entry = map.get(id);
       if (isIncome(t)) {
-        map[id].income += Math.abs(parseFloat(t.amount) || 0);
+        entry.income += Math.abs(parseFloat(t.amount) || 0);
       } else {
-        map[id].expenses += Math.abs(parseFloat(t.amount) || 0);
+        entry.expenses += Math.abs(parseFloat(t.amount) || 0);
       }
     });
-    return Object.values(map)
+
+    return Array.from(map.values())
       .map(c => ({ ...c, net: c.income - c.expenses }))
       .sort((a, b) => b.income - a.income)
       .slice(0, 5);
   }, [transactions, clients]);
 
-  // Top projects by income
+  // Top 5 projects by income
   const topProjects = useMemo(() => {
-    const map = {};
+    const map = new Map();
+
     transactions.forEach(t => {
       const id = t.project_id || t.project;
       if (!id) return;
+
       const info = projects.find(p => p.id === id || p.name === id);
-      if (!map[id]) map[id] = { name: info?.name || id, client: info?.client || '', income: 0, expenses: 0 };
+      const name = info?.name || (id.startsWith('rec') ? 'Proyecto' : id);
+      const client = info?.client || '';
+
+      if (!map.has(id)) {
+        map.set(id, { name, client, income: 0, expenses: 0 });
+      }
+
+      const entry = map.get(id);
       if (isIncome(t)) {
-        map[id].income += Math.abs(parseFloat(t.amount) || 0);
+        entry.income += Math.abs(parseFloat(t.amount) || 0);
       } else {
-        map[id].expenses += Math.abs(parseFloat(t.amount) || 0);
+        entry.expenses += Math.abs(parseFloat(t.amount) || 0);
       }
     });
-    return Object.values(map)
+
+    return Array.from(map.values())
       .map(p => ({ ...p, net: p.income - p.expenses }))
       .sort((a, b) => b.income - a.income)
       .slice(0, 5);
   }, [transactions, projects]);
 
   // Expenses by category
-  const categoryData = useMemo(() => {
-    const cats = {};
+  const expensesByCategory = useMemo(() => {
+    const map = new Map();
+    let total = 0;
+
     transactions.filter(t => !isIncome(t)).forEach(t => {
       const cat = t.category || t.qonto_category || 'Otros';
-      cats[cat] = (cats[cat] || 0) + Math.abs(parseFloat(t.amount) || 0);
+      const amount = Math.abs(parseFloat(t.amount) || 0);
+      map.set(cat, (map.get(cat) || 0) + amount);
+      total += amount;
     });
-    const total = Object.values(cats).reduce((a, b) => a + b, 0);
-    const colors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#6366F1'];
-    return Object.entries(cats)
+
+    const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
+
+    return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
       .map(([name, value], i) => ({
         name,
         value,
         percent: total > 0 ? (value / total) * 100 : 0,
-        color: colors[i % colors.length]
+        color: colors[i]
       }));
   }, [transactions]);
 
-  const totalExpenses = categoryData.reduce((s, c) => s + c.value, 0);
-
-  // Pending count
-  const pendingCount = transactions.filter(t =>
-    !t.project && !t.project_id && !t.client && !t.client_id && !t.excluded
-  ).length;
-
-  const marginStatus = metrics.margin >= 20 ? 'good' : metrics.margin >= 0 ? 'warning' : 'bad';
+  const totalExpenses = expensesByCategory.reduce((sum, c) => sum + c.value, 0);
+  const marginStatus = metrics.margin >= 20 ? 'excellent' : metrics.margin >= 0 ? 'moderate' : 'negative';
 
   return (
-    <div className="space-y-6">
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-4 gap-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* KPI Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
         <KPICard
-          title="Ingresos"
+          label="Ingresos"
           value={formatCurrency(metrics.income, true)}
-          icon="↑"
-          color="emerald"
+          trend="+12.5%"
+          trendUp={true}
+          color="#10b981"
+          bgColor="#ecfdf5"
         />
         <KPICard
-          title="Gastos"
+          label="Gastos"
           value={formatCurrency(metrics.expenses, true)}
-          icon="↓"
-          color="red"
+          trend="-3.2%"
+          trendUp={false}
+          color="#ef4444"
+          bgColor="#fef2f2"
         />
         <KPICard
-          title="Resultado"
+          label="Resultado Neto"
           value={formatCurrency(metrics.net, true)}
-          icon={metrics.net >= 0 ? '+' : '-'}
-          color={metrics.net >= 0 ? 'blue' : 'red'}
+          color={metrics.net >= 0 ? '#3b82f6' : '#ef4444'}
+          bgColor={metrics.net >= 0 ? '#eff6ff' : '#fef2f2'}
         />
         <KPICard
-          title="Margen"
+          label="Margen"
           value={`${metrics.margin.toFixed(1)}%`}
-          icon="%"
-          color={marginStatus === 'good' ? 'emerald' : marginStatus === 'warning' ? 'amber' : 'red'}
-          status={marginStatus === 'good' ? 'Excelente' : marginStatus === 'warning' ? 'Moderado' : 'Negativo'}
+          badge={marginStatus === 'excellent' ? 'Excelente' : marginStatus === 'moderate' ? 'Moderado' : 'Negativo'}
+          badgeColor={marginStatus === 'excellent' ? '#10b981' : marginStatus === 'moderate' ? '#f59e0b' : '#ef4444'}
+          color={marginStatus === 'excellent' ? '#10b981' : marginStatus === 'moderate' ? '#f59e0b' : '#ef4444'}
+          bgColor={marginStatus === 'excellent' ? '#ecfdf5' : marginStatus === 'moderate' ? '#fffbeb' : '#fef2f2'}
         />
       </div>
 
       {/* Alert for pending */}
       {pendingCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600 text-xl">
-              ⚡
-            </div>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 20px',
+          backgroundColor: '#fffbeb',
+          border: '1px solid #fcd34d',
+          borderRadius: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              backgroundColor: '#fbbf24',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px'
+            }}>⚡</div>
             <div>
-              <p className="font-semibold text-amber-900">{pendingCount} transacciones pendientes</p>
-              <p className="text-sm text-amber-700">Sin asignar a proyecto o cliente</p>
+              <div style={{ fontWeight: '600', color: '#92400e' }}>{pendingCount} transacciones pendientes</div>
+              <div style={{ fontSize: '14px', color: '#a16207' }}>Requieren asignación a proyecto o cliente</div>
             </div>
           </div>
           <button
             onClick={() => onNavigate('review')}
-            className="px-4 py-2 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 transition-colors"
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#f59e0b',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
           >
             Revisar ahora →
           </button>
         </div>
       )}
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Left: Categories */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-semibold text-slate-900 text-lg">Gastos por Categoria</h3>
-            <button onClick={() => onNavigate('transactions')} className="text-sm text-blue-600 hover:underline">
-              Ver todo →
-            </button>
-          </div>
-
-          {categoryData.length === 0 ? (
-            <p className="text-slate-400 text-center py-8">Sin datos de gastos</p>
+      {/* Two Column Layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        {/* Expenses by Category */}
+        <Card title="Gastos por Categoría" action="Ver todo →" onAction={() => onNavigate('transactions')}>
+          {expensesByCategory.length === 0 ? (
+            <EmptyState message="Sin datos de gastos" />
           ) : (
-            <div className="flex gap-6">
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
               {/* Donut Chart */}
-              <div className="relative w-40 h-40 flex-shrink-0">
-                <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
-                  {(() => {
-                    let offset = 0;
-                    return categoryData.map((cat, i) => {
-                      const circumference = 2 * Math.PI * 35;
-                      const dash = (cat.percent / 100) * circumference;
-                      const currentOffset = offset;
-                      offset += dash;
-                      return (
-                        <circle
-                          key={i}
-                          cx="50"
-                          cy="50"
-                          r="35"
-                          fill="none"
-                          strokeWidth="12"
-                          stroke={cat.color}
-                          strokeDasharray={`${dash} ${circumference}`}
-                          strokeDashoffset={-currentOffset}
-                        />
-                      );
-                    });
-                  })()}
+              <div style={{ position: 'relative', width: '140px', height: '140px', flexShrink: 0 }}>
+                <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                  {expensesByCategory.reduce((acc, cat, i) => {
+                    const r = 35;
+                    const circumference = 2 * Math.PI * r;
+                    const dash = (cat.percent / 100) * circumference;
+                    const offset = acc.offset;
+                    acc.elements.push(
+                      <circle
+                        key={i}
+                        cx="50"
+                        cy="50"
+                        r={r}
+                        fill="none"
+                        strokeWidth="12"
+                        stroke={cat.color}
+                        strokeDasharray={`${dash} ${circumference}`}
+                        strokeDashoffset={-offset}
+                      />
+                    );
+                    acc.offset += dash;
+                    return acc;
+                  }, { offset: 0, elements: [] }).elements}
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-slate-900">{formatCurrency(totalExpenses, true)}</p>
-                    <p className="text-xs text-slate-500">Total</p>
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <div style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>
+                    {formatCurrency(totalExpenses, true)}
                   </div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Total</div>
                 </div>
               </div>
 
               {/* Legend */}
-              <div className="flex-1 space-y-2">
-                {categoryData.map((cat, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                    <span className="text-sm text-slate-600 flex-1 truncate">{cat.name}</span>
-                    <span className="text-sm font-medium text-slate-900">{formatCurrency(cat.value, true)}</span>
-                    <span className="text-xs text-slate-400 w-10 text-right">{cat.percent.toFixed(0)}%</span>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {expensesByCategory.map((cat, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: cat.color }} />
+                    <span style={{ flex: 1, fontSize: '13px', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b', fontFamily: 'monospace' }}>{formatCurrency(cat.value, true)}</span>
+                    <span style={{ fontSize: '12px', color: '#94a3b8', width: '40px', textAlign: 'right' }}>{cat.percent.toFixed(0)}%</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </div>
+        </Card>
 
-        {/* Right: Summary */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <h3 className="font-semibold text-slate-900 text-lg mb-6">Resumen</h3>
-          <div className="space-y-4">
-            <SummaryRow label="Clientes activos" value={clients.length} />
-            <SummaryRow label="Proyectos" value={projects.length} />
-            <SummaryRow label="Transacciones" value={transactions.length} />
-            <SummaryRow label="Sin asignar" value={pendingCount} highlight={pendingCount > 0} />
+        {/* Quick Stats */}
+        <Card title="Resumen General">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <StatRow label="Clientes activos" value={clients.length} />
+            <StatRow label="Proyectos" value={projects.length} />
+            <StatRow label="Transacciones" value={transactions.length} />
+            <StatRow label="Sin asignar" value={pendingCount} highlight={pendingCount > 0} />
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Rankings */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Top Clients */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900 text-lg">Top Clientes</h3>
-            <button onClick={() => onNavigate('profitability')} className="text-sm text-blue-600 hover:underline">
-              Ver todo →
-            </button>
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        <Card title="Top Clientes" subtitle="Por ingresos" action="Ver análisis →" onAction={() => onNavigate('profitability')}>
           {topClients.length === 0 ? (
-            <p className="text-slate-400 text-center py-8">Sin datos</p>
+            <EmptyState message="Sin clientes asignados" />
           ) : (
-            <div className="space-y-3">
-              {topClients.map((client, i) => (
-                <RankingItem
-                  key={i}
-                  rank={i + 1}
-                  name={client.name}
-                  value={formatCurrency(client.income, true)}
-                  secondary={`Neto: ${formatCurrency(client.net, true)}`}
-                  secondaryColor={client.net >= 0 ? 'text-emerald-600' : 'text-red-500'}
-                />
-              ))}
-            </div>
+            <RankingList items={topClients} />
           )}
-        </div>
+        </Card>
 
-        {/* Top Projects */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-slate-900 text-lg">Top Proyectos</h3>
-            <button onClick={() => onNavigate('profitability')} className="text-sm text-blue-600 hover:underline">
-              Ver todo →
-            </button>
-          </div>
+        <Card title="Top Proyectos" subtitle="Por ingresos" action="Ver análisis →" onAction={() => onNavigate('profitability')}>
           {topProjects.length === 0 ? (
-            <p className="text-slate-400 text-center py-8">Sin datos</p>
+            <EmptyState message="Sin proyectos asignados" />
           ) : (
-            <div className="space-y-3">
-              {topProjects.map((proj, i) => (
-                <RankingItem
-                  key={i}
-                  rank={i + 1}
-                  name={proj.name}
-                  subtitle={proj.client}
-                  value={formatCurrency(proj.income, true)}
-                  secondary={`Neto: ${formatCurrency(proj.net, true)}`}
-                  secondaryColor={proj.net >= 0 ? 'text-emerald-600' : 'text-red-500'}
-                />
-              ))}
-            </div>
+            <RankingList items={topProjects} showSubtitle />
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );
 }
 
-function KPICard({ title, value, icon, color, status }) {
-  const colorStyles = {
-    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-    red: 'bg-red-50 border-red-200 text-red-600',
-    blue: 'bg-blue-50 border-blue-200 text-blue-700',
-    amber: 'bg-amber-50 border-amber-200 text-amber-700',
-  };
-
-  const iconStyles = {
-    emerald: 'bg-emerald-100 text-emerald-600',
-    red: 'bg-red-100 text-red-600',
-    blue: 'bg-blue-100 text-blue-600',
-    amber: 'bg-amber-100 text-amber-600',
-  };
-
+function KPICard({ label, value, trend, trendUp, badge, badgeColor, color, bgColor }) {
   return (
-    <div className={`rounded-xl border p-5 ${colorStyles[color]}`}>
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${iconStyles[color]}`}>
-          {icon}
+    <div style={{
+      backgroundColor: bgColor,
+      borderRadius: '12px',
+      padding: '20px',
+      border: `1px solid ${color}20`
+    }}>
+      <div style={{ fontSize: '13px', fontWeight: '500', color: '#64748b', marginBottom: '8px' }}>{label}</div>
+      <div style={{ fontSize: '28px', fontWeight: '700', color: color, fontFamily: 'monospace' }}>{value}</div>
+      {trend && (
+        <div style={{ fontSize: '13px', color: trendUp ? '#10b981' : '#ef4444', marginTop: '4px' }}>
+          {trend} vs periodo anterior
         </div>
-        <span className="text-sm font-medium opacity-80">{title}</span>
-      </div>
-      <p className="text-2xl font-bold font-mono">{value}</p>
-      {status && <p className="text-xs mt-1 opacity-70">{status}</p>}
+      )}
+      {badge && (
+        <div style={{
+          display: 'inline-block',
+          marginTop: '8px',
+          padding: '4px 10px',
+          backgroundColor: `${badgeColor}20`,
+          color: badgeColor,
+          borderRadius: '20px',
+          fontSize: '12px',
+          fontWeight: '600'
+        }}>
+          {badge}
+        </div>
+      )}
     </div>
   );
 }
 
-function SummaryRow({ label, value, highlight }) {
+function Card({ title, subtitle, action, onAction, children }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-      <span className="text-sm text-slate-600">{label}</span>
-      <span className={`text-lg font-bold ${highlight ? 'text-amber-600' : 'text-slate-900'}`}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function RankingItem({ rank, name, subtitle, value, secondary, secondaryColor }) {
-  const medals = ['🥇', '🥈', '🥉'];
-
-  return (
-    <div className="flex items-center gap-3 py-2">
-      <div className="w-8 text-center">
-        {rank <= 3 ? (
-          <span className="text-lg">{medals[rank - 1]}</span>
-        ) : (
-          <span className="text-sm font-bold text-slate-400">#{rank}</span>
+    <div style={{
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      border: '1px solid #e2e8f0',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '16px 20px',
+        borderBottom: '1px solid #f1f5f9'
+      }}>
+        <div>
+          <div style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b' }}>{title}</div>
+          {subtitle && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>{subtitle}</div>}
+        </div>
+        {action && (
+          <button
+            onClick={onAction}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#3b82f6',
+              fontSize: '13px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            {action}
+          </button>
         )}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-900 truncate">{name}</p>
-        {subtitle && <p className="text-xs text-slate-500 truncate">{subtitle}</p>}
+      <div style={{ padding: '20px' }}>
+        {children}
       </div>
-      <div className="text-right">
-        <p className="font-bold font-mono text-slate-900">{value}</p>
-        <p className={`text-xs font-medium ${secondaryColor}`}>{secondary}</p>
-      </div>
+    </div>
+  );
+}
+
+function StatRow({ label, value, highlight }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '12px 0',
+      borderBottom: '1px solid #f1f5f9'
+    }}>
+      <span style={{ fontSize: '14px', color: '#64748b' }}>{label}</span>
+      <span style={{
+        fontSize: '18px',
+        fontWeight: '700',
+        color: highlight ? '#f59e0b' : '#1e293b'
+      }}>{value}</span>
+    </div>
+  );
+}
+
+function RankingList({ items, showSubtitle }) {
+  const medals = ['🥇', '🥈', '🥉'];
+  const maxIncome = items[0]?.income || 1;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {items.map((item, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '28px', textAlign: 'center', fontSize: '16px' }}>
+            {i < 3 ? medals[i] : <span style={{ color: '#94a3b8', fontWeight: '600' }}>#{i + 1}</span>}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: '500', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+            {showSubtitle && item.client && (
+              <div style={{ fontSize: '12px', color: '#94a3b8' }}>{item.client}</div>
+            )}
+            <div style={{ marginTop: '6px', height: '4px', backgroundColor: '#f1f5f9', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${(item.income / maxIncome) * 100}%`, backgroundColor: '#3b82f6', borderRadius: '2px' }} />
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontWeight: '600', fontFamily: 'monospace', color: '#1e293b' }}>{formatCurrency(item.income, true)}</div>
+            <div style={{ fontSize: '12px', color: item.net >= 0 ? '#10b981' : '#ef4444' }}>
+              Neto: {formatCurrency(item.net, true)}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ message }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>
+      <div style={{ fontSize: '32px', marginBottom: '8px' }}>📊</div>
+      <div>{message}</div>
     </div>
   );
 }

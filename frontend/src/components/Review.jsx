@@ -72,7 +72,7 @@ export default function Review({ transactions, projects, clients, onRefresh, sho
           }))
         });
       }
-      showToast('Transaccion asignada', 'success');
+      showToast('Transacción asignada correctamente', 'success');
       setSelectedTx(null);
       setAllocations([{ project: '', client: '', percentage: 100 }]);
       onRefresh();
@@ -88,7 +88,7 @@ export default function Review({ transactions, projects, clients, onRefresh, sho
     setSaving(true);
     try {
       await api.updateTransaction(selectedTx.id, { excluded: true });
-      showToast('Transaccion excluida', 'success');
+      showToast('Transacción excluida', 'success');
       setSelectedTx(null);
       onRefresh();
     } catch (error) {
@@ -98,36 +98,74 @@ export default function Review({ transactions, projects, clients, onRefresh, sho
     }
   };
 
-  const amount = selectedTx ? parseFloat(selectedTx.amount) || 0 : 0;
+  const amount = selectedTx ? Math.abs(parseFloat(selectedTx.amount) || 0) : 0;
   const income = selectedTx ? isIncome(selectedTx) : false;
 
+  // Styles
+  const cardStyle = {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    overflow: 'hidden'
+  };
+
   return (
-    <div className="flex gap-6" style={{ height: 'calc(100vh - 180px)' }}>
-      {/* Left: Pending List */}
-      <div className="flex-1 bg-white rounded-lg border border-slate-200 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <span className="font-semibold">{pending.length} pendientes</span>
+    <div style={{ display: 'flex', gap: '24px', height: 'calc(100vh - 180px)' }}>
+      {/* Left Panel - Pending List */}
+      <div style={{ flex: '1', display: 'flex', flexDirection: 'column', ...cardStyle }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 20px',
+          borderBottom: '1px solid #f1f5f9'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontWeight: '600', fontSize: '16px', color: '#1e293b' }}>
+              Pendientes
+            </span>
+            <span style={{
+              padding: '4px 10px',
+              backgroundColor: '#fef3c7',
+              color: '#d97706',
+              borderRadius: '20px',
+              fontSize: '13px',
+              fontWeight: '600'
+            }}>
+              {pending.length}
+            </span>
+          </div>
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value)}
-            className="text-sm border rounded px-2 py-1"
+            style={{
+              padding: '6px 12px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              fontSize: '13px',
+              backgroundColor: 'white'
+            }}
           >
-            <option value="date-desc">Mas recientes</option>
-            <option value="date-asc">Mas antiguas</option>
+            <option value="date-desc">Más recientes</option>
+            <option value="date-asc">Más antiguas</option>
             <option value="amount-desc">Mayor monto</option>
             <option value="amount-asc">Menor monto</option>
           </select>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        {/* List */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           {pending.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-              <span className="text-4xl mb-2">✓</span>
-              <p>Todo asignado</p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>✓</div>
+              <div style={{ fontWeight: '500', fontSize: '16px' }}>Todo asignado</div>
+              <div style={{ fontSize: '14px', marginTop: '4px' }}>No hay transacciones pendientes</div>
             </div>
           ) : (
             pending.map(tx => {
-              const txAmount = parseFloat(tx.amount) || 0;
+              const txAmount = Math.abs(parseFloat(tx.amount) || 0);
               const txIncome = isIncome(tx);
               const isSelected = selectedTx?.id === tx.id;
 
@@ -135,17 +173,48 @@ export default function Review({ transactions, projects, clients, onRefresh, sho
                 <div
                   key={tx.id}
                   onClick={() => selectTransaction(tx)}
-                  className={`flex items-center gap-3 px-4 py-3 border-b border-slate-100 cursor-pointer ${
-                    isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-slate-50'
-                  }`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid #f1f5f9',
+                    cursor: 'pointer',
+                    backgroundColor: isSelected ? '#eff6ff' : 'white',
+                    borderLeft: isSelected ? '4px solid #3b82f6' : '4px solid transparent',
+                    transition: 'all 0.15s'
+                  }}
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{tx.counterparty_name || tx.label || 'Sin descripcion'}</p>
-                    <p className="text-sm text-slate-500">{formatDate(tx.settled_at)} · {tx.qonto_category || '-'}</p>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    backgroundColor: txIncome ? '#ecfdf5' : '#fef2f2',
+                    color: txIncome ? '#10b981' : '#ef4444',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: '600',
+                    flexShrink: 0
+                  }}>
+                    {txIncome ? '↑' : '↓'}
                   </div>
-                  <span className={`font-mono font-semibold ${txIncome ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {txIncome ? '+' : ''}{formatCurrency(txAmount, true)}
-                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: '500', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {tx.counterparty_name || tx.label || 'Sin descripción'}
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
+                      {formatDate(tx.settled_at || tx.emitted_at)} · {tx.qonto_category || '-'}
+                    </div>
+                  </div>
+                  <div style={{
+                    fontFamily: 'monospace',
+                    fontWeight: '600',
+                    fontSize: '15px',
+                    color: txIncome ? '#10b981' : '#ef4444'
+                  }}>
+                    {txIncome ? '+' : '-'}{formatCurrency(txAmount, true)}
+                  </div>
                 </div>
               );
             })
@@ -153,103 +222,205 @@ export default function Review({ transactions, projects, clients, onRefresh, sho
         </div>
       </div>
 
-      {/* Right: Assignment Panel */}
-      <div className="w-96 bg-white rounded-lg border border-slate-200 flex flex-col overflow-hidden">
+      {/* Right Panel - Assignment Form */}
+      <div style={{ width: '400px', display: 'flex', flexDirection: 'column', ...cardStyle }}>
         {!selectedTx ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-            <span className="text-4xl mb-2">📋</span>
-            <p>Selecciona una transaccion</p>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '40px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+            <div style={{ fontWeight: '500', fontSize: '16px', color: '#64748b' }}>Selecciona una transacción</div>
+            <div style={{ fontSize: '14px', marginTop: '8px', textAlign: 'center' }}>
+              Haz clic en una transacción para asignarla a un proyecto o cliente
+            </div>
           </div>
         ) : (
           <>
-            {/* Header */}
-            <div className="p-4 border-b border-slate-200">
-              <p className="font-medium truncate">{selectedTx.counterparty_name || selectedTx.label}</p>
-              <p className={`text-2xl font-bold font-mono ${income ? 'text-emerald-600' : 'text-red-500'}`}>
-                {income ? '+' : ''}{formatCurrency(amount)}
-              </p>
-              <p className="text-sm text-slate-500 mt-1">
-                {formatDate(selectedTx.settled_at)} · {selectedTx.qonto_category || '-'}
-              </p>
+            {/* Selected Transaction Header */}
+            <div style={{ padding: '20px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{
+                padding: '16px',
+                borderRadius: '10px',
+                backgroundColor: income ? '#ecfdf5' : '#fef2f2'
+              }}>
+                <div style={{ fontWeight: '500', color: '#1e293b', marginBottom: '8px' }}>
+                  {selectedTx.counterparty_name || selectedTx.label || 'Transacción'}
+                </div>
+                <div style={{
+                  fontSize: '28px',
+                  fontWeight: '700',
+                  fontFamily: 'monospace',
+                  color: income ? '#10b981' : '#ef4444'
+                }}>
+                  {income ? '+' : '-'}{formatCurrency(amount)}
+                </div>
+                <div style={{ fontSize: '13px', color: '#64748b', marginTop: '8px' }}>
+                  {formatDate(selectedTx.settled_at || selectedTx.emitted_at)} · {selectedTx.qonto_category || '-'}
+                </div>
+              </div>
             </div>
 
-            {/* Allocations */}
-            <div className="flex-1 p-4 overflow-y-auto">
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-semibold">Asignaciones</span>
-                <button onClick={addAllocation} className="text-sm text-blue-600">+ Agregar</button>
+            {/* Allocation Form */}
+            <div style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <span style={{ fontWeight: '600', color: '#1e293b' }}>Asignaciones</span>
+                <button
+                  onClick={addAllocation}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: '#eff6ff',
+                    color: '#3b82f6',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Dividir
+                </button>
               </div>
 
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {allocations.map((alloc, i) => (
-                  <div key={i} className="p-3 bg-slate-50 rounded-lg">
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      <select
-                        value={alloc.project}
-                        onChange={e => updateAllocation(i, 'project', e.target.value)}
-                        className="px-2 py-1.5 border rounded text-sm"
-                      >
-                        <option value="">Proyecto...</option>
-                        {projects.map(p => (
-                          <option key={p.id || p.name} value={p.id || p.name}>{p.name}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={alloc.client}
-                        onChange={e => updateAllocation(i, 'client', e.target.value)}
-                        className="px-2 py-1.5 border rounded text-sm"
-                      >
-                        <option value="">Cliente...</option>
-                        {clients.map(c => (
-                          <option key={c.id || c.name} value={c.id || c.name}>{c.name}</option>
-                        ))}
-                      </select>
+                  <div key={i} style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Proyecto</label>
+                        <select
+                          value={alloc.project}
+                          onChange={e => updateAllocation(i, 'project', e.target.value)}
+                          style={formSelectStyle}
+                        >
+                          <option value="">Sin proyecto</option>
+                          {projects.map(p => (
+                            <option key={p.id || p.name} value={p.id || p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Cliente</label>
+                        <select
+                          value={alloc.client}
+                          onChange={e => updateAllocation(i, 'client', e.target.value)}
+                          style={formSelectStyle}
+                        >
+                          <option value="">Sin cliente</option>
+                          {clients.map(c => (
+                            <option key={c.id || c.name} value={c.id || c.name}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={alloc.percentage}
-                        onChange={e => updateAllocation(i, 'percentage', e.target.value)}
-                        className="w-20 px-2 py-1 border rounded text-sm text-center"
-                      />
-                      <span className="text-sm text-slate-500">%</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Porcentaje</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={alloc.percentage}
+                            onChange={e => updateAllocation(i, 'percentage', e.target.value)}
+                            style={{ flex: 1 }}
+                          />
+                          <span style={{ width: '50px', textAlign: 'right', fontWeight: '600', color: '#1e293b' }}>
+                            {alloc.percentage}%
+                          </span>
+                        </div>
+                      </div>
                       {allocations.length > 1 && (
-                        <button onClick={() => removeAllocation(i)} className="ml-auto text-red-500 text-sm">✕</button>
+                        <button
+                          onClick={() => removeAllocation(i)}
+                          style={{
+                            padding: '6px',
+                            background: 'none',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            fontSize: '16px'
+                          }}
+                        >
+                          ✕
+                        </button>
                       )}
                     </div>
+                    {alloc.percentage > 0 && (
+                      <div style={{ marginTop: '8px', fontSize: '13px', color: '#64748b', fontFamily: 'monospace' }}>
+                        = {formatCurrency(amount * (alloc.percentage / 100))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
 
-              <div className={`mt-4 p-3 rounded-lg text-center font-semibold ${
-                totalPercentage === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-              }`}>
-                Total: {totalPercentage}%
+              {/* Total Indicator */}
+              <div style={{
+                marginTop: '16px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontWeight: '600',
+                backgroundColor: totalPercentage === 100 ? '#ecfdf5' : '#fef2f2',
+                color: totalPercentage === 100 ? '#10b981' : '#ef4444'
+              }}>
+                <span>Total asignado</span>
+                <span>{totalPercentage}%</span>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-200 flex justify-between">
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 20px',
+              borderTop: '1px solid #f1f5f9',
+              backgroundColor: '#fafafa'
+            }}>
               <button
                 onClick={excludeTransaction}
                 disabled={saving}
-                className="px-3 py-2 text-red-600 text-sm font-medium"
+                style={{
+                  padding: '10px 16px',
+                  background: 'none',
+                  border: 'none',
+                  color: '#ef4444',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
               >
                 Excluir
               </button>
-              <div className="flex gap-2">
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={() => setSelectedTx(null)}
-                  className="px-3 py-2 text-slate-600 text-sm"
+                  style={{
+                    padding: '10px 16px',
+                    backgroundColor: 'white',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    color: '#64748b',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={saveAssignment}
                   disabled={!isValid || saving}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded disabled:opacity-50"
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: isValid ? '#3b82f6' : '#94a3b8',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: isValid && !saving ? 'pointer' : 'not-allowed'
+                  }}
                 >
                   {saving ? 'Guardando...' : 'Guardar'}
                 </button>
@@ -261,3 +432,12 @@ export default function Review({ transactions, projects, clients, onRefresh, sho
     </div>
   );
 }
+
+const formSelectStyle = {
+  width: '100%',
+  padding: '8px 10px',
+  border: '1px solid #e2e8f0',
+  borderRadius: '6px',
+  fontSize: '13px',
+  backgroundColor: 'white'
+};

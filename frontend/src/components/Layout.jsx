@@ -4,9 +4,9 @@ const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
   { id: 'profitability', label: 'Rentabilidad', icon: ProfitIcon },
   { id: 'transactions', label: 'Transacciones', icon: TransactionsIcon },
-  { id: 'review', label: 'Revision', icon: ReviewIcon, badge: true },
+  { id: 'review', label: 'Revisión', icon: ReviewIcon, badge: true },
   { id: 'simulator', label: 'Simulador IA', icon: AIIcon },
-  { id: 'settings', label: 'Configuracion', icon: SettingsIcon, bottom: true },
+  { id: 'settings', label: 'Configuración', icon: SettingsIcon, bottom: true },
 ];
 
 export default function Layout({
@@ -20,38 +20,78 @@ export default function Layout({
   onPeriodChange
 }) {
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 fixed top-0 left-0 h-full flex flex-col z-50">
+      <aside style={{
+        width: '260px',
+        backgroundColor: '#0f172a',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 50
+      }}>
         {/* Logo */}
-        <div className="h-20 flex items-center px-6 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-blue-500/30">
+        <div style={{
+          height: '80px',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 24px',
+          borderBottom: '1px solid #1e293b'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              background: 'linear-gradient(135deg, #60a5fa, #3b82f6)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: '700',
+              fontSize: '14px',
+              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+            }}>
               G4U
             </div>
             <div>
-              <p className="font-semibold text-white">Rentabilidad</p>
-              <p className="text-xs text-slate-500">Financial Dashboard</p>
+              <p style={{ fontWeight: '600', color: 'white', fontSize: '15px', margin: 0 }}>Rentabilidad</p>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Financial Dashboard</p>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
-          <p className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Menu</p>
-          {navItems.filter(i => !i.bottom).map(item => (
-            <NavLink
-              key={item.id}
-              item={item}
-              active={currentView === item.id}
-              badge={item.badge ? pendingCount : null}
-              onClick={() => onNavigate(item.id)}
-            />
-          ))}
+        <nav style={{ flex: 1, padding: '16px' }}>
+          <p style={{
+            padding: '8px 12px',
+            fontSize: '11px',
+            fontWeight: '600',
+            color: '#64748b',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            margin: 0
+          }}>
+            Menú
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
+            {navItems.filter(i => !i.bottom).map(item => (
+              <NavLink
+                key={item.id}
+                item={item}
+                active={currentView === item.id}
+                badge={item.badge ? pendingCount : null}
+                onClick={() => onNavigate(item.id)}
+              />
+            ))}
+          </div>
         </nav>
 
         {/* Bottom Section */}
-        <div className="p-4 border-t border-slate-800">
+        <div style={{ padding: '16px', borderTop: '1px solid #1e293b' }}>
           {navItems.filter(i => i.bottom).map(item => (
             <NavLink
               key={item.id}
@@ -63,10 +103,20 @@ export default function Layout({
 
           {/* Sync Status */}
           {lastSync && (
-            <div className="mt-4 px-3 py-2 bg-slate-800/50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                <span className="text-xs text-slate-400">
+            <div style={{
+              marginTop: '16px',
+              padding: '10px 12px',
+              backgroundColor: 'rgba(30, 41, 59, 0.5)',
+              borderRadius: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: '#10b981',
+                  borderRadius: '50%'
+                }}></span>
+                <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                   Sincronizado {formatRelativeTime(lastSync)}
                 </span>
               </div>
@@ -76,34 +126,56 @@ export default function Layout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 min-h-screen flex flex-col">
+      <main style={{ flex: 1, marginLeft: '260px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* Top Bar */}
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-40 shadow-sm">
-          <div className="flex items-center gap-6">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">
-                {getPageTitle(currentView)}
-              </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
-                {getPageSubtitle(currentView)}
-              </p>
-            </div>
+        <header style={{
+          height: '80px',
+          backgroundColor: 'white',
+          borderBottom: '1px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 32px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 40,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+        }}>
+          <div>
+            <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+              {getPageTitle(currentView)}
+            </h1>
+            <p style={{ fontSize: '14px', color: '#64748b', marginTop: '2px', margin: 0 }}>
+              {getPageSubtitle(currentView)}
+            </p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* Period Selector */}
-            <div className="flex bg-slate-100 rounded-xl p-1">
+            <div style={{
+              display: 'flex',
+              backgroundColor: '#f1f5f9',
+              borderRadius: '12px',
+              padding: '4px'
+            }}>
               {['week', 'month', 'quarter', 'year'].map(p => (
                 <button
                   key={p}
                   onClick={() => onPeriodChange(p)}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                    period === p
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  style={{
+                    padding: '10px 16px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: period === p ? 'white' : 'transparent',
+                    color: period === p ? '#0f172a' : '#64748b',
+                    boxShadow: period === p ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s'
+                  }}
                 >
-                  {p === 'week' ? '7 dias' : p === 'month' ? '30 dias' : p === 'quarter' ? '90 dias' : '1 ano'}
+                  {p === 'week' ? '7 días' : p === 'month' ? '30 días' : p === 'quarter' ? '90 días' : '1 año'}
                 </button>
               ))}
             </div>
@@ -111,17 +183,30 @@ export default function Layout({
             {/* Sync Button */}
             <button
               onClick={onSync}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                backgroundColor: '#0f172a',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.2)'
+              }}
               title="Sincronizar"
             >
-              <SyncIcon className="w-4 h-4" />
+              <SyncIcon style={{ width: '16px', height: '16px' }} />
               <span>Sincronizar</span>
             </button>
           </div>
         </header>
 
         {/* Content */}
-        <div className="flex-1 p-8 overflow-auto">
+        <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
           {children}
         </div>
       </main>
@@ -135,18 +220,35 @@ function NavLink({ item, active, badge, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left text-sm font-medium transition-all duration-200 relative group ${
-        active
-          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-      }`}
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '12px 14px',
+        borderRadius: '10px',
+        textAlign: 'left',
+        fontSize: '14px',
+        fontWeight: '500',
+        border: 'none',
+        cursor: 'pointer',
+        backgroundColor: active ? '#3b82f6' : 'transparent',
+        color: active ? 'white' : '#94a3b8',
+        boxShadow: active ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+        transition: 'all 0.15s'
+      }}
     >
-      <Icon className="w-5 h-5" />
-      <span>{item.label}</span>
+      <Icon style={{ width: '20px', height: '20px' }} />
+      <span style={{ flex: 1 }}>{item.label}</span>
       {badge > 0 && (
-        <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
-          active ? 'bg-white/20 text-white' : 'bg-red-500 text-white'
-        }`}>
+        <span style={{
+          fontSize: '12px',
+          fontWeight: '700',
+          padding: '2px 8px',
+          borderRadius: '20px',
+          backgroundColor: active ? 'rgba(255,255,255,0.2)' : '#ef4444',
+          color: 'white'
+        }}>
           {badge}
         </span>
       )}
@@ -157,18 +259,18 @@ function NavLink({ item, active, badge, onClick }) {
 function getPageTitle(view) {
   const titles = {
     dashboard: 'Dashboard Ejecutivo',
-    profitability: 'Analisis de Rentabilidad',
+    profitability: 'Análisis de Rentabilidad',
     transactions: 'Transacciones',
-    review: 'Bandeja de Revision',
+    review: 'Bandeja de Revisión',
     simulator: 'Simulador IA',
-    settings: 'Configuracion',
+    settings: 'Configuración',
   };
   return titles[view] || view;
 }
 
 function getPageSubtitle(view) {
   const subtitles = {
-    dashboard: 'Vista general de metricas financieras',
+    dashboard: 'Vista general de métricas financieras',
     profitability: 'Rentabilidad por cliente y proyecto',
     transactions: 'Historial de movimientos',
     review: 'Asignar transacciones a proyectos',
