@@ -22,8 +22,12 @@
 
         /* Layout */
         .app { display: flex; min-height: 100vh; }
-        .sidebar { width: 240px; background: var(--card); border-right: 1px solid var(--border); padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; }
-        .main { flex: 1; margin-left: 240px; padding: 24px; }
+        .sidebar { width: 240px; background: var(--card); border-right: 1px solid var(--border); padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; transition: width 0.2s, transform 0.2s; }
+        .sidebar.collapsed { width: 0; padding: 0; overflow: hidden; }
+        .main { flex: 1; margin-left: 240px; padding: 24px; transition: margin-left 0.2s; }
+        .main.expanded { margin-left: 0; }
+        .sidebar-toggle { position: fixed; top: 20px; left: 10px; z-index: 100; background: var(--primary); color: white; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; display: none; }
+        .sidebar.collapsed + .main .sidebar-toggle { display: block; }
 
         /* Sidebar */
         .logo { padding: 0 20px 20px; font-size: 20px; font-weight: 700; color: var(--primary); }
@@ -193,8 +197,11 @@
 <body>
     <div class="app">
         <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo">G4U Finance</div>
+        <aside class="sidebar" id="sidebar">
+            <div class="logo" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>G4U Finance</span>
+                <button onclick="toggleSidebar()" style="background:none;border:none;color:white;cursor:pointer;font-size:18px;padding:4px;">◀</button>
+            </div>
             <nav>
                 <div class="nav-item active" data-view="dashboard">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
@@ -217,7 +224,8 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="main">
+        <main class="main" id="main">
+            <button class="sidebar-toggle" onclick="toggleSidebar()">☰ Menu</button>
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
                 <div class="header">
@@ -404,7 +412,7 @@
                             </select>
                         </div>
                         <div class="card-body" style="padding:12px;">
-                            <canvas id="chart-projects" height="150"></canvas>
+                            <canvas id="chart-projects" height="120"></canvas>
                         </div>
                     </div>
                     <div class="project-grid" id="pl-projects-grid">
@@ -443,7 +451,7 @@
                             </select>
                         </div>
                         <div class="card-body" style="padding:12px;">
-                            <canvas id="chart-clients" height="150"></canvas>
+                            <canvas id="chart-clients" height="120"></canvas>
                         </div>
                     </div>
                     <div id="pl-clients-grid">
@@ -533,11 +541,12 @@
                                     <th class="sortable" onclick="sortTransactions('client')">Cliente <span id="sort-client"></span></th>
                                     <th class="sortable" onclick="sortTransactions('vat_amount')" style="text-align:right">IVA <span id="sort-vat_amount"></span></th>
                                     <th class="sortable" onclick="sortTransactions('amount')" style="text-align:right">Monto <span id="sort-amount"></span></th>
+                                    <th style="width:60px;text-align:center;">Asig.</th>
                                     <th style="width:60px;"></th>
                                 </tr>
                             </thead>
                             <tbody id="transactions-table">
-                                <tr><td colspan="11" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                <tr><td colspan="12" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1216,6 +1225,13 @@
             });
         });
 
+        function toggleSidebar() {
+            var sidebar = document.getElementById('sidebar');
+            var main = document.getElementById('main');
+            sidebar.classList.toggle('collapsed');
+            main.classList.toggle('expanded');
+        }
+
         function showView(name) {
             document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
             document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
@@ -1609,7 +1625,9 @@
                 t._category = '-';
                 t._project = '-';
                 t._client = '-';
+                t._allocPct = 0;
                 if (txAllocs.length > 0) {
+                    t._allocPct = txAllocs.reduce(function(sum, a) { return sum + (a.percentage || 0); }, 0);
                     var cats = txAllocs.map(function(a) { return a.category; }).filter(Boolean);
                     if (cats.length > 0) t._category = cats.join(', ');
                     var projNames = txAllocs.map(function(a) {
@@ -1667,6 +1685,9 @@
                 var projectName = t._project;
                 var clientName = t._client;
                 var isSelected = selectedTransactions.indexOf(t.id) !== -1;
+                var allocPct = t._allocPct || 0;
+                var allocColor = allocPct >= 100 ? '#10b981' : (allocPct > 0 ? '#f59e0b' : '#94a3b8');
+                var allocBg = allocPct >= 100 ? '#dcfce7' : (allocPct > 0 ? '#fef3c7' : '#f1f5f9');
 
                 html += '<tr' + (isSelected ? ' style="background:#e0f2fe;"' : '') + '>';
                 html += '<td><input type="checkbox" class="tx-checkbox" data-id="' + t.id + '" onchange="toggleTxSelection(\'' + t.id + '\')"' + (isSelected ? ' checked' : '') + '></td>';
@@ -1679,10 +1700,11 @@
                 html += '<td style="font-size:12px;">' + clientName + '</td>';
                 html += '<td style="text-align:right;font-size:12px;">' + (vatAmount > 0 ? fmt(vatAmount) : '-') + '</td>';
                 html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
+                html += '<td style="text-align:center;"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:' + allocBg + ';color:' + allocColor + ';">' + allocPct + '%</span></td>';
                 html += '<td><button onclick="openTxAllocation(\'' + t.id + '\')" class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;">Asignar</button></td>';
                 html += '</tr>';
             });
-            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="11" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
+            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="12" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
         function renderPL() {
