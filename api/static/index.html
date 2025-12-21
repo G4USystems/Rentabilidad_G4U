@@ -1678,7 +1678,7 @@
                 t._client = '-';
                 t._allocPct = 0;
                 if (txAllocs.length > 0) {
-                    t._allocPct = txAllocs.reduce(function(sum, a) { return sum + (a.percentage || 0); }, 0);
+                    t._allocPct = Math.round(txAllocs.reduce(function(sum, a) { return sum + (a.percentage || 0); }, 0));
                     var cats = txAllocs.map(function(a) { return a.category; }).filter(Boolean);
                     if (cats.length > 0) t._category = cats.join(', ');
                     var projNames = txAllocs.map(function(a) {
@@ -2982,11 +2982,18 @@
                 return;
             }
 
-            // Normalizar porcentajes para que sumen 100%
+            // Normalizar porcentajes para que sumen exactamente 100%
             var normalizedDistribution = {};
-            Object.keys(projectDistribution).forEach(function(pid) {
-                if (projectDistribution[pid] > 0) {
-                    normalizedDistribution[pid] = (projectDistribution[pid] / totalPct) * 100;
+            var pids = Object.keys(projectDistribution).filter(function(pid) { return projectDistribution[pid] > 0; });
+            var runningTotal = 0;
+            pids.forEach(function(pid, i) {
+                if (i === pids.length - 1) {
+                    // Ultimo proyecto recibe el resto para asegurar suma = 100
+                    normalizedDistribution[pid] = Math.round((100 - runningTotal) * 100) / 100;
+                } else {
+                    var normalized = Math.round((projectDistribution[pid] / totalPct) * 10000) / 100;
+                    normalizedDistribution[pid] = normalized;
+                    runningTotal += normalized;
                 }
             });
 
@@ -3060,12 +3067,14 @@
                         completed++;
                     }
                     document.getElementById('alloc-progress').textContent = (index + 1) + ' / ' + allocations.length;
-                    processNext(index + 1);
+                    // Small delay to avoid Airtable rate limiting
+                    setTimeout(function() { processNext(index + 1); }, 100);
                 }).catch(function(e) {
                     console.error('Fetch error:', e);
                     errors++;
                     document.getElementById('alloc-progress').textContent = (index + 1) + ' / ' + allocations.length;
-                    processNext(index + 1);
+                    // Delay extra on error before retry next
+                    setTimeout(function() { processNext(index + 1); }, 500);
                 });
             }
 
