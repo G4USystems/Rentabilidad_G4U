@@ -588,7 +588,7 @@
                                     <th class="sortable" onclick="sortTransactions('client')">Cliente <span id="sort-client"></span></th>
                                     <th class="sortable" onclick="sortTransactions('vat_amount')" style="text-align:right">IVA <span id="sort-vat_amount"></span></th>
                                     <th class="sortable" onclick="sortTransactions('amount')" style="text-align:right">Monto <span id="sort-amount"></span></th>
-                                    <th style="width:60px;text-align:center;">Asig.</th>
+                                    <th class="sortable" onclick="sortTransactions('assigned')" style="width:60px;text-align:center;">Asig. <span id="sort-assigned"></span></th>
                                     <th style="width:60px;"></th>
                                 </tr>
                             </thead>
@@ -1545,7 +1545,7 @@
                 sortDirection = 'desc';
             }
             // Update sort indicators
-            ['settled_at', 'counterparty_name', 'side', 'qonto_category', 'category', 'project', 'client', 'vat_amount', 'amount'].forEach(function(f) {
+            ['settled_at', 'counterparty_name', 'side', 'qonto_category', 'category', 'project', 'client', 'vat_amount', 'amount', 'assigned'].forEach(function(f) {
                 var el = document.getElementById('sort-' + f);
                 if (el) el.textContent = (f === sortField) ? (sortDirection === 'asc' ? '▲' : '▼') : '';
             });
@@ -1684,11 +1684,14 @@
                 } else if (sortField === 'client') {
                     aVal = a._client || '';
                     bVal = b._client || '';
+                } else if (sortField === 'assigned') {
+                    aVal = a._allocPct || 0;
+                    bVal = b._allocPct || 0;
                 } else {
                     aVal = a[sortField] || '';
                     bVal = b[sortField] || '';
                 }
-                if (sortField === 'amount' || sortField === 'vat_amount') {
+                if (sortField === 'amount' || sortField === 'vat_amount' || sortField === 'assigned') {
                     aVal = parseFloat(aVal) || 0;
                     bVal = parseFloat(bVal) || 0;
                 }
