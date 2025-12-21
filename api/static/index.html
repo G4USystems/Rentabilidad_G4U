@@ -610,7 +610,7 @@
                 <!-- Tabs for Settings sections -->
                 <div class="tabs mb-4">
                     <div class="tab active" onclick="showSettingsTab('connections', event)">Estado</div>
-                    <div class="tab" onclick="showSettingsTab('unassigned', event)">Sin Asignar</div>
+                    <div class="tab" onclick="showSettingsTab('unassigned', event)">Asignacion de Gastos</div>
                     <div class="tab" onclick="showSettingsTab('team', event)">Equipo</div>
                     <div class="tab" onclick="showSettingsTab('clients', event)">Clientes</div>
                     <div class="tab" onclick="showSettingsTab('projects', event)">Proyectos</div>
@@ -2995,33 +2995,68 @@
                 return;
             }
 
-            var promises = [];
+            // Build list of allocations to create
+            var allocations = [];
             unassignedExpenses.forEach(function(tx) {
                 Object.keys(projectDistribution).forEach(function(projectId) {
                     var pct = projectDistribution[projectId];
                     if (pct > 0) {
-                        promises.push(
-                            fetch('/api/transaction-allocation', {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({
-                                    transaction_id: tx.id,
-                                    project_id: projectId,
-                                    percentage: pct
-                                })
-                            })
-                        );
+                        allocations.push({
+                            transaction_id: tx.id,
+                            project_id: projectId,
+                            percentage: pct
+                        });
                     }
                 });
             });
 
-            Promise.all(promises).then(function() {
-                alert('Distribucion aplicada: ' + promises.length + ' asignaciones creadas');
-                projectDistribution = {};
-                loadTransactionAllocations();
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
+            // Process sequentially to avoid overwhelming the server
+            var completed = 0;
+            var errors = 0;
+            var statusEl = document.createElement('div');
+            statusEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:24px 32px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.2);z-index:10000;text-align:center;';
+            statusEl.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">Procesando asignaciones...</div><div id="alloc-progress">0 / ' + allocations.length + '</div>';
+            document.body.appendChild(statusEl);
+
+            function processNext(index) {
+                if (index >= allocations.length) {
+                    document.body.removeChild(statusEl);
+                    if (errors > 0) {
+                        alert('Completado con ' + errors + ' errores. ' + completed + ' asignaciones creadas.');
+                    } else {
+                        alert('Distribucion aplicada: ' + completed + ' asignaciones creadas');
+                    }
+                    projectDistribution = {};
+                    loadTransactionAllocations();
+                    return;
+                }
+
+                var alloc = allocations[index];
+                fetch('/api/transaction-allocation', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(alloc)
+                }).then(function(r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                }).then(function(result) {
+                    if (result.error) {
+                        console.error('Allocation error:', result.error);
+                        errors++;
+                    } else {
+                        completed++;
+                    }
+                    document.getElementById('alloc-progress').textContent = (index + 1) + ' / ' + allocations.length;
+                    processNext(index + 1);
+                }).catch(function(e) {
+                    console.error('Fetch error:', e);
+                    errors++;
+                    document.getElementById('alloc-progress').textContent = (index + 1) + ' / ' + allocations.length;
+                    processNext(index + 1);
+                });
+            }
+
+            processNext(0);
         }
 
         function saveClient() {
