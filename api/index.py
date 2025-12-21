@@ -527,8 +527,15 @@ HTML = """
 def index():
     from flask import send_from_directory
     import os
-    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    static_dir = os.path.join(os.path.dirname(__file__), 'static', 'dist')
     return send_from_directory(static_dir, 'index.html')
+
+@app.route("/assets/<path:filename>")
+def serve_assets(filename):
+    from flask import send_from_directory
+    import os
+    static_dir = os.path.join(os.path.dirname(__file__), 'static', 'dist', 'assets')
+    return send_from_directory(static_dir, filename)
 
 @app.route("/api/ping")
 def api_ping():

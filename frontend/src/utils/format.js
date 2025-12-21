@@ -1,46 +1,57 @@
 /**
- * Format currency with proper EUR formatting
- * Uses Spanish locale for proper thousands separator (.) and decimal (,)
+ * Format currency with modern, clean display
+ * Uses compact notation for large numbers
  */
 export function formatCurrency(value, compact = false) {
   const num = parseFloat(value) || 0;
+  const absNum = Math.abs(num);
 
-  if (compact && Math.abs(num) >= 1000000) {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'EUR',
-      notation: 'compact',
-      compactDisplay: 'short',
-      maximumFractionDigits: 1,
-    }).format(num);
+  // For compact mode, use abbreviated format
+  if (compact) {
+    if (absNum >= 1000000) {
+      const formatted = (num / 1000000).toFixed(1);
+      return `${formatted.replace('.', ',')}M €`;
+    }
+    if (absNum >= 1000) {
+      const formatted = (num / 1000).toFixed(absNum >= 10000 ? 0 : 1);
+      return `${formatted.replace('.', ',')}K €`;
+    }
+    return `${num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} €`;
   }
 
-  if (compact && Math.abs(num) >= 1000) {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 0,
-    }).format(num);
-  }
+  // Full format with decimals
+  const parts = num.toFixed(2).split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const decPart = parts[1];
 
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(num);
+  return `${intPart},${decPart} €`;
 }
 
 /**
- * Format percentage with proper decimals
+ * Format large numbers in a clean, readable way
+ * Example: 1234567 → "1,23M"
+ */
+export function formatNumber(value, decimals = 0) {
+  const num = parseFloat(value) || 0;
+  const absNum = Math.abs(num);
+
+  if (absNum >= 1000000) {
+    return `${(num / 1000000).toFixed(2).replace('.', ',')}M`;
+  }
+  if (absNum >= 1000) {
+    return `${(num / 1000).toFixed(1).replace('.', ',')}K`;
+  }
+
+  return num.toFixed(decimals).replace('.', ',');
+}
+
+/**
+ * Format percentage - clean display
  */
 export function formatPercent(value, decimals = 1) {
   const num = parseFloat(value) || 0;
-  return new Intl.NumberFormat('es-ES', {
-    style: 'percent',
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(num / 100);
+  const sign = num >= 0 ? '+' : '';
+  return `${sign}${num.toFixed(decimals).replace('.', ',')}%`;
 }
 
 /**
@@ -100,8 +111,8 @@ export function formatRelativeTime(dateStr) {
  * Check if transaction is income
  */
 export function isIncome(tx) {
-  const amount = parseFloat(tx.amount) || 0;
-  return tx.side === 'credit' || amount > 0;
+  const side = (tx.side || '').toLowerCase();
+  return side === 'credit' || side === 'income';
 }
 
 /**
