@@ -186,7 +186,7 @@ function IntegrationsPanel({ showToast }) {
   const syncQonto = async () => {
     showToast('Sincronizando con Qonto...', 'info');
     try {
-      const response = await fetch('/api/sync_all', { method: 'POST' });
+      const response = await fetch('/api/sync', { method: 'POST' });
       if (response.ok) {
         showToast('Sincronizacion completada', 'success');
       } else {

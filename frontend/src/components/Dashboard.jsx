@@ -22,19 +22,28 @@ export default function Dashboard({ transactions, projects, clients, onNavigate 
 
   // Top clients by profitability
   const topClients = useMemo(() => {
-    const clientData = {};
+    const clientMap = {};
+
     transactions.forEach(t => {
-      const client = t.client || t.client_id;
-      if (!client) return;
-      if (!clientData[client]) clientData[client] = { name: client, income: 0, expenses: 0 };
+      const clientId = t.client_id || t.client;
+      if (!clientId) return;
+
+      // Find client name from clients array
+      const clientInfo = clients.find(c => c.id === clientId || c.name === clientId);
+      const clientName = clientInfo?.name || clientId;
+
+      if (!clientMap[clientId]) {
+        clientMap[clientId] = { id: clientId, name: clientName, income: 0, expenses: 0 };
+      }
+
       if (isIncome(t)) {
-        clientData[client].income += Math.abs(parseFloat(t.amount) || 0);
+        clientMap[clientId].income += Math.abs(parseFloat(t.amount) || 0);
       } else {
-        clientData[client].expenses += Math.abs(parseFloat(t.amount) || 0);
+        clientMap[clientId].expenses += Math.abs(parseFloat(t.amount) || 0);
       }
     });
 
-    return Object.values(clientData)
+    return Object.values(clientMap)
       .map(c => ({
         ...c,
         net: c.income - c.expenses,
@@ -42,26 +51,36 @@ export default function Dashboard({ transactions, projects, clients, onNavigate 
       }))
       .sort((a, b) => b.income - a.income)
       .slice(0, 5);
-  }, [transactions]);
+  }, [transactions, clients]);
 
   // Top projects by profitability
   const topProjects = useMemo(() => {
-    const projectData = {};
+    const projectMap = {};
+
     transactions.forEach(t => {
-      const proj = t.project || t.project_id;
-      if (!proj) return;
-      if (!projectData[proj]) {
-        const info = projects.find(p => p.id === proj || p.name === proj);
-        projectData[proj] = { name: info?.name || proj, client: info?.client || '', income: 0, expenses: 0 };
+      const projId = t.project_id || t.project;
+      if (!projId) return;
+
+      const projInfo = projects.find(p => p.id === projId || p.name === projId);
+
+      if (!projectMap[projId]) {
+        projectMap[projId] = {
+          id: projId,
+          name: projInfo?.name || projId,
+          client: projInfo?.client || '',
+          income: 0,
+          expenses: 0
+        };
       }
+
       if (isIncome(t)) {
-        projectData[proj].income += Math.abs(parseFloat(t.amount) || 0);
+        projectMap[projId].income += Math.abs(parseFloat(t.amount) || 0);
       } else {
-        projectData[proj].expenses += Math.abs(parseFloat(t.amount) || 0);
+        projectMap[projId].expenses += Math.abs(parseFloat(t.amount) || 0);
       }
     });
 
-    return Object.values(projectData)
+    return Object.values(projectMap)
       .map(p => ({
         ...p,
         net: p.income - p.expenses,
@@ -78,149 +97,277 @@ export default function Dashboard({ transactions, projects, clients, onNavigate 
       const cat = t.category || t.qonto_category || 'Sin categoria';
       cats[cat] = (cats[cat] || 0) + Math.abs(parseFloat(t.amount) || 0);
     });
+
+    const total = Object.values(cats).reduce((a, b) => a + b, 0);
+
     return Object.entries(cats)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 6);
+      .slice(0, 6)
+      .map(([name, value]) => ({ name, value, percent: total > 0 ? (value / total) * 100 : 0 }));
   }, [transactions]);
-
-  const maxCategoryValue = categoryData[0]?.[1] || 1;
 
   // Pending count
   const pendingCount = transactions.filter(t =>
     !t.project && !t.project_id && !t.client && !t.client_id && !t.excluded
   ).length;
 
+  const categoryColors = [
+    'bg-blue-500',
+    'bg-indigo-500',
+    'bg-violet-500',
+    'bg-purple-500',
+    'bg-fuchsia-500',
+    'bg-pink-500',
+  ];
+
   return (
-    <div className="animate-fadeIn">
-      {/* Hero Metrics */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        {/* Main Margin Card */}
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-          <p className="text-blue-100 text-sm font-medium mb-2">Margen Neto</p>
-          <p className="text-4xl font-bold font-mono mb-2">{formatPercent(metrics.margin)}</p>
-          <div className="inline-flex items-center gap-1 bg-white/20 px-2.5 py-1 rounded-full text-sm">
-            <TrendIcon up={metrics.margin >= 0} />
-            <span>{metrics.margin >= 0 ? '+' : ''}{metrics.margin.toFixed(1)}%</span>
+    <div className="space-y-6">
+      {/* Hero KPI Cards */}
+      <div className="grid grid-cols-4 gap-5">
+        {/* Main Margin Card - Premium gradient */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 text-white shadow-xl">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl" />
+          <div className="relative">
+            <p className="text-slate-400 text-sm font-medium tracking-wide uppercase mb-3">Margen Neto</p>
+            <p className="text-5xl font-bold tracking-tight mb-3">
+              {metrics.margin >= 0 ? '+' : ''}{metrics.margin.toFixed(1)}%
+            </p>
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+              metrics.margin >= 20 ? 'bg-emerald-500/20 text-emerald-400' :
+              metrics.margin >= 0 ? 'bg-amber-500/20 text-amber-400' :
+              'bg-red-500/20 text-red-400'
+            }`}>
+              <StatusDot status={metrics.margin >= 20 ? 'success' : metrics.margin >= 0 ? 'warning' : 'error'} />
+              <span>{metrics.margin >= 20 ? 'Excelente' : metrics.margin >= 0 ? 'Moderado' : 'Critico'}</span>
+            </div>
           </div>
         </div>
 
-        {/* Income */}
-        <MetricCard
+        {/* Income Card */}
+        <KPICard
           label="Ingresos"
           value={formatCurrency(metrics.income)}
-          valueClass="text-emerald-600"
+          icon={<ArrowUpIcon className="w-5 h-5 text-emerald-500" />}
+          iconBg="bg-emerald-50"
+          valueColor="text-emerald-600"
           subtitle={`${metrics.incomeCount} transacciones`}
         />
 
-        {/* Expenses */}
-        <MetricCard
+        {/* Expenses Card */}
+        <KPICard
           label="Gastos"
           value={formatCurrency(metrics.expenses)}
-          valueClass="text-red-500"
+          icon={<ArrowDownIcon className="w-5 h-5 text-red-500" />}
+          iconBg="bg-red-50"
+          valueColor="text-red-500"
           subtitle={`${metrics.expenseCount} transacciones`}
         />
 
-        {/* Net Result */}
-        <MetricCard
+        {/* Net Result Card */}
+        <KPICard
           label="Resultado Neto"
-          value={formatCurrency(metrics.net)}
-          valueClass={metrics.net >= 0 ? 'text-emerald-600' : 'text-red-500'}
-          subtitle={`${metrics.net >= 0 ? 'Beneficio' : 'Perdida'}`}
+          value={formatCurrency(Math.abs(metrics.net))}
+          icon={metrics.net >= 0 ? <TrendUpIcon className="w-5 h-5 text-emerald-500" /> : <TrendDownIcon className="w-5 h-5 text-red-500" />}
+          iconBg={metrics.net >= 0 ? "bg-emerald-50" : "bg-red-50"}
+          valueColor={metrics.net >= 0 ? 'text-emerald-600' : 'text-red-500'}
+          subtitle={metrics.net >= 0 ? 'Beneficio neto' : 'Perdida neta'}
+          prefix={metrics.net >= 0 ? '+' : '-'}
         />
       </div>
 
-      {/* Dashboard Grid */}
-      <div className="grid grid-cols-3 gap-6">
-        {/* Left Column - Charts */}
-        <div className="col-span-2 space-y-6">
-          {/* Category Breakdown */}
-          <Card title="Gastos por Categoria" action="Ver todo" onAction={() => onNavigate('transactions')}>
-            <div className="space-y-4">
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Left - Categories Chart */}
+        <div className="col-span-8">
+          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-soft overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Distribucion de Gastos</h3>
+                <p className="text-sm text-slate-500 mt-0.5">Por categoria de gasto</p>
+              </div>
+              <button
+                onClick={() => onNavigate('transactions')}
+                className="text-sm text-blue-600 font-medium hover:text-blue-700 transition-colors"
+              >
+                Ver detalle →
+              </button>
+            </div>
+
+            <div className="p-6">
               {categoryData.length === 0 ? (
-                <p className="text-slate-400 text-center py-8">Sin datos de gastos</p>
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <ChartIcon className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <p className="text-slate-500 font-medium">Sin datos de gastos</p>
+                  <p className="text-sm text-slate-400 mt-1">Los gastos apareceran aqui</p>
+                </div>
               ) : (
-                categoryData.map(([name, value]) => (
-                  <div key={name} className="flex items-center gap-4">
-                    <div className="w-32 text-sm font-medium text-slate-700 truncate">{name}</div>
-                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                        style={{ width: `${(value / maxCategoryValue) * 100}%` }}
-                      />
-                    </div>
-                    <div className="w-24 text-right text-sm font-semibold font-mono text-slate-900">
-                      {formatCurrency(value, true)}
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Bars */}
+                  <div className="space-y-4">
+                    {categoryData.map((cat, i) => (
+                      <div key={cat.name} className="group">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-slate-700 truncate max-w-[200px]">{cat.name}</span>
+                          <span className="text-sm font-bold text-slate-900 font-mono">{formatCurrency(cat.value, true)}</span>
+                        </div>
+                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${categoryColors[i]} rounded-full transition-all duration-700 ease-out`}
+                            style={{ width: `${cat.percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Donut visual */}
+                  <div className="flex items-center justify-center">
+                    <div className="relative w-44 h-44">
+                      <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                        {categoryData.reduce((acc, cat, i) => {
+                          const offset = acc.offset;
+                          const dashArray = (cat.percent * 251.2) / 100;
+                          acc.elements.push(
+                            <circle
+                              key={cat.name}
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              fill="none"
+                              strokeWidth="12"
+                              className={categoryColors[i].replace('bg-', 'stroke-')}
+                              strokeDasharray={`${dashArray} 251.2`}
+                              strokeDashoffset={-offset}
+                              style={{ transition: 'stroke-dasharray 0.7s ease' }}
+                            />
+                          );
+                          acc.offset += dashArray;
+                          return acc;
+                        }, { offset: 0, elements: [] }).elements}
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-slate-900">{formatCurrency(metrics.expenses, true)}</p>
+                          <p className="text-xs text-slate-500 font-medium">Total gastos</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                ))
+                </div>
               )}
             </div>
-          </Card>
+          </div>
         </div>
 
-        {/* Right Column - Lists */}
-        <div className="space-y-6">
-          {/* Top Clients */}
-          <Card title="Top Clientes" action="Ver todos" onAction={() => onNavigate('profitability')}>
-            {topClients.length === 0 ? (
-              <p className="text-slate-400 text-center py-8">Sin datos de clientes</p>
-            ) : (
-              <div className="space-y-2">
-                {topClients.map((client, i) => (
-                  <RankingItem
-                    key={client.name}
-                    position={i + 1}
-                    name={client.name}
-                    value={formatCurrency(client.income, true)}
-                    subtitle={formatPercent(client.margin)}
-                    subtitleClass={client.margin >= 0 ? 'text-emerald-600' : 'text-red-500'}
-                    onClick={() => onNavigate('profitability')}
-                  />
-                ))}
-              </div>
-            )}
-          </Card>
-
-          {/* Top Projects */}
-          <Card title="Top Proyectos" action="Ver todos" onAction={() => onNavigate('profitability')}>
-            {topProjects.length === 0 ? (
-              <p className="text-slate-400 text-center py-8">Sin datos de proyectos</p>
-            ) : (
-              <div className="space-y-2">
-                {topProjects.map((project, i) => (
-                  <RankingItem
-                    key={project.name}
-                    position={i + 1}
-                    name={project.name}
-                    subtitle2={project.client || 'Sin cliente'}
-                    value={formatCurrency(project.income, true)}
-                    subtitle={formatPercent(project.margin)}
-                    subtitleClass={project.margin >= 0 ? 'text-emerald-600' : 'text-red-500'}
-                    onClick={() => onNavigate('profitability')}
-                  />
-                ))}
-              </div>
-            )}
-          </Card>
-
+        {/* Right - Alerts & Quick Actions */}
+        <div className="col-span-4 space-y-5">
           {/* Pending Alert */}
           {pendingCount > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center text-white">
-                <AlertIcon className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-slate-900">{pendingCount} transacciones pendientes</p>
-                <p className="text-sm text-slate-600">Requieren asignacion</p>
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60 rounded-2xl p-5 shadow-soft">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
+                  <AlertIcon className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-slate-900 text-lg">{pendingCount}</p>
+                  <p className="text-sm text-slate-600">Transacciones sin asignar</p>
+                </div>
               </div>
               <button
                 onClick={() => onNavigate('review')}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                className="mt-4 w-full py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
               >
-                Revisar
+                Revisar ahora
               </button>
             </div>
           )}
+
+          {/* Quick Stats */}
+          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-soft p-5">
+            <h4 className="font-semibold text-slate-900 mb-4">Resumen Rapido</h4>
+            <div className="space-y-3">
+              <QuickStat label="Clientes activos" value={clients.length} />
+              <QuickStat label="Proyectos" value={projects.length} />
+              <QuickStat label="Transacciones" value={transactions.length} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Grid - Rankings */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Top Clients */}
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-soft overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Top Clientes</h3>
+              <p className="text-sm text-slate-500 mt-0.5">Por volumen de ingresos</p>
+            </div>
+            <button
+              onClick={() => onNavigate('profitability')}
+              className="text-sm text-blue-600 font-medium hover:text-blue-700 transition-colors"
+            >
+              Ver todos →
+            </button>
+          </div>
+
+          <div className="p-4">
+            {topClients.length === 0 ? (
+              <EmptyState icon={<UsersIcon />} message="Sin datos de clientes" />
+            ) : (
+              <div className="space-y-1">
+                {topClients.map((client, i) => (
+                  <RankingRow
+                    key={client.id}
+                    position={i + 1}
+                    name={client.name}
+                    value={formatCurrency(client.income, true)}
+                    margin={client.margin}
+                    onClick={() => onNavigate('profitability')}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Top Projects */}
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-soft overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">Top Proyectos</h3>
+              <p className="text-sm text-slate-500 mt-0.5">Por volumen de ingresos</p>
+            </div>
+            <button
+              onClick={() => onNavigate('profitability')}
+              className="text-sm text-blue-600 font-medium hover:text-blue-700 transition-colors"
+            >
+              Ver todos →
+            </button>
+          </div>
+
+          <div className="p-4">
+            {topProjects.length === 0 ? (
+              <EmptyState icon={<FolderIcon />} message="Sin datos de proyectos" />
+            ) : (
+              <div className="space-y-1">
+                {topProjects.map((project, i) => (
+                  <RankingRow
+                    key={project.id}
+                    position={i + 1}
+                    name={project.name}
+                    subtitle={project.client || 'Sin cliente'}
+                    value={formatCurrency(project.income, true)}
+                    margin={project.margin}
+                    onClick={() => onNavigate('profitability')}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -228,68 +375,120 @@ export default function Dashboard({ transactions, projects, clients, onNavigate 
 }
 
 // Sub-components
-function MetricCard({ label, value, valueClass = '', subtitle }) {
+function KPICard({ label, value, icon, iconBg, valueColor, subtitle, prefix = '' }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-      <p className="text-slate-500 text-sm font-medium mb-2">{label}</p>
-      <p className={`text-3xl font-bold font-mono mb-1 ${valueClass}`}>{value}</p>
-      <p className="text-sm text-slate-400">{subtitle}</p>
-    </div>
-  );
-}
-
-function Card({ title, action, onAction, children }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-        <h3 className="font-semibold text-slate-900">{title}</h3>
-        {action && (
-          <button
-            onClick={onAction}
-            className="text-sm text-blue-600 font-medium hover:underline"
-          >
-            {action}
-          </button>
-        )}
+    <div className="bg-white rounded-2xl border border-slate-200/60 p-6 shadow-soft hover:shadow-lg transition-shadow duration-300">
+      <div className="flex items-center gap-4 mb-4">
+        <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center`}>
+          {icon}
+        </div>
+        <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">{label}</p>
       </div>
-      <div className="p-5">{children}</div>
+      <p className={`text-3xl font-bold font-mono ${valueColor}`}>
+        {prefix}{value}
+      </p>
+      <p className="text-sm text-slate-400 mt-1">{subtitle}</p>
     </div>
   );
 }
 
-function RankingItem({ position, name, subtitle2, value, subtitle, subtitleClass, onClick }) {
-  const positionColors = [
-    'bg-gradient-to-br from-amber-400 to-amber-500',
-    'bg-gradient-to-br from-slate-400 to-slate-500',
-    'bg-gradient-to-br from-orange-400 to-orange-500',
-  ];
+function RankingRow({ position, name, subtitle, value, margin, onClick }) {
+  const medals = ['🥇', '🥈', '🥉'];
 
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+      className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors group"
     >
-      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-        position <= 3 ? positionColors[position - 1] + ' text-white' : 'bg-slate-100 text-slate-500'
-      }`}>
-        {position}
+      <div className="w-8 h-8 flex items-center justify-center">
+        {position <= 3 ? (
+          <span className="text-xl">{medals[position - 1]}</span>
+        ) : (
+          <span className="text-sm font-bold text-slate-400">#{position}</span>
+        )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-900 truncate">{name}</p>
-        {subtitle2 && <p className="text-xs text-slate-500">{subtitle2}</p>}
+        <p className="font-medium text-slate-900 truncate group-hover:text-blue-600 transition-colors">{name}</p>
+        {subtitle && <p className="text-xs text-slate-500 truncate">{subtitle}</p>}
       </div>
       <div className="text-right">
-        <p className="font-semibold font-mono text-slate-900">{value}</p>
-        <p className={`text-xs font-medium ${subtitleClass}`}>{subtitle}</p>
+        <p className="font-bold font-mono text-slate-900">{value}</p>
+        <p className={`text-xs font-semibold ${margin >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+          {margin >= 0 ? '+' : ''}{margin.toFixed(1)}%
+        </p>
       </div>
     </div>
   );
 }
 
-function TrendIcon({ up }) {
+function QuickStat({ label, value }) {
   return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d={up ? "M7 17l5-5 5 5M7 7l5 5 5-5" : "M7 7l5 5 5-5M7 17l5-5 5 5"} />
+    <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+      <span className="text-sm text-slate-600">{label}</span>
+      <span className="text-lg font-bold text-slate-900">{value}</span>
+    </div>
+  );
+}
+
+function StatusDot({ status }) {
+  const colors = {
+    success: 'bg-emerald-400',
+    warning: 'bg-amber-400',
+    error: 'bg-red-400',
+  };
+  return <span className={`w-2 h-2 rounded-full ${colors[status]} animate-pulse`} />;
+}
+
+function EmptyState({ icon, message }) {
+  return (
+    <div className="text-center py-8">
+      <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+        {icon}
+      </div>
+      <p className="text-slate-500 text-sm">{message}</p>
+    </div>
+  );
+}
+
+// Icons
+function ArrowUpIcon(props) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
+  );
+}
+
+function ArrowDownIcon(props) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path d="M12 5v14M19 12l-7 7-7-7" />
+    </svg>
+  );
+}
+
+function TrendUpIcon(props) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M23 6l-9.5 9.5-5-5L1 18" />
+      <path d="M17 6h6v6" />
+    </svg>
+  );
+}
+
+function TrendDownIcon(props) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M23 18l-9.5-9.5-5 5L1 6" />
+      <path d="M17 18h6v-6" />
+    </svg>
+  );
+}
+
+function ChartIcon(props) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M18 20V10M12 20V4M6 20v-6" />
     </svg>
   );
 }
@@ -299,6 +498,22 @@ function AlertIcon(props) {
     <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="12" r="10"/>
       <path d="M12 8v4M12 16h.01"/>
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+    </svg>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
     </svg>
   );
 }

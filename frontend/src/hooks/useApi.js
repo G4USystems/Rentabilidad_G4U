@@ -42,19 +42,18 @@ export function useData(refreshInterval = 30000) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [dashboardData, clientsData, teamData, allocationsData] = await Promise.all([
-        apiFetch('/dashboard_data'),
-        apiFetch('/clients'),
-        apiFetch('/team_members'),
-        apiFetch('/v2/allocations').catch(() => ({ allocations: [] })),
+      const [mainData, teamData, allocationsData] = await Promise.all([
+        apiFetch('/data'),
+        apiFetch('/team-members').catch(() => ({ members: [] })),
+        apiFetch('/transaction-allocations').catch(() => ({ allocations: [] })),
       ]);
 
       setData({
-        transactions: dashboardData.transactions || [],
-        projects: dashboardData.projects || [],
-        categories: dashboardData.categories || [],
-        clients: clientsData.clients || [],
-        teamMembers: teamData.team_members || [],
+        transactions: mainData.transactions || [],
+        projects: mainData.projects || [],
+        categories: mainData.categories || [],
+        clients: mainData.clients || [],
+        teamMembers: teamData.members || [],
         allocations: allocationsData.allocations || [],
       });
 
@@ -129,45 +128,37 @@ export function useMutation() {
 export const api = {
   // Transactions
   updateTransaction: (id, data) =>
-    apiFetch(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    apiFetch(`/transaction/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Allocations
   createAllocation: (data) =>
-    apiFetch('/v2/allocations', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/transaction-allocation', { method: 'POST', body: JSON.stringify(data) }),
 
   // Clients
   createClient: (data) =>
-    apiFetch('/clients', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/client', { method: 'POST', body: JSON.stringify(data) }),
   deleteClient: (id) =>
-    apiFetch(`/clients/${id}`, { method: 'DELETE' }),
+    apiFetch(`/client/${id}`, { method: 'DELETE' }),
 
   // Projects
   createProject: (data) =>
-    apiFetch('/projects', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/project', { method: 'POST', body: JSON.stringify(data) }),
   deleteProject: (id) =>
-    apiFetch(`/projects/${id}`, { method: 'DELETE' }),
+    apiFetch(`/project/${id}`, { method: 'DELETE' }),
 
   // Team
   createTeamMember: (data) =>
-    apiFetch('/team_members', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/team-member', { method: 'POST', body: JSON.stringify(data) }),
   deleteTeamMember: (id) =>
-    apiFetch(`/team_members/${id}`, { method: 'DELETE' }),
+    apiFetch(`/team-member/${id}`, { method: 'DELETE' }),
 
   // Categories
   createCategory: (data) =>
-    apiFetch('/categories', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/category', { method: 'POST', body: JSON.stringify(data) }),
   deleteCategory: (id) =>
-    apiFetch(`/categories/${id}`, { method: 'DELETE' }),
+    apiFetch(`/category/${id}`, { method: 'DELETE' }),
 
   // Sync
   syncQonto: () =>
-    apiFetch('/sync_all', { method: 'POST' }),
-
-  // AI Simulator
-  simulate: (data) =>
-    apiFetch('/v2/scenarios/simulate', { method: 'POST', body: JSON.stringify(data) }),
-
-  // AI Forecast
-  forecast: (data) =>
-    apiFetch('/v2/forecasting/ai-forecast', { method: 'POST', body: JSON.stringify(data) }),
+    apiFetch('/sync', { method: 'POST' }),
 };
