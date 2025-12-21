@@ -1,525 +1,773 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <title>G4U - Dashboard Financiero</title>
+    <title>G4U Finance - Dashboard Ejecutivo</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        :root {
-            --bg: #f8fafc;
-            --card: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --primary: #3b82f6;
-            --primary-dark: #2563eb;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+    <meta name="description" content="Dashboard financiero ejecutivo para G4U">
 
-        /* Layout */
-        .app { display: flex; min-height: 100vh; }
-        .sidebar { width: 240px; background: var(--card); border-right: 1px solid var(--border); padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; }
-        .main { flex: 1; margin-left: 240px; padding: 24px; }
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
 
-        /* Sidebar */
-        .logo { padding: 0 20px 20px; font-size: 20px; font-weight: 700; color: var(--primary); }
-        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
-        .nav-item:hover { background: var(--bg); color: var(--text); }
-        .nav-item.active { background: #eff6ff; color: var(--primary); border-left-color: var(--primary); font-weight: 500; }
-        .nav-item svg { width: 20px; height: 20px; margin-right: 12px; }
-        .nav-section { padding: 16px 20px 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-
-        /* Header */
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .header h1 { font-size: 24px; font-weight: 600; }
-        .header-actions { display: flex; gap: 12px; align-items: center; }
-
-        /* Cards */
-        .card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); }
-        .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-        .card-body { padding: 20px; }
-
-        /* KPI Grid */
-        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-        .kpi { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
-        .kpi-label { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
-        .kpi-value { font-size: 28px; font-weight: 600; }
-        .kpi-value.positive { color: var(--success); }
-        .kpi-value.negative { color: var(--danger); }
-        .kpi-change { font-size: 12px; margin-top: 8px; }
-        .kpi-change.up { color: var(--success); }
-        .kpi-change.down { color: var(--danger); }
-
-        /* Filters */
-        .filters { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
-        .filter-group { display: flex; align-items: center; gap: 8px; }
-        .filter-group label { font-size: 13px; color: var(--text-muted); }
-        select, input[type="date"], input[type="text"], input[type="number"] {
-            padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card);
-        }
-        select:focus, input:focus { outline: none; border-color: var(--primary); }
-
-        /* Buttons */
-        .btn { padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-dark); }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-        .btn-outline:hover { background: var(--bg); }
-        .btn-success { background: var(--success); color: white; }
-        .btn-sm { padding: 6px 12px; font-size: 13px; }
-
-        /* Tables */
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 12px 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: var(--bg); border-bottom: 1px solid var(--border); }
-        th.sortable { cursor: pointer; user-select: none; }
-        th.sortable:hover { background: #e2e8f0; }
-        th.sortable span { font-size: 10px; margin-left: 4px; }
-        td { padding: 14px 16px; border-bottom: 1px solid var(--border); }
-        tr:hover { background: #fafafa; }
-        .amount { font-family: 'SF Mono', Monaco, monospace; font-weight: 500; }
-        .amount.positive { color: var(--success); }
-        .amount.negative { color: var(--danger); }
-
-        /* P&L Statement */
-        .pl-section { margin-bottom: 16px; }
-        .pl-section-header { padding: 12px 16px; background: var(--bg); font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
-        .pl-row { display: flex; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid #f1f5f9; }
-        .pl-row:hover { background: #fafafa; }
-        .pl-row.indent { padding-left: 32px; }
-        .pl-row.total { font-weight: 600; background: var(--bg); }
-        .pl-row.grand-total { font-weight: 700; background: #f0f9ff; border-top: 2px solid var(--primary); }
-        .pl-label { color: var(--text); }
-        .pl-amount { font-family: 'SF Mono', Monaco, monospace; }
-
-        /* Tabs */
-        .tabs { display: flex; gap: 4px; background: var(--bg); padding: 4px; border-radius: 10px; margin-bottom: 20px; }
-        .tab { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 500; color: var(--text-muted); transition: all 0.2s; }
-        .tab:hover { color: var(--text); }
-        .tab.active { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-
-        /* Views */
-        .view { display: none; }
-        .view.active { display: block; }
-
-        /* Status */
-        .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-        .status.ok { background: #dcfce7; color: #166534; }
-        .status.pending { background: #fef3c7; color: #92400e; }
-        .status.error { background: #fee2e2; color: #991b1b; }
-
-        /* Modal */
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-overlay.active { display: flex; }
-        .modal { background: var(--card); border-radius: 16px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
-        .modal-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .modal-header h3 { font-size: 18px; }
-        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted); }
-        .modal-body { padding: 20px; }
-        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
-
-        /* Form */
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--text); }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-
-        /* Project cards */
-        .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-        .project-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-        .project-name { font-weight: 600; font-size: 16px; margin-bottom: 12px; }
-        .project-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .project-stat { }
-        .project-stat-label { font-size: 12px; color: var(--text-muted); }
-        .project-stat-value { font-size: 18px; font-weight: 600; }
-        .project-bar { height: 8px; background: var(--bg); border-radius: 4px; margin-top: 16px; overflow: hidden; }
-        .project-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
-        .project-bar-fill.positive { background: var(--success); }
-        .project-bar-fill.negative { background: var(--danger); }
-
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .sidebar { display: none; }
-            .main { margin-left: 0; }
-            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 640px) {
-            .kpi-grid { grid-template-columns: 1fr; }
-            .form-row { grid-template-columns: 1fr; }
-        }
-
-        .hidden { display: none !important; }
-        .text-muted { color: var(--text-muted); }
-        .text-sm { font-size: 13px; }
-        .mt-4 { margin-top: 16px; }
-        .mb-4 { margin-bottom: 16px; }
-        .settings-section.hidden { display: none; }
-    </style>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
 </head>
 <body>
     <div class="app">
-        <!-- Sidebar -->
+        <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <div class="logo">G4U Finance</div>
-            <nav>
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">G4</div>
+                    <span>G4U Finance</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
                 <div class="nav-item active" data-view="dashboard">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
                     Dashboard
                 </div>
-                <div class="nav-item" data-view="pl">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    Estado P&L
+
+                <div class="nav-item" data-view="clients">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    Clientes
                 </div>
-                <div class="nav-item" data-view="transactions">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                    Transacciones
-                </div>
+
                 <div class="nav-item" data-view="projects">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
                     Proyectos
                 </div>
-                <div class="nav-section">Configuracion</div>
+
+                <div class="nav-item" data-view="transactions">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                    </svg>
+                    Transacciones
+                </div>
+
+                <div class="nav-section">Workflow</div>
+
+                <div class="nav-item" data-view="review">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                    Revision
+                    <span class="badge" id="review-badge" style="display:none;">0</span>
+                </div>
+
+                <div class="nav-section">Sistema</div>
+
                 <div class="nav-item" data-view="settings">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    Ajustes
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Configuracion
                 </div>
             </nav>
         </aside>
 
         <!-- Main Content -->
         <main class="main">
-            <!-- Dashboard View -->
-            <div id="view-dashboard" class="view active">
-                <div class="header">
-                    <h1>Dashboard</h1>
-                    <div class="header-actions">
-                        <span id="status-indicator"></span>
-                        <button class="btn btn-outline" onclick="syncQonto()">Sync Qonto</button>
-                        <button class="btn btn-primary" onclick="openModal('add-transaction')">+ Nuevo</button>
-                    </div>
+            <!-- Top Header Bar -->
+            <header class="top-header">
+                <div class="search-box">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="text" id="global-search" placeholder="Buscar transacciones, clientes, proyectos...">
+                    <kbd>Ctrl+K</kbd>
                 </div>
 
-                <div class="filters">
-                    <div class="filter-group">
-                        <label>Periodo:</label>
-                        <select id="filter-period" onchange="applyFilters()">
-                            <option value="all">Todo el tiempo</option>
-                            <option value="month">Este mes</option>
-                            <option value="quarter">Este trimestre</option>
-                            <option value="year">Este anio</option>
-                            <option value="custom">Personalizado</option>
-                        </select>
+                <div class="header-actions">
+                    <div class="sync-status" id="sync-status">
+                        <span class="dot"></span>
+                        <span>Conectado</span>
                     </div>
-                    <div class="filter-group hidden" id="custom-dates">
-                        <input type="date" id="filter-from" onchange="applyFilters()">
-                        <span>a</span>
-                        <input type="date" id="filter-to" onchange="applyFilters()">
-                    </div>
-                </div>
 
-                <div class="kpi-grid">
-                    <div class="kpi">
-                        <div class="kpi-label">Ingresos</div>
-                        <div class="kpi-value positive" id="kpi-income">-</div>
-                    </div>
-                    <div class="kpi">
-                        <div class="kpi-label">Gastos</div>
-                        <div class="kpi-value negative" id="kpi-expenses">-</div>
-                    </div>
-                    <div class="kpi">
-                        <div class="kpi-label">Resultado Neto</div>
-                        <div class="kpi-value" id="kpi-net">-</div>
-                    </div>
-                    <div class="kpi">
-                        <div class="kpi-label">Margen</div>
-                        <div class="kpi-value" id="kpi-margin">-</div>
-                    </div>
-                </div>
+                    <button class="notification-btn" onclick="App.navigateTo('review')">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                        <span class="badge" id="notification-badge" style="display:none;">0</span>
+                    </button>
 
-                <div class="card">
-                    <div class="card-header">
-                        Transacciones Recientes
-                        <a href="#" onclick="showView('transactions'); return false;" class="text-sm" style="color: var(--primary);">Ver todas</a>
-                    </div>
-                    <div class="card-body" style="padding: 0;">
-                        <table>
-                            <thead>
-                                <tr><th>Fecha</th><th>Descripcion</th><th>Categoria</th><th style="text-align:right">Monto</th></tr>
-                            </thead>
-                            <tbody id="recent-transactions">
-                                <tr><td colspan="4" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="App.syncQonto()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Sync
+                    </button>
                 </div>
-            </div>
+            </header>
 
-            <!-- P&L View -->
-            <div id="view-pl" class="view">
-                <div class="header">
-                    <h1>Estado de Resultados (P&L)</h1>
-                    <div class="header-actions">
-                        <select id="pl-period" onchange="renderPL()">
-                            <option value="all">Todo el tiempo</option>
-                            <option value="month">Este mes</option>
-                            <option value="quarter">Este trimestre</option>
-                            <option value="year">Este anio</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-body" style="padding:0;" id="pl-statement">
-                        <div style="padding:40px;text-align:center;color:var(--text-muted);">Cargando...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Transactions View -->
-            <div id="view-transactions" class="view">
-                <div class="header">
-                    <h1>Transacciones</h1>
-                    <div class="header-actions">
-                        <button class="btn btn-primary" onclick="openModal('add-transaction')">+ Nueva Transaccion</button>
-                    </div>
-                </div>
-
-                <div class="filters" style="flex-wrap:wrap;">
-                    <div class="filter-group">
-                        <label>Tipo:</label>
-                        <select id="tx-filter-type" onchange="renderTransactions()">
-                            <option value="">Todos</option>
-                            <option value="credit">Ingresos</option>
-                            <option value="debit">Gastos</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Cat. Qonto:</label>
-                        <select id="tx-filter-qonto-cat" onchange="renderTransactions()">
-                            <option value="">Todas</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Proyecto:</label>
-                        <select id="tx-filter-project" onchange="renderTransactions()">
-                            <option value="">Todos</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Cliente:</label>
-                        <select id="tx-filter-client" onchange="renderTransactions()">
-                            <option value="">Todos</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Asignacion:</label>
-                        <select id="tx-filter-assigned" onchange="renderTransactions()">
-                            <option value="">Todas</option>
-                            <option value="assigned">Asignadas</option>
-                            <option value="unassigned">Sin asignar</option>
-                            <option value="partial">Parcialmente asignadas</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>Desde:</label>
-                        <input type="date" id="tx-filter-from" onchange="renderTransactions()">
-                    </div>
-                    <div class="filter-group">
-                        <label>Hasta:</label>
-                        <input type="date" id="tx-filter-to" onchange="renderTransactions()">
-                    </div>
-                    <div class="filter-group">
-                        <label>Buscar:</label>
-                        <input type="text" id="tx-search" placeholder="Descripcion..." onkeyup="renderTransactions()">
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-body" style="padding:0;overflow-x:auto;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th class="sortable" onclick="sortTransactions('settled_at')">Fecha <span id="sort-settled_at"></span></th>
-                                    <th class="sortable" onclick="sortTransactions('counterparty_name')">Descripcion <span id="sort-counterparty_name"></span></th>
-                                    <th class="sortable" onclick="sortTransactions('qonto_category')">Cat. Qonto <span id="sort-qonto_category"></span></th>
-                                    <th>Asignacion</th>
-                                    <th class="sortable" onclick="sortTransactions('vat_amount')" style="text-align:right">IVA <span id="sort-vat_amount"></span></th>
-                                    <th class="sortable" onclick="sortTransactions('amount')" style="text-align:right">Monto <span id="sort-amount"></span></th>
-                                    <th style="width:60px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="transactions-table">
-                                <tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Projects View -->
-            <div id="view-projects" class="view">
-                <div class="header">
-                    <h1>Rentabilidad por Proyecto</h1>
-                </div>
-
-                <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
-                    <div class="kpi">
-                        <div class="kpi-label">Proyectos Activos</div>
-                        <div class="kpi-value" id="projects-count">-</div>
-                    </div>
-                    <div class="kpi">
-                        <div class="kpi-label">Ingresos Totales</div>
-                        <div class="kpi-value positive" id="projects-income">-</div>
-                    </div>
-                    <div class="kpi">
-                        <div class="kpi-label">Margen Promedio</div>
-                        <div class="kpi-value" id="projects-margin">-</div>
-                    </div>
-                </div>
-
-                <div class="project-grid" id="projects-grid">
-                    <div style="padding:40px;text-align:center;color:var(--text-muted);">Cargando proyectos...</div>
-                </div>
-            </div>
-
-            <!-- Settings View -->
-            <div id="view-settings" class="view">
-                <div class="header">
-                    <h1>Ajustes</h1>
-                </div>
-
-                <!-- Tabs for Settings sections -->
-                <div class="tabs mb-4">
-                    <div class="tab active" onclick="showSettingsTab('connections', event)">Conexiones</div>
-                    <div class="tab" onclick="showSettingsTab('team', event)">Equipo</div>
-                    <div class="tab" onclick="showSettingsTab('clients', event)">Clientes</div>
-                    <div class="tab" onclick="showSettingsTab('projects', event)">Proyectos</div>
-                    <div class="tab" onclick="showSettingsTab('categories', event)">Categorias</div>
-                    <div class="tab" onclick="showSettingsTab('salaries', event)">Salarios</div>
-                </div>
-
-                <!-- Connections Section -->
-                <div id="settings-connections" class="settings-section">
-                    <div class="card">
-                        <div class="card-header">Conexiones</div>
-                        <div class="card-body">
-                            <p class="mb-4">Estado de las integraciones:</p>
-                            <div style="display:flex;gap:16px;margin-bottom:16px;">
-                                <div><strong>Qonto:</strong> <span id="status-qonto">-</span></div>
-                                <div><strong>Airtable:</strong> <span id="status-airtable">-</span></div>
+            <!-- Content Area -->
+            <div class="content">
+                <!-- ==================== DASHBOARD VIEW ==================== -->
+                <div id="view-dashboard" class="view active">
+                    <div class="page-header">
+                        <h1>Dashboard Financiero</h1>
+                        <div class="page-header-actions">
+                            <div class="period-selector">
+                                <button class="period-btn" data-period="week" onclick="App.setPeriod('week')">Semana</button>
+                                <button class="period-btn active" data-period="month" onclick="App.setPeriod('month')">Mes</button>
+                                <button class="period-btn" data-period="quarter" onclick="App.setPeriod('quarter')">Trimestre</button>
+                                <button class="period-btn" data-period="year" onclick="App.setPeriod('year')">Año</button>
+                                <button class="period-btn" data-period="all" onclick="App.setPeriod('all')">Todo</button>
                             </div>
-                            <div id="qonto-org-info" class="mb-4" style="padding:12px;background:var(--bg);border-radius:8px;display:none;">
-                                <strong>Organizacion:</strong> <span id="qonto-org-name">-</span><br>
-                                <strong>Saldo:</strong> <span id="qonto-balance">-</span>
+                            <div class="export-buttons">
+                                <button class="export-btn" onclick="App.exportPDF()">
+                                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z"/></svg>
+                                    PDF
+                                </button>
+                                <button class="export-btn" onclick="App.exportExcel()">
+                                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/></svg>
+                                    Excel
+                                </button>
                             </div>
-                            <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                                <button class="btn btn-primary" onclick="syncQonto()">Sincronizar Transacciones</button>
-                                <button class="btn btn-outline" onclick="syncQontoMembers()">Importar Miembros de Qonto</button>
-                                <button class="btn btn-outline" onclick="loadQontoOrganization()">Ver Info Organizacion</button>
+                        </div>
+                    </div>
+
+                    <!-- KPI Cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Margen Neto</span>
+                                <div class="kpi-icon blue">
+                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"/></svg>
+                                </div>
                             </div>
-                            <p style="font-size:13px;color:var(--text-muted);margin-top:12px;">Sincronizar importa transacciones nuevas y actualiza categorias de Qonto en las existentes.</p>
+                            <div class="kpi-value positive" id="kpi-margin">--</div>
+                            <div class="kpi-footer">
+                                <span class="kpi-change up">-- vs anterior</span>
+                            </div>
+                            <div class="kpi-sparkline"></div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Resultado Neto</span>
+                                <div class="kpi-icon green">
+                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z"/></svg>
+                                </div>
+                            </div>
+                            <div class="kpi-value" id="kpi-ebitda">--</div>
+                            <div class="kpi-footer">
+                                <span class="kpi-change">-- vs anterior</span>
+                            </div>
+                            <div class="kpi-sparkline"></div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Ingresos</span>
+                                <div class="kpi-icon green">
+                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z"/></svg>
+                                </div>
+                            </div>
+                            <div class="kpi-value positive" id="kpi-income">--</div>
+                            <div class="kpi-footer">
+                                <span class="kpi-change up">-- vs anterior</span>
+                            </div>
+                            <div class="kpi-sparkline"></div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Gastos</span>
+                                <div class="kpi-icon red">
+                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z"/></svg>
+                                </div>
+                            </div>
+                            <div class="kpi-value negative" id="kpi-expenses">--</div>
+                            <div class="kpi-footer">
+                                <span class="kpi-change">-- vs anterior</span>
+                            </div>
+                            <div class="kpi-sparkline"></div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Margen Bruto</span>
+                                <div class="kpi-icon yellow">
+                                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z"/></svg>
+                                </div>
+                            </div>
+                            <div class="kpi-value" id="kpi-gross-margin">--</div>
+                            <div class="kpi-footer">
+                                <span class="kpi-change neutral">--</span>
+                            </div>
+                            <div class="kpi-sparkline"></div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Grid -->
+                    <div class="dashboard-grid">
+                        <!-- Main Chart -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Evolucion Mensual</h3>
+                                <div class="chart-legend">
+                                    <span class="chart-legend-item">
+                                        <span class="chart-legend-dot" style="background: var(--success);"></span>
+                                        Ingresos
+                                    </span>
+                                    <span class="chart-legend-item">
+                                        <span class="chart-legend-dot" style="background: var(--danger);"></span>
+                                        Gastos
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container">
+                                    <canvas id="chart-evolution"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Alerts Panel -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Alertas</h3>
+                            </div>
+                            <div class="card-body" id="alerts-panel">
+                                <div class="text-muted text-sm">Cargando alertas...</div>
+                            </div>
+                        </div>
+
+                        <!-- Top Clients -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Top Clientes</h3>
+                                <a href="#" onclick="App.navigateTo('clients'); return false;" class="text-sm" style="color: var(--primary);">Ver todos</a>
+                            </div>
+                            <div class="card-body" id="top-clients-list">
+                                <div class="skeleton skeleton-text"></div>
+                                <div class="skeleton skeleton-text"></div>
+                                <div class="skeleton skeleton-text sm"></div>
+                            </div>
+                        </div>
+
+                        <!-- Top Projects -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Top Proyectos</h3>
+                                <a href="#" onclick="App.navigateTo('projects'); return false;" class="text-sm" style="color: var(--primary);">Ver todos</a>
+                            </div>
+                            <div class="card-body" id="top-projects-list">
+                                <div class="skeleton skeleton-text"></div>
+                                <div class="skeleton skeleton-text"></div>
+                                <div class="skeleton skeleton-text sm"></div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Transactions -->
+                        <div class="card dashboard-full">
+                            <div class="card-header">
+                                <h3>Transacciones Recientes</h3>
+                                <a href="#" onclick="App.navigateTo('transactions'); return false;" class="text-sm" style="color: var(--primary);">Ver todas</a>
+                            </div>
+                            <div class="card-body" style="padding: 0;">
+                                <div class="table-container">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th>Descripcion</th>
+                                                <th>Categoria</th>
+                                                <th>Proyecto</th>
+                                                <th style="text-align: right;">Monto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="recent-transactions">
+                                            <tr><td colspan="5" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Team Members Section -->
-                <div id="settings-team" class="settings-section hidden">
-                    <div class="card">
-                        <div class="card-header">
-                            Equipo
-                            <button class="btn btn-sm btn-primary" onclick="openModal('add-member')">+ Nuevo Miembro</button>
+                <!-- ==================== CLIENTS VIEW ==================== -->
+                <div id="view-clients" class="view">
+                    <div class="page-header">
+                        <div>
+                            <div class="breadcrumbs" id="clients-breadcrumbs">
+                                <span class="current">Clientes</span>
+                            </div>
+                            <h1 id="clients-title">Clientes</h1>
                         </div>
-                        <div class="card-body" style="padding:0;">
+                        <div class="page-header-actions">
+                            <button class="btn btn-primary" onclick="App.openModal('add-client')">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Nuevo Cliente
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Client Filters -->
+                    <div class="filters">
+                        <div class="filter-group">
+                            <label>Buscar:</label>
+                            <input type="text" id="client-search" placeholder="Nombre del cliente..." onkeyup="App.filterClients()">
+                        </div>
+                        <div class="filter-group">
+                            <label>Periodo:</label>
+                            <select id="client-period" onchange="App.filterClients()">
+                                <option value="all">Todo el tiempo</option>
+                                <option value="month" selected>Este mes</option>
+                                <option value="quarter">Este trimestre</option>
+                                <option value="year">Este año</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Clients KPIs -->
+                    <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Total Clientes</span>
+                            </div>
+                            <div class="kpi-value" id="clients-count">--</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Ingresos Totales</span>
+                            </div>
+                            <div class="kpi-value positive" id="clients-income">--</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Margen Promedio</span>
+                            </div>
+                            <div class="kpi-value" id="clients-margin">--</div>
+                        </div>
+                    </div>
+
+                    <!-- Clients List -->
+                    <div class="card">
+                        <div class="card-body" style="padding: 0;">
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Cliente</th>
+                                            <th>Proyectos</th>
+                                            <th style="text-align: right;">Ingresos</th>
+                                            <th style="text-align: right;">Gastos</th>
+                                            <th style="text-align: right;">Margen</th>
+                                            <th>Tendencia</th>
+                                            <th style="width: 100px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="clients-table-body">
+                                        <tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Client Detail Panel (hidden by default) -->
+                    <div id="client-detail" class="hidden">
+                        <!-- Client detail content will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- ==================== PROJECTS VIEW ==================== -->
+                <div id="view-projects" class="view">
+                    <div class="page-header">
+                        <div>
+                            <div class="breadcrumbs" id="projects-breadcrumbs">
+                                <span class="current">Proyectos</span>
+                            </div>
+                            <h1 id="projects-title">Proyectos</h1>
+                        </div>
+                        <div class="page-header-actions">
+                            <button class="btn btn-primary" onclick="App.openModal('add-project')">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Nuevo Proyecto
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Project Filters -->
+                    <div class="filters">
+                        <div class="filter-group">
+                            <label>Cliente:</label>
+                            <select id="project-filter-client" onchange="App.filterProjects()">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Estado:</label>
+                            <select id="project-filter-status" onchange="App.filterProjects()">
+                                <option value="">Todos</option>
+                                <option value="Active">Activo</option>
+                                <option value="Completed">Completado</option>
+                                <option value="On Hold">En Pausa</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Buscar:</label>
+                            <input type="text" id="project-search" placeholder="Nombre del proyecto..." onkeyup="App.filterProjects()">
+                        </div>
+                    </div>
+
+                    <!-- Projects KPIs -->
+                    <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr);">
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Proyectos Activos</span>
+                            </div>
+                            <div class="kpi-value" id="projects-active">--</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Ingresos Totales</span>
+                            </div>
+                            <div class="kpi-value positive" id="projects-income">--</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Gastos Totales</span>
+                            </div>
+                            <div class="kpi-value negative" id="projects-expenses">--</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-header">
+                                <span class="kpi-label">Margen Promedio</span>
+                            </div>
+                            <div class="kpi-value" id="projects-margin">--</div>
+                        </div>
+                    </div>
+
+                    <!-- Projects Grid -->
+                    <div class="project-grid" id="projects-grid">
+                        <div class="text-muted" style="padding:40px;text-align:center;">Cargando proyectos...</div>
+                    </div>
+                </div>
+
+                <!-- ==================== TRANSACTIONS VIEW ==================== -->
+                <div id="view-transactions" class="view">
+                    <div class="page-header">
+                        <h1>Transacciones</h1>
+                        <div class="page-header-actions">
+                            <button class="btn btn-secondary" onclick="App.exportTransactions()">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                Exportar
+                            </button>
+                            <button class="btn btn-primary" onclick="App.openModal('add-transaction')">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Nueva
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Transaction Filters -->
+                    <div class="filters">
+                        <div class="filter-group">
+                            <label>Tipo:</label>
+                            <select id="tx-filter-type" onchange="App.applyTransactionFilters()">
+                                <option value="">Todos</option>
+                                <option value="credit">Ingresos</option>
+                                <option value="debit">Gastos</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Categoria:</label>
+                            <select id="tx-filter-category" onchange="App.applyTransactionFilters()">
+                                <option value="">Todas</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Proyecto:</label>
+                            <select id="tx-filter-project" onchange="App.applyTransactionFilters()">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Cliente:</label>
+                            <select id="tx-filter-client" onchange="App.applyTransactionFilters()">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="filter-separator"></div>
+                        <div class="filter-group">
+                            <label>Desde:</label>
+                            <input type="date" id="tx-filter-from" onchange="App.applyTransactionFilters()">
+                        </div>
+                        <div class="filter-group">
+                            <label>Hasta:</label>
+                            <input type="date" id="tx-filter-to" onchange="App.applyTransactionFilters()">
+                        </div>
+                        <div class="filter-group">
+                            <label>Buscar:</label>
+                            <input type="text" id="tx-search" placeholder="Descripcion..." onkeyup="App.applyTransactionFilters()">
+                        </div>
+                        <div class="filter-actions">
+                            <button class="btn btn-ghost btn-sm" onclick="App.clearTransactionFilters()">Limpiar</button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Filters -->
+                    <div class="quick-filters">
+                        <button class="quick-filter" data-filter="assigned" onclick="App.toggleQuickFilter('assigned')">Asignadas</button>
+                        <button class="quick-filter" data-filter="unassigned" onclick="App.toggleQuickFilter('unassigned')">Sin asignar</button>
+                        <button class="quick-filter" data-filter="high-value" onclick="App.toggleQuickFilter('high-value')">Alto valor</button>
+                    </div>
+
+                    <!-- Transactions Table -->
+                    <div class="card">
+                        <div class="card-body" style="padding: 0; overflow-x: auto;">
                             <table>
                                 <thead>
-                                    <tr><th>Nombre</th><th>Rol</th><th style="text-align:right">Salario Mensual</th><th style="width:100px;"></th></tr>
+                                    <tr>
+                                        <th style="width: 40px;">
+                                            <input type="checkbox" class="table-checkbox" id="select-all-tx" onchange="App.toggleAllTransactions()">
+                                        </th>
+                                        <th class="sortable" onclick="App.sortTransactions('settled_at')">Fecha <span class="sort-icon" id="sort-settled_at"></span></th>
+                                        <th class="sortable" onclick="App.sortTransactions('counterparty_name')">Descripcion <span class="sort-icon" id="sort-counterparty_name"></span></th>
+                                        <th>Categoria</th>
+                                        <th>Proyecto / Cliente</th>
+                                        <th class="sortable" style="text-align: right;" onclick="App.sortTransactions('amount')">Monto <span class="sort-icon" id="sort-amount"></span></th>
+                                        <th style="width: 80px;"></th>
+                                    </tr>
                                 </thead>
-                                <tbody id="team-members-table">
-                                    <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                <tbody id="transactions-table-body">
+                                    <tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                </div>
 
-                <!-- Clients Section -->
-                <div id="settings-clients" class="settings-section hidden">
-                    <div class="card">
-                        <div class="card-header">
-                            Clientes
-                            <button class="btn btn-sm btn-primary" onclick="openModal('add-client')">+ Nuevo Cliente</button>
-                        </div>
-                        <div class="card-body" style="padding:0;">
-                            <table>
-                                <thead>
-                                    <tr><th>Nombre</th><th>Contacto</th><th>Email</th><th>Telefono</th><th style="width:100px;"></th></tr>
-                                </thead>
-                                <tbody id="clients-table">
-                                    <tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                    <!-- Bulk Actions Bar (shown when items selected) -->
+                    <div class="bulk-actions-bar hidden" id="bulk-actions-bar">
+                        <span class="count"><span id="selected-count">0</span> seleccionadas</span>
+                        <button class="btn btn-sm" onclick="App.bulkAssignProject()">Asignar Proyecto</button>
+                        <button class="btn btn-sm" onclick="App.bulkAssignClient()">Asignar Cliente</button>
+                        <button class="btn btn-sm" onclick="App.bulkExclude()">Excluir</button>
+                        <span class="close-btn" onclick="App.clearSelection()">✕</span>
                     </div>
                 </div>
 
-                <!-- Projects Section -->
-                <div id="settings-projects" class="settings-section hidden">
-                    <div class="card">
-                        <div class="card-header">
-                            Proyectos
-                            <button class="btn btn-sm btn-primary" onclick="openModal('add-project')">+ Nuevo Proyecto</button>
-                        </div>
-                        <div class="card-body" style="padding:0;">
-                            <table>
-                                <thead>
-                                    <tr><th>Nombre</th><th>Cliente</th><th>Estado</th><th style="width:100px;"></th></tr>
-                                </thead>
-                                <tbody id="projects-table">
-                                    <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                                </tbody>
-                            </table>
+                <!-- ==================== REVIEW VIEW ==================== -->
+                <div id="view-review" class="view">
+                    <div class="page-header">
+                        <h1>Revision de Transacciones</h1>
+                        <div class="page-header-actions">
+                            <span class="text-muted text-sm" id="review-count">-- pendientes</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Categories Section -->
-                <div id="settings-categories" class="settings-section hidden">
-                    <div class="card">
-                        <div class="card-header">
-                            Categorias
-                            <button class="btn btn-sm btn-primary" onclick="openModal('add-category')">+ Nueva Categoria</button>
-                        </div>
-                        <div class="card-body" style="padding:0;">
-                            <table>
-                                <thead>
-                                    <tr><th>Nombre</th><th>Tipo</th><th style="width:100px;"></th></tr>
-                                </thead>
-                                <tbody id="categories-table">
-                                    <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Salary Allocations Section -->
-                <div id="settings-salaries" class="settings-section hidden">
-                    <div class="card">
-                        <div class="card-header">
-                            Asignacion de Salarios por Proyecto
-                            <div style="display:flex;gap:12px;align-items:center;">
-                                <select id="allocation-month" onchange="loadSalaryAllocations()" style="width:150px;">
-                                </select>
-                                <button class="btn btn-sm btn-primary" onclick="openModal('add-allocation')">+ Asignar</button>
+                    <div class="review-layout">
+                        <!-- Transaction List -->
+                        <div class="review-list-container">
+                            <div class="review-list-header">
+                                <div class="filter-group">
+                                    <select id="review-sort" onchange="App.sortReview()">
+                                        <option value="date-desc">Mas recientes</option>
+                                        <option value="date-asc">Mas antiguas</option>
+                                        <option value="amount-desc">Mayor monto</option>
+                                        <option value="amount-asc">Menor monto</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-ghost" onclick="App.selectAllReview()">Seleccionar todas</button>
+                                </div>
+                            </div>
+                            <div class="review-list" id="review-list">
+                                <div class="text-muted" style="padding:40px;text-align:center;">Cargando transacciones...</div>
                             </div>
                         </div>
-                        <div class="card-body">
-                            <p class="text-sm text-muted mb-4">Las asignaciones se guardan por mes. Cambiar un mes no afecta meses anteriores.</p>
-                            <div id="allocations-container">
-                                <div class="text-muted" style="text-align:center;padding:20px;">Selecciona un mes y agrega asignaciones</div>
+
+                        <!-- Review Panel -->
+                        <div class="review-panel">
+                            <div class="review-panel-header">
+                                <div class="review-panel-title" id="review-panel-title">Selecciona una transaccion</div>
+                                <div class="review-panel-subtitle" id="review-panel-subtitle">--</div>
+                            </div>
+                            <div class="review-panel-body" id="review-panel-body">
+                                <div class="text-muted">Selecciona una transaccion de la lista para revisar y asignar.</div>
+                            </div>
+                            <div class="review-panel-footer" id="review-panel-footer" style="display:none;">
+                                <button class="btn btn-secondary" onclick="App.excludeTransaction()">Excluir</button>
+                                <button class="btn btn-success" onclick="App.confirmAssignment()">Confirmar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== SETTINGS VIEW ==================== -->
+                <div id="view-settings" class="view">
+                    <div class="page-header">
+                        <h1>Configuracion</h1>
+                    </div>
+
+                    <div class="tabs">
+                        <div class="tab active" onclick="App.showSettingsTab('connections', this)">Conexiones</div>
+                        <div class="tab" onclick="App.showSettingsTab('team', this)">Equipo</div>
+                        <div class="tab" onclick="App.showSettingsTab('clients-settings', this)">Clientes</div>
+                        <div class="tab" onclick="App.showSettingsTab('projects-settings', this)">Proyectos</div>
+                        <div class="tab" onclick="App.showSettingsTab('categories', this)">Categorias</div>
+                        <div class="tab" onclick="App.showSettingsTab('salaries', this)">Salarios</div>
+                    </div>
+
+                    <!-- Connections Tab -->
+                    <div id="settings-connections" class="settings-section">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Integraciones</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="grid-2 mb-6">
+                                    <div style="padding:16px;background:var(--bg);border-radius:var(--radius-lg);border:1px solid var(--border);">
+                                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                                            <div style="width:40px;height:40px;background:var(--primary-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                                <span style="font-weight:bold;color:var(--primary);">Q</span>
+                                            </div>
+                                            <div>
+                                                <div class="font-semibold">Qonto</div>
+                                                <div class="text-sm text-muted">Cuenta bancaria</div>
+                                            </div>
+                                            <span class="status success" style="margin-left:auto;" id="status-qonto">Conectado</span>
+                                        </div>
+                                        <button class="btn btn-secondary btn-sm" onclick="App.syncQonto()">Sincronizar</button>
+                                    </div>
+                                    <div style="padding:16px;background:var(--bg);border-radius:var(--radius-lg);border:1px solid var(--border);">
+                                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                                            <div style="width:40px;height:40px;background:var(--warning-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                                                <span style="font-weight:bold;color:var(--warning);">A</span>
+                                            </div>
+                                            <div>
+                                                <div class="font-semibold">Airtable</div>
+                                                <div class="text-sm text-muted">Base de datos</div>
+                                            </div>
+                                            <span class="status success" style="margin-left:auto;" id="status-airtable">Conectado</span>
+                                        </div>
+                                        <button class="btn btn-secondary btn-sm" onclick="App.testAirtable()">Probar conexion</button>
+                                    </div>
+                                </div>
+
+                                <div id="qonto-org-info" class="hidden" style="padding:16px;background:var(--bg);border-radius:var(--radius);margin-top:16px;">
+                                    <strong>Organizacion:</strong> <span id="qonto-org-name">-</span><br>
+                                    <strong>Saldo:</strong> <span id="qonto-balance">-</span>
+                                </div>
+
+                                <div class="mt-4" style="display:flex;gap:12px;flex-wrap:wrap;">
+                                    <button class="btn btn-primary" onclick="App.syncQonto()">Sincronizar Transacciones</button>
+                                    <button class="btn btn-secondary" onclick="App.syncQontoMembers()">Importar Miembros</button>
+                                    <button class="btn btn-secondary" onclick="App.loadQontoOrganization()">Ver Info Organizacion</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Team Tab -->
+                    <div id="settings-team" class="settings-section hidden">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Equipo</h3>
+                                <button class="btn btn-primary btn-sm" onclick="App.openModal('add-member')">+ Nuevo Miembro</button>
+                            </div>
+                            <div class="card-body" style="padding:0;">
+                                <table>
+                                    <thead>
+                                        <tr><th>Nombre</th><th>Rol</th><th style="text-align:right">Salario Mensual</th><th style="width:100px;"></th></tr>
+                                    </thead>
+                                    <tbody id="team-members-table">
+                                        <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Clients Settings Tab -->
+                    <div id="settings-clients-settings" class="settings-section hidden">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Clientes</h3>
+                                <button class="btn btn-primary btn-sm" onclick="App.openModal('add-client')">+ Nuevo Cliente</button>
+                            </div>
+                            <div class="card-body" style="padding:0;">
+                                <table>
+                                    <thead>
+                                        <tr><th>Nombre</th><th>Contacto</th><th>Email</th><th>Telefono</th><th style="width:100px;"></th></tr>
+                                    </thead>
+                                    <tbody id="settings-clients-table">
+                                        <tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Projects Settings Tab -->
+                    <div id="settings-projects-settings" class="settings-section hidden">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Proyectos</h3>
+                                <button class="btn btn-primary btn-sm" onclick="App.openModal('add-project')">+ Nuevo Proyecto</button>
+                            </div>
+                            <div class="card-body" style="padding:0;">
+                                <table>
+                                    <thead>
+                                        <tr><th>Nombre</th><th>Cliente</th><th>Estado</th><th style="width:100px;"></th></tr>
+                                    </thead>
+                                    <tbody id="settings-projects-table">
+                                        <tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Categories Tab -->
+                    <div id="settings-categories" class="settings-section hidden">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Categorias</h3>
+                                <button class="btn btn-primary btn-sm" onclick="App.openModal('add-category')">+ Nueva Categoria</button>
+                            </div>
+                            <div class="card-body" style="padding:0;">
+                                <table>
+                                    <thead>
+                                        <tr><th>Nombre</th><th>Tipo</th><th style="width:100px;"></th></tr>
+                                    </thead>
+                                    <tbody id="categories-table">
+                                        <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Salaries Tab -->
+                    <div id="settings-salaries" class="settings-section hidden">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Asignacion de Salarios por Proyecto</h3>
+                                <div style="display:flex;gap:12px;align-items:center;">
+                                    <select id="allocation-month" onchange="App.loadSalaryAllocations()"></select>
+                                    <button class="btn btn-primary btn-sm" onclick="App.openModal('add-allocation')">+ Asignar</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-sm text-muted mb-4">Las asignaciones se guardan por mes. Cambiar un mes no afecta meses anteriores.</p>
+                                <div id="allocations-container">
+                                    <div class="text-muted" style="text-align:center;padding:20px;">Selecciona un mes</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -528,12 +776,17 @@
         </main>
     </div>
 
+    <!-- Notifications Container -->
+    <div id="notifications" style="position:fixed;top:80px;right:24px;z-index:1001;display:flex;flex-direction:column;gap:8px;"></div>
+
+    <!-- ==================== MODALS ==================== -->
+
     <!-- Add Transaction Modal -->
     <div class="modal-overlay" id="modal-add-transaction">
         <div class="modal">
             <div class="modal-header">
                 <h3>Nueva Transaccion</h3>
-                <button class="modal-close" onclick="closeModal('add-transaction')">&times;</button>
+                <button class="modal-close" onclick="App.closeModal('add-transaction')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-row">
@@ -563,102 +816,46 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('add-transaction')">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveTransaction()">Guardar</button>
+                <button class="btn btn-secondary" onclick="App.closeModal('add-transaction')">Cancelar</button>
+                <button class="btn btn-primary" onclick="App.saveTransaction()">Guardar</button>
             </div>
         </div>
     </div>
 
-    <!-- Add Team Member Modal -->
-    <div class="modal-overlay" id="modal-add-member">
+    <!-- Add Client Modal -->
+    <div class="modal-overlay" id="modal-add-client">
         <div class="modal">
             <div class="modal-header">
-                <h3>Nuevo Miembro del Equipo</h3>
-                <button class="modal-close" onclick="closeModal('add-member')">&times;</button>
+                <h3>Nuevo Cliente</h3>
+                <button class="modal-close" onclick="App.closeModal('add-client')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
                     <label>Nombre</label>
-                    <input type="text" id="new-member-name" placeholder="Nombre completo">
+                    <input type="text" id="new-client-name" placeholder="Nombre de la empresa">
                 </div>
                 <div class="form-group">
-                    <label>Rol</label>
-                    <input type="text" id="new-member-role" placeholder="Ej: Desarrollador, Disenador...">
+                    <label>Contacto</label>
+                    <input type="text" id="new-client-contact" placeholder="Persona de contacto">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="new-client-email" placeholder="email@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Telefono</label>
+                        <input type="text" id="new-client-phone" placeholder="+34...">
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label>Salario Mensual (EUR)</label>
-                    <input type="number" step="0.01" id="new-member-salary" placeholder="0.00">
+                    <label>Notas</label>
+                    <textarea id="new-client-notes" rows="3" placeholder="Notas adicionales..." style="width:100%;"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('add-member')">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveTeamMember()">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Salary Allocation Modal -->
-    <div class="modal-overlay" id="modal-add-allocation">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Asignar Salario a Proyecto</h3>
-                <button class="modal-close" onclick="closeModal('add-allocation')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Miembro del Equipo</label>
-                    <select id="alloc-member">
-                        <option value="">Seleccionar...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Proyecto</label>
-                    <select id="alloc-project">
-                        <option value="">Seleccionar...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Porcentaje de Dedicacion (%)</label>
-                    <input type="number" step="1" min="0" max="100" id="alloc-percentage" placeholder="100" value="100">
-                </div>
-                <div class="form-group">
-                    <label>Monto Calculado (EUR)</label>
-                    <input type="number" step="0.01" id="alloc-amount" placeholder="0.00" readonly style="background:#f8fafc;">
-                </div>
-                <p class="text-sm text-muted">El monto se calcula automaticamente: Salario x Porcentaje / 100</p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('add-allocation')">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveSalaryAllocation()">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Team Member Modal -->
-    <div class="modal-overlay" id="modal-edit-member">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Editar Miembro</h3>
-                <button class="modal-close" onclick="closeModal('edit-member')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="edit-member-id">
-                <div class="form-group">
-                    <label>Nombre</label>
-                    <input type="text" id="edit-member-name" placeholder="Nombre completo">
-                </div>
-                <div class="form-group">
-                    <label>Rol</label>
-                    <input type="text" id="edit-member-role" placeholder="Ej: Desarrollador, Disenador...">
-                </div>
-                <div class="form-group">
-                    <label>Salario Mensual (EUR)</label>
-                    <input type="number" step="0.01" id="edit-member-salary" placeholder="0.00">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('edit-member')">Cancelar</button>
-                <button class="btn btn-primary" onclick="updateTeamMember()">Actualizar</button>
+                <button class="btn btn-secondary" onclick="App.closeModal('add-client')">Cancelar</button>
+                <button class="btn btn-primary" onclick="App.saveClient()">Guardar</button>
             </div>
         </div>
     </div>
@@ -668,7 +865,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Nuevo Proyecto</h3>
-                <button class="modal-close" onclick="closeModal('add-project')">&times;</button>
+                <button class="modal-close" onclick="App.closeModal('add-project')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -691,43 +888,36 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('add-project')">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveProject()">Guardar</button>
+                <button class="btn btn-secondary" onclick="App.closeModal('add-project')">Cancelar</button>
+                <button class="btn btn-primary" onclick="App.saveProject()">Guardar</button>
             </div>
         </div>
     </div>
 
-    <!-- Edit Project Modal -->
-    <div class="modal-overlay" id="modal-edit-project">
+    <!-- Add Team Member Modal -->
+    <div class="modal-overlay" id="modal-add-member">
         <div class="modal">
             <div class="modal-header">
-                <h3>Editar Proyecto</h3>
-                <button class="modal-close" onclick="closeModal('edit-project')">&times;</button>
+                <h3>Nuevo Miembro</h3>
+                <button class="modal-close" onclick="App.closeModal('add-member')">&times;</button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="edit-project-id">
                 <div class="form-group">
-                    <label>Nombre del Proyecto</label>
-                    <input type="text" id="edit-project-name" placeholder="Nombre del proyecto">
+                    <label>Nombre</label>
+                    <input type="text" id="new-member-name" placeholder="Nombre completo">
                 </div>
                 <div class="form-group">
-                    <label>Cliente</label>
-                    <select id="edit-project-client">
-                        <option value="">Sin cliente</option>
-                    </select>
+                    <label>Rol</label>
+                    <input type="text" id="new-member-role" placeholder="Ej: Desarrollador">
                 </div>
                 <div class="form-group">
-                    <label>Estado</label>
-                    <select id="edit-project-status">
-                        <option value="Active">Activo</option>
-                        <option value="Completed">Completado</option>
-                        <option value="On Hold">En Pausa</option>
-                    </select>
+                    <label>Salario Mensual (EUR)</label>
+                    <input type="number" step="0.01" id="new-member-salary" placeholder="0.00">
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('edit-project')">Cancelar</button>
-                <button class="btn btn-primary" onclick="updateProject()">Actualizar</button>
+                <button class="btn btn-secondary" onclick="App.closeModal('add-member')">Cancelar</button>
+                <button class="btn btn-primary" onclick="App.saveTeamMember()">Guardar</button>
             </div>
         </div>
     </div>
@@ -737,11 +927,11 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Nueva Categoria</h3>
-                <button class="modal-close" onclick="closeModal('add-category')">&times;</button>
+                <button class="modal-close" onclick="App.closeModal('add-category')">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Nombre de la Categoria</label>
+                    <label>Nombre</label>
                     <input type="text" id="new-category-name" placeholder="Nombre de la categoria">
                 </div>
                 <div class="form-group">
@@ -753,1610 +943,125 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('add-category')">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveCategory()">Guardar</button>
+                <button class="btn btn-secondary" onclick="App.closeModal('add-category')">Cancelar</button>
+                <button class="btn btn-primary" onclick="App.saveCategory()">Guardar</button>
             </div>
         </div>
     </div>
 
-    <!-- Edit Category Modal -->
-    <div class="modal-overlay" id="modal-edit-category">
+    <!-- Add Salary Allocation Modal -->
+    <div class="modal-overlay" id="modal-add-allocation">
         <div class="modal">
             <div class="modal-header">
-                <h3>Editar Categoria</h3>
-                <button class="modal-close" onclick="closeModal('edit-category')">&times;</button>
+                <h3>Asignar Salario a Proyecto</h3>
+                <button class="modal-close" onclick="App.closeModal('add-allocation')">&times;</button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="edit-category-id">
                 <div class="form-group">
-                    <label>Nombre de la Categoria</label>
-                    <input type="text" id="edit-category-name" placeholder="Nombre de la categoria">
-                </div>
-                <div class="form-group">
-                    <label>Tipo</label>
-                    <select id="edit-category-type">
-                        <option value="Expense">Gasto</option>
-                        <option value="Income">Ingreso</option>
+                    <label>Miembro</label>
+                    <select id="alloc-member" onchange="App.calculateAllocationAmount()">
+                        <option value="">Seleccionar...</option>
                     </select>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('edit-category')">Cancelar</button>
-                <button class="btn btn-primary" onclick="updateCategory()">Actualizar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Client Modal -->
-    <div class="modal-overlay" id="modal-add-client">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Nuevo Cliente</h3>
-                <button class="modal-close" onclick="closeModal('add-client')">&times;</button>
-            </div>
-            <div class="modal-body">
                 <div class="form-group">
-                    <label>Nombre</label>
-                    <input type="text" id="new-client-name" placeholder="Nombre de la empresa/cliente">
-                </div>
-                <div class="form-group">
-                    <label>Contacto</label>
-                    <input type="text" id="new-client-contact" placeholder="Persona de contacto">
+                    <label>Proyecto</label>
+                    <select id="alloc-project">
+                        <option value="">Seleccionar...</option>
+                    </select>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="new-client-email" placeholder="email@ejemplo.com">
+                        <label>Porcentaje (%)</label>
+                        <input type="number" min="0" max="100" id="alloc-percentage" value="100" onchange="App.calculateAllocationAmount()">
                     </div>
                     <div class="form-group">
-                        <label>Telefono</label>
-                        <input type="text" id="new-client-phone" placeholder="+34...">
+                        <label>Monto (EUR)</label>
+                        <input type="number" step="0.01" id="alloc-amount" readonly style="background:var(--bg);">
                     </div>
-                </div>
-                <div class="form-group">
-                    <label>Notas</label>
-                    <textarea id="new-client-notes" rows="3" placeholder="Notas adicionales..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('add-client')">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveClient()">Guardar</button>
+                <button class="btn btn-secondary" onclick="App.closeModal('add-allocation')">Cancelar</button>
+                <button class="btn btn-primary" onclick="App.saveSalaryAllocation()">Guardar</button>
             </div>
         </div>
     </div>
 
-    <!-- Edit Client Modal -->
-    <div class="modal-overlay" id="modal-edit-client">
-        <div class="modal">
+    <!-- Transaction Assignment Modal -->
+    <div class="modal-overlay" id="modal-tx-assignment">
+        <div class="modal lg">
             <div class="modal-header">
-                <h3>Editar Cliente</h3>
-                <button class="modal-close" onclick="closeModal('edit-client')">&times;</button>
+                <h3>Asignar Transaccion</h3>
+                <button class="modal-close" onclick="App.closeModal('tx-assignment')">&times;</button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="edit-client-id">
-                <div class="form-group">
-                    <label>Nombre</label>
-                    <input type="text" id="edit-client-name" placeholder="Nombre de la empresa/cliente">
+                <div id="tx-assignment-info" style="padding:16px;background:var(--bg);border-radius:var(--radius);margin-bottom:20px;">
+                    <strong id="tx-assignment-desc">-</strong><br>
+                    <span class="text-muted">Monto: </span><span id="tx-assignment-amount">-</span>
                 </div>
-                <div class="form-group">
-                    <label>Contacto</label>
-                    <input type="text" id="edit-client-contact" placeholder="Persona de contacto">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="edit-client-email" placeholder="email@ejemplo.com">
-                    </div>
-                    <div class="form-group">
-                        <label>Telefono</label>
-                        <input type="text" id="edit-client-phone" placeholder="+34...">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Notas</label>
-                    <textarea id="edit-client-notes" rows="3" placeholder="Notas adicionales..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('edit-client')">Cancelar</button>
-                <button class="btn btn-primary" onclick="updateClient()">Actualizar</button>
-            </div>
-        </div>
-    </div>
 
-    <!-- Transaction Allocation Modal -->
-    <div class="modal-overlay" id="modal-tx-allocation">
-        <div class="modal" style="max-width:600px;">
-            <div class="modal-header">
-                <h2>Asignar a Proyectos/Clientes</h2>
-                <span class="modal-close" onclick="closeModal('tx-allocation')">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div id="tx-alloc-info" style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;">
-                    <strong id="tx-alloc-desc">-</strong><br>
-                    <span class="text-muted">Monto: </span><span id="tx-alloc-amount">-</span>
+                <!-- AI Suggestion -->
+                <div class="suggestion-box" id="tx-suggestion-box" style="display:none;">
+                    <div class="suggestion-header">
+                        <svg class="suggestion-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z"/></svg>
+                        <span class="suggestion-label">Sugerencia IA</span>
+                    </div>
+                    <div class="suggestion-content" id="tx-suggestion-content">-</div>
+                    <div class="suggestion-action">
+                        <button class="btn btn-primary btn-sm" onclick="App.applySuggestion()">Aplicar sugerencia</button>
+                    </div>
                 </div>
-                <div id="tx-alloc-list" style="margin-bottom:16px;">
-                    <!-- Allocations will be rendered here -->
+
+                <!-- Allocations List -->
+                <div id="tx-allocations-list" style="margin-bottom:20px;">
+                    <!-- Current allocations rendered here -->
                 </div>
-                <div id="tx-alloc-total" style="margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:8px;display:flex;justify-content:space-between;">
+
+                <!-- Allocation Total -->
+                <div class="allocation-total" id="tx-allocation-total">
                     <span>Total asignado:</span>
-                    <strong id="tx-alloc-total-pct">0%</strong>
+                    <strong id="tx-allocation-pct">0%</strong>
                 </div>
-                <div style="border-top:1px solid var(--border);padding-top:16px;">
-                    <h4 style="margin-bottom:12px;">Agregar asignacion</h4>
-                    <div class="form-row">
+
+                <!-- Add New Allocation -->
+                <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px;">
+                    <h4 style="margin-bottom:16px;">Agregar asignacion</h4>
+                    <div class="form-row form-row-3">
                         <div class="form-group">
                             <label>Categoria</label>
-                            <select id="tx-alloc-category" style="width:100%;">
-                                <option value="">Sin categoria</option>
-                            </select>
+                            <select id="tx-alloc-category"></select>
                         </div>
                         <div class="form-group">
                             <label>Proyecto</label>
-                            <select id="tx-alloc-project" style="width:100%;">
-                                <option value="">Sin proyecto</option>
-                            </select>
+                            <select id="tx-alloc-project"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cliente</label>
+                            <select id="tx-alloc-client"></select>
                         </div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label>Cliente</label>
-                            <select id="tx-alloc-client" style="width:100%;">
-                                <option value="">Sin cliente</option>
-                            </select>
+                        <div class="form-group" style="max-width:120px;">
+                            <label>Porcentaje</label>
+                            <input type="number" id="tx-alloc-pct" min="0" max="100" value="100">
                         </div>
-                        <div class="form-group" style="flex:0 0 100px;">
-                            <label>%</label>
-                            <input type="number" id="tx-alloc-pct" min="0" max="100" value="100" style="width:100%;">
+                        <div class="form-group" style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-primary" onclick="App.addTransactionAllocation()">Agregar</button>
                         </div>
                     </div>
-                    <button class="btn btn-primary" onclick="addTransactionAllocation()" style="width:100%;">+ Agregar Asignacion</button>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('tx-allocation')">Cerrar</button>
+                <button class="btn btn-secondary" onclick="App.closeModal('tx-assignment')">Cerrar</button>
             </div>
         </div>
     </div>
 
-    <script>
-        // State
-        var transactions = [];
-        var categories = [];
-        var projects = [];
-        var clients = [];
-        var filteredTransactions = [];
-        var teamMembers = [];
-        var salaryAllocations = [];
-        var transactionAllocations = [];
-        var currentAllocTxId = null;
-        var sortField = 'settled_at';
-        var sortDirection = 'desc';
-
-        // Utilities
-        function fmt(n) {
-            return new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR'}).format(n || 0);
-        }
-
-        function formatDate(d) {
-            if (!d) return '-';
-            return d.split('T')[0];
-        }
-
-        // Navigation
-        document.querySelectorAll('.nav-item').forEach(function(item) {
-            item.addEventListener('click', function() {
-                var view = this.getAttribute('data-view');
-                if (view) showView(view);
-            });
-        });
-
-        function showView(name) {
-            document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
-            document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
-            document.querySelector('.nav-item[data-view="'+name+'"]').classList.add('active');
-            document.getElementById('view-'+name).classList.add('active');
-        }
-
-        // Settings tabs
-        function showSettingsTab(name, event) {
-            document.querySelectorAll('#view-settings .tab').forEach(function(t) { t.classList.remove('active'); });
-            document.querySelectorAll('.settings-section').forEach(function(s) { s.classList.add('hidden'); });
-            if (event && event.target) event.target.classList.add('active');
-            document.getElementById('settings-' + name).classList.remove('hidden');
-        }
-
-        // Modal
-        function openModal(name) {
-            document.getElementById('modal-'+name).classList.add('active');
-            if (name === 'add-transaction') {
-                document.getElementById('new-tx-date').value = new Date().toISOString().split('T')[0];
-            }
-        }
-        function closeModal(name) {
-            document.getElementById('modal-'+name).classList.remove('active');
-        }
-
-        // Data Loading
-        function loadData() {
-            fetch('/api/data').then(function(r) { return r.json(); }).then(function(data) {
-                if (data.error) {
-                    console.error(data.error);
-                    return;
-                }
-                transactions = data.transactions || [];
-                categories = data.categories || [];
-                projects = data.projects || [];
-
-                populateTransactionFilters();
-                applyFilters();
-                renderAll();
-            }).catch(function(e) {
-                console.error('Error loading data:', e);
-            });
-        }
-
-        function checkStatus() {
-            fetch('/api/status').then(function(r) { return r.json(); }).then(function(data) {
-                var ok = data.airtable && data.qonto;
-                document.getElementById('status-indicator').innerHTML = ok
-                    ? '<span class="status ok">Conectado</span>'
-                    : '<span class="status error">Desconectado</span>';
-                document.getElementById('status-qonto').innerHTML = data.qonto ? '<span class="status ok">OK</span>' : '<span class="status error">Error</span>';
-                document.getElementById('status-airtable').innerHTML = data.airtable ? '<span class="status ok">OK</span>' : '<span class="status error">Error</span>';
-            });
-        }
-
-        // Filtering
-        function applyFilters() {
-            var period = document.getElementById('filter-period').value;
-            var customDates = document.getElementById('custom-dates');
-
-            if (period === 'custom') {
-                customDates.classList.remove('hidden');
-            } else {
-                customDates.classList.add('hidden');
-            }
-
-            var now = new Date();
-            var from = null, to = null;
-
-            if (period === 'month') {
-                from = new Date(now.getFullYear(), now.getMonth(), 1);
-                to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            } else if (period === 'quarter') {
-                var q = Math.floor(now.getMonth() / 3);
-                from = new Date(now.getFullYear(), q * 3, 1);
-                to = new Date(now.getFullYear(), (q + 1) * 3, 0);
-            } else if (period === 'year') {
-                from = new Date(now.getFullYear(), 0, 1);
-                to = new Date(now.getFullYear(), 11, 31);
-            } else if (period === 'custom') {
-                var fromVal = document.getElementById('filter-from').value;
-                var toVal = document.getElementById('filter-to').value;
-                if (fromVal) from = new Date(fromVal);
-                if (toVal) to = new Date(toVal);
-            }
-
-            filteredTransactions = transactions.filter(function(t) {
-                if (!t.settled_at) return true;
-                var d = new Date(t.settled_at);
-                if (from && d < from) return false;
-                if (to && d > to) return false;
-                return true;
-            });
-
-            renderKPIs();
-            renderRecentTransactions();
-        }
-
-        // Rendering
-        function renderAll() {
-            renderKPIs();
-            renderRecentTransactions();
-            renderTransactions();
-            renderPL();
-            renderProjects();
-        }
-
-        function renderKPIs() {
-            var income = 0, expenses = 0;
-            filteredTransactions.forEach(function(t) {
-                var amt = parseFloat(t.amount) || 0;
-                if (t.side === 'credit') income += amt;
-                else expenses += amt;
-            });
-            var net = income - expenses;
-            var margin = income > 0 ? (net / income * 100) : 0;
-
-            document.getElementById('kpi-income').textContent = fmt(income);
-            document.getElementById('kpi-expenses').textContent = fmt(expenses);
-            document.getElementById('kpi-net').textContent = fmt(net);
-            document.getElementById('kpi-net').className = 'kpi-value ' + (net >= 0 ? 'positive' : 'negative');
-            document.getElementById('kpi-margin').textContent = margin.toFixed(1) + '%';
-            document.getElementById('kpi-margin').className = 'kpi-value ' + (margin >= 0 ? 'positive' : 'negative');
-        }
-
-        function renderRecentTransactions() {
-            var html = '';
-            var recent = filteredTransactions.slice(0, 10);
-            recent.forEach(function(t) {
-                var cls = t.side === 'credit' ? 'positive' : 'negative';
-                var sign = t.side === 'credit' ? '+' : '-';
-                html += '<tr>';
-                html += '<td>' + formatDate(t.settled_at) + '</td>';
-                html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
-                html += '<td>' + (t.category || '-') + '</td>';
-                html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
-                html += '</tr>';
-            });
-            document.getElementById('recent-transactions').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
-        }
-
-        function sortTransactions(field) {
-            if (sortField === field) {
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortField = field;
-                sortDirection = 'desc';
-            }
-            // Update sort indicators
-            ['settled_at', 'counterparty_name', 'qonto_category', 'vat_amount', 'amount'].forEach(function(f) {
-                var el = document.getElementById('sort-' + f);
-                if (el) el.textContent = (f === sortField) ? (sortDirection === 'asc' ? '▲' : '▼') : '';
-            });
-            renderTransactions();
-        }
-
-        function populateTransactionFilters() {
-            // Populate Qonto category filter (unique values from transactions)
-            var qontoCats = {};
-            transactions.forEach(function(t) {
-                if (t.qonto_category) qontoCats[t.qonto_category] = true;
-            });
-            var qontoCatFilter = document.getElementById('tx-filter-qonto-cat');
-            var qontoCatHtml = '<option value="">Todas</option>';
-            Object.keys(qontoCats).sort().forEach(function(cat) {
-                qontoCatHtml += '<option value="' + cat + '">' + cat + '</option>';
-            });
-            qontoCatFilter.innerHTML = qontoCatHtml;
-
-            // Populate project filter
-            var projFilter = document.getElementById('tx-filter-project');
-            var projHtml = '<option value="">Todos</option>';
-            projects.forEach(function(p) {
-                projHtml += '<option value="' + p.id + '">' + p.name + '</option>';
-            });
-            projFilter.innerHTML = projHtml;
-
-            // Populate client filter
-            var clientFilter = document.getElementById('tx-filter-client');
-            var clientHtml = '<option value="">Todos</option>';
-            clients.forEach(function(c) {
-                clientHtml += '<option value="' + c.id + '">' + c.name + '</option>';
-            });
-            clientFilter.innerHTML = clientHtml;
-        }
-
-        function renderTransactions() {
-            var filterType = document.getElementById('tx-filter-type').value;
-            var filterQontoCat = document.getElementById('tx-filter-qonto-cat').value;
-            var filterProject = document.getElementById('tx-filter-project').value;
-            var filterClient = document.getElementById('tx-filter-client').value;
-            var filterAssigned = document.getElementById('tx-filter-assigned').value;
-            var filterFrom = document.getElementById('tx-filter-from').value;
-            var filterTo = document.getElementById('tx-filter-to').value;
-            var search = (document.getElementById('tx-search').value || '').toLowerCase();
-
-            var filtered = transactions.filter(function(t) {
-                // Type filter
-                if (filterType && t.side !== filterType) return false;
-                // Qonto category filter
-                if (filterQontoCat && t.qonto_category !== filterQontoCat) return false;
-                // Date range filter
-                if (filterFrom && t.settled_at < filterFrom) return false;
-                if (filterTo && t.settled_at > filterTo) return false;
-
-                // Get allocations for this transaction
-                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
-                var totalPct = txAllocs.reduce(function(sum, a) { return sum + a.percentage; }, 0);
-
-                // Project filter (based on allocations)
-                if (filterProject) {
-                    var hasProject = txAllocs.some(function(a) { return a.project_id === filterProject; });
-                    if (!hasProject) return false;
-                }
-                // Client filter (based on allocations)
-                if (filterClient) {
-                    var hasClient = txAllocs.some(function(a) { return a.client_id === filterClient; });
-                    if (!hasClient) return false;
-                }
-                // Assignment status filter
-                if (filterAssigned === 'assigned' && totalPct < 100) return false;
-                if (filterAssigned === 'unassigned' && totalPct > 0) return false;
-                if (filterAssigned === 'partial' && (totalPct === 0 || totalPct >= 100)) return false;
-
-                // Search filter
-                if (search) {
-                    var qontoCat = t.qonto_category || '';
-                    var allocInfo = txAllocs.map(function(a) {
-                        var parts = [];
-                        if (a.category) parts.push(a.category);
-                        if (a.project_id) {
-                            var p = projects.find(function(p) { return p.id === a.project_id; });
-                            if (p) parts.push(p.name);
-                        }
-                        if (a.client_id) {
-                            var c = clients.find(function(c) { return c.id === a.client_id; });
-                            if (c) parts.push(c.name);
-                        }
-                        return parts.join(' ');
-                    }).join(' ');
-                    var text = ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + qontoCat + ' ' + allocInfo).toLowerCase();
-                    if (text.indexOf(search) === -1) return false;
-                }
-                return true;
-            });
-
-            // Sort transactions
-            filtered.sort(function(a, b) {
-                var aVal = a[sortField] || '';
-                var bVal = b[sortField] || '';
-                if (sortField === 'amount' || sortField === 'vat_amount') {
-                    aVal = parseFloat(aVal) || 0;
-                    bVal = parseFloat(bVal) || 0;
-                }
-                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-                return 0;
-            });
-
-            var html = '';
-            filtered.forEach(function(t) {
-                var cls = t.side === 'credit' ? 'positive' : 'negative';
-                var sign = t.side === 'credit' ? '+' : '-';
-                var qontoCategory = t.qonto_category || '';
-                var vatAmount = t.vat_amount || 0;
-
-                // Build allocation summary
-                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
-                var allocPct = txAllocs.reduce(function(sum, a) { return sum + a.percentage; }, 0);
-                var allocSummary = '';
-                if (txAllocs.length === 0) {
-                    allocSummary = '<span class="text-muted" style="font-size:11px;">Sin asignar</span>';
-                } else {
-                    var summaryParts = [];
-                    txAllocs.forEach(function(a) {
-                        var parts = [];
-                        if (a.category) parts.push(a.category);
-                        if (a.project_id) {
-                            var proj = projects.find(function(p) { return p.id === a.project_id; });
-                            if (proj) parts.push(proj.name);
-                        }
-                        if (a.client_id) {
-                            var client = clients.find(function(c) { return c.id === a.client_id; });
-                            if (client) parts.push(client.name);
-                        }
-                        if (parts.length > 0) {
-                            summaryParts.push(parts.join('/') + ' ' + a.percentage + '%');
-                        }
-                    });
-                    allocSummary = '<span style="font-size:11px;">' + summaryParts.join(', ') + '</span>';
-                    if (allocPct === 100) {
-                        allocSummary += '<span style="background:#10b981;color:white;padding:1px 4px;border-radius:8px;font-size:9px;margin-left:4px;">✓</span>';
-                    } else {
-                        allocSummary += '<span style="background:#f59e0b;color:white;padding:1px 4px;border-radius:8px;font-size:9px;margin-left:4px;">' + allocPct + '%</span>';
-                    }
-                }
-
-                html += '<tr>';
-                html += '<td style="white-space:nowrap;">' + formatDate(t.settled_at) + '</td>';
-                html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
-                html += '<td style="font-size:12px;color:#666;">' + (qontoCategory || '<span class="text-muted">-</span>') + '</td>';
-                html += '<td style="max-width:250px;">' + allocSummary + ' <button onclick="openTxAllocation(\'' + t.id + '\')" class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;margin-left:4px;">Asignar</button></td>';
-                html += '<td style="text-align:right;font-size:12px;color:#666;">' + (vatAmount ? fmt(vatAmount) : '-') + '</td>';
-                html += '<td style="text-align:right" class="amount ' + cls + '">' + sign + fmt(t.amount) + '</td>';
-                html += '<td></td>';
-                html += '</tr>';
-            });
-            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
-        }
-
-        function renderPL() {
-            // Group by Income/Expense using allocation categories
-            var income = 0, expenses = 0;
-            var byCategory = {};
-
-            filteredTransactions.forEach(function(t) {
-                var amt = parseFloat(t.amount) || 0;
-                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
-
-                if (txAllocs.length > 0) {
-                    // Distribute by allocations
-                    txAllocs.forEach(function(alloc) {
-                        var allocAmt = amt * alloc.percentage / 100;
-                        var cat = alloc.category || 'Sin categoria';
-                        if (!byCategory[cat]) byCategory[cat] = {income: 0, expense: 0};
-                        if (t.side === 'credit') {
-                            income += allocAmt;
-                            byCategory[cat].income += allocAmt;
-                        } else {
-                            expenses += allocAmt;
-                            byCategory[cat].expense += allocAmt;
-                        }
-                    });
-                } else {
-                    // No allocations - put in "Sin categoria"
-                    var cat = 'Sin categoria';
-                    if (!byCategory[cat]) byCategory[cat] = {income: 0, expense: 0};
-                    if (t.side === 'credit') {
-                        income += amt;
-                        byCategory[cat].income += amt;
-                    } else {
-                        expenses += amt;
-                        byCategory[cat].expense += amt;
-                    }
-                }
-            });
-
-            var html = '';
-
-            // Revenue Section
-            html += '<div class="pl-section">';
-            html += '<div class="pl-section-header"><span>INGRESOS</span><span></span></div>';
-            for (var cat in byCategory) {
-                if (byCategory[cat].income > 0) {
-                    html += '<div class="pl-row indent"><span class="pl-label">' + cat + '</span><span class="pl-amount positive">' + fmt(byCategory[cat].income) + '</span></div>';
-                }
-            }
-            html += '<div class="pl-row total"><span>Total Ingresos</span><span class="pl-amount positive">' + fmt(income) + '</span></div>';
-            html += '</div>';
-
-            // Expenses Section
-            html += '<div class="pl-section">';
-            html += '<div class="pl-section-header"><span>GASTOS</span><span></span></div>';
-            for (var cat in byCategory) {
-                if (byCategory[cat].expense > 0) {
-                    html += '<div class="pl-row indent"><span class="pl-label">' + cat + '</span><span class="pl-amount negative">' + fmt(byCategory[cat].expense) + '</span></div>';
-                }
-            }
-            html += '<div class="pl-row total"><span>Total Gastos</span><span class="pl-amount negative">' + fmt(expenses) + '</span></div>';
-            html += '</div>';
-
-            // Net Result
-            var net = income - expenses;
-            var netCls = net >= 0 ? 'positive' : 'negative';
-            html += '<div class="pl-section">';
-            html += '<div class="pl-row grand-total"><span>RESULTADO NETO</span><span class="pl-amount ' + netCls + '">' + fmt(net) + '</span></div>';
-            html += '</div>';
-
-            document.getElementById('pl-statement').innerHTML = html;
-        }
-
-        function renderProjects() {
-            // Fetch all salary allocations for project profitability
-            fetch('/api/salary-allocations').then(function(r) { return r.json(); }).then(function(data) {
-                var allAllocations = data.allocations || [];
-                renderProjectsWithAllocations(allAllocations);
-            }).catch(function(e) {
-                console.error('Error fetching allocations for projects:', e);
-                renderProjectsWithAllocations([]);
-            });
-        }
-
-        function renderProjectsWithAllocations(allAllocations) {
-            var byProject = {};
-            var byClient = {};
-            var totalIncome = 0;
-
-            projects.forEach(function(p) {
-                byProject[p.id] = {name: p.name, income: 0, expense: 0, salaries: 0};
-            });
-            clients.forEach(function(c) {
-                byClient[c.id] = {name: c.name, income: 0, expense: 0};
-            });
-
-            // Also add "Sin proyecto" for unassigned
-            byProject['_none'] = {name: 'Sin asignar', income: 0, expense: 0, salaries: 0};
-            byClient['_none'] = {name: 'Sin cliente', income: 0, expense: 0};
-
-            // Add transaction costs using transaction allocations
-            transactions.forEach(function(t) {
-                var amt = parseFloat(t.amount) || 0;
-
-                // Check if transaction has specific allocations
-                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
-
-                if (txAllocs.length > 0) {
-                    // Distribute according to allocations
-                    txAllocs.forEach(function(alloc) {
-                        var allocAmt = amt * alloc.percentage / 100;
-                        var pid = alloc.project_id || '_none';
-                        var cid = alloc.client_id || '_none';
-
-                        if (byProject[pid]) {
-                            if (t.side === 'credit') {
-                                byProject[pid].income += allocAmt;
-                            } else {
-                                byProject[pid].expense += allocAmt;
-                            }
-                        }
-                        if (byClient[cid]) {
-                            if (t.side === 'credit') {
-                                byClient[cid].income += allocAmt;
-                            } else {
-                                byClient[cid].expense += allocAmt;
-                            }
-                        }
-                    });
-                } else {
-                    // Use direct project_id/client_id assignment (100%)
-                    var pid = t.project_id || '_none';
-                    var cid = t.client_id || '_none';
-
-                    if (byProject[pid]) {
-                        if (t.side === 'credit') {
-                            byProject[pid].income += amt;
-                        } else {
-                            byProject[pid].expense += amt;
-                        }
-                    }
-                    if (byClient[cid]) {
-                        if (t.side === 'credit') {
-                            byClient[cid].income += amt;
-                        } else {
-                            byClient[cid].expense += amt;
-                        }
-                    }
-                }
-
-                if (t.side === 'credit') totalIncome += amt;
-            });
-
-            // Add salary allocations (all months)
-            allAllocations.forEach(function(a) {
-                var pid = a.project_id;
-                if (byProject[pid]) {
-                    byProject[pid].salaries += a.amount || 0;
-                }
-            });
-
-            var projectList = Object.keys(byProject).map(function(id) {
-                var p = byProject[id];
-                p.id = id;
-                p.totalCosts = p.expense + p.salaries;
-                p.net = p.income - p.totalCosts;
-                p.margin = p.income > 0 ? (p.net / p.income * 100) : 0;
-                return p;
-            }).filter(function(p) {
-                return p.income > 0 || p.expense > 0 || p.salaries > 0;
-            }).sort(function(a, b) {
-                return b.income - a.income;
-            });
-
-            // KPIs
-            document.getElementById('projects-count').textContent = projectList.filter(function(p) { return p.id !== '_none'; }).length;
-            document.getElementById('projects-income').textContent = fmt(totalIncome);
-
-            var avgMargin = 0;
-            if (projectList.length > 0) {
-                avgMargin = projectList.reduce(function(sum, p) { return sum + p.margin; }, 0) / projectList.length;
-            }
-            document.getElementById('projects-margin').textContent = avgMargin.toFixed(1) + '%';
-            document.getElementById('projects-margin').className = 'kpi-value ' + (avgMargin >= 0 ? 'positive' : 'negative');
-
-            // Project cards
-            var html = '';
-            projectList.forEach(function(p) {
-                var barWidth = p.income > 0 ? Math.min(100, (p.net / p.income) * 100 + 50) : 50;
-                var barCls = p.net >= 0 ? 'positive' : 'negative';
-                html += '<div class="project-card">';
-                html += '<div class="project-name">' + p.name + '</div>';
-                html += '<div class="project-stats">';
-                html += '<div class="project-stat"><div class="project-stat-label">Ingresos</div><div class="project-stat-value positive">' + fmt(p.income) + '</div></div>';
-                html += '<div class="project-stat"><div class="project-stat-label">Gastos Directos</div><div class="project-stat-value negative">' + fmt(p.expense) + '</div></div>';
-                html += '<div class="project-stat"><div class="project-stat-label">Salarios</div><div class="project-stat-value negative">' + fmt(p.salaries) + '</div></div>';
-                html += '<div class="project-stat"><div class="project-stat-label">Costo Total</div><div class="project-stat-value negative">' + fmt(p.totalCosts) + '</div></div>';
-                html += '</div>';
-                html += '<div class="project-stats mt-4">';
-                html += '<div class="project-stat"><div class="project-stat-label">Neto</div><div class="project-stat-value ' + (p.net >= 0 ? 'positive' : 'negative') + '">' + fmt(p.net) + '</div></div>';
-                html += '<div class="project-stat"><div class="project-stat-label">Margen</div><div class="project-stat-value">' + p.margin.toFixed(1) + '%</div></div>';
-                html += '</div>';
-                html += '<div class="project-bar"><div class="project-bar-fill ' + barCls + '" style="width:' + barWidth + '%"></div></div>';
-                html += '</div>';
-            });
-
-            document.getElementById('projects-grid').innerHTML = html || '<div style="padding:40px;text-align:center;color:var(--text-muted);">No hay proyectos con transacciones</div>';
-        }
-
-        // Actions
-        function syncQonto() {
-            if (!confirm('Sincronizar transacciones desde Qonto?')) return;
-            fetch('/api/sync', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {
-                var msg = 'Qonto: ' + (data.qonto_count || 0) + ' transacciones\n';
-                msg += 'Nuevas: ' + (data.synced || 0) + '\n';
-                msg += 'Existentes: ' + (data.skipped || 0) + '\n';
-                msg += 'Categorias actualizadas: ' + (data.categories_updated || 0);
-                if (data.fields_found) {
-                    if (!data.fields_found.qonto_category) {
-                        msg += '\n\n⚠️ Campo "Qonto Category" no encontrado en Airtable.\nCrea un campo llamado "Qonto Category" (tipo texto) en la tabla Transactions.';
-                    }
-                }
-                if (data.error) msg += '\n\nError: ' + data.error;
-                alert(msg);
-                loadData();
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function saveTransaction() {
-            var data = {
-                type: document.getElementById('new-tx-type').value,
-                date: document.getElementById('new-tx-date').value,
-                amount: parseFloat(document.getElementById('new-tx-amount').value) || 0,
-                description: document.getElementById('new-tx-description').value,
-                counterparty: document.getElementById('new-tx-counterparty').value
-            };
-
-            if (!data.amount || !data.date) {
-                alert('Por favor completa monto y fecha');
-                return;
-            }
-
-            fetch('/api/transaction', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('add-transaction');
-                    loadData();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        // ==================== Team Members ====================
-
-        function loadTeamMembers() {
-            fetch('/api/team-members').then(function(r) { return r.json(); }).then(function(data) {
-                teamMembers = data.members || [];
-                renderTeamMembers();
-                populateAllocationSelects();
-            }).catch(function(e) {
-                console.error('Error loading team members:', e);
-            });
-        }
-
-        function renderTeamMembers() {
-            var html = '';
-            teamMembers.forEach(function(m) {
-                html += '<tr>';
-                html += '<td>' + (m.name || '-') + '</td>';
-                html += '<td>' + (m.role || '-') + '</td>';
-                html += '<td style="text-align:right" class="amount">' + fmt(m.salary) + '</td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="editTeamMember(\'' + m.id + '\')">Editar</button> ';
-                html += '<button class="btn btn-sm btn-outline" onclick="deleteTeamMember(\'' + m.id + '\')" style="color:var(--danger);">X</button></td>';
-                html += '</tr>';
-            });
-            document.getElementById('team-members-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay miembros. Crea la tabla "Team Members" en Airtable con campos: Name, Role, Salary</td></tr>';
-        }
-
-        function saveTeamMember() {
-            var data = {
-                name: document.getElementById('new-member-name').value,
-                role: document.getElementById('new-member-role').value,
-                salary: parseFloat(document.getElementById('new-member-salary').value) || 0
-            };
-
-            if (!data.name) {
-                alert('Por favor ingresa un nombre');
-                return;
-            }
-
-            fetch('/api/team-member', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('add-member');
-                    document.getElementById('new-member-name').value = '';
-                    document.getElementById('new-member-role').value = '';
-                    document.getElementById('new-member-salary').value = '';
-                    loadTeamMembers();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function editTeamMember(id) {
-            var member = teamMembers.find(function(m) { return m.id === id; });
-            if (!member) return;
-            document.getElementById('edit-member-id').value = id;
-            document.getElementById('edit-member-name').value = member.name || '';
-            document.getElementById('edit-member-role').value = member.role || '';
-            document.getElementById('edit-member-salary').value = member.salary || '';
-            openModal('edit-member');
-        }
-
-        function updateTeamMember() {
-            var id = document.getElementById('edit-member-id').value;
-            var data = {
-                name: document.getElementById('edit-member-name').value,
-                role: document.getElementById('edit-member-role').value,
-                salary: parseFloat(document.getElementById('edit-member-salary').value) || 0
-            };
-
-            fetch('/api/team-member/' + id, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('edit-member');
-                    loadTeamMembers();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function deleteTeamMember(id) {
-            if (!confirm('Eliminar este miembro del equipo?')) return;
-            fetch('/api/team-member/' + id, { method: 'DELETE' })
-            .then(function(r) { return r.json(); })
-            .then(function(result) {
-                if (result.error) alert('Error: ' + result.error);
-                else loadTeamMembers();
-            }).catch(function(e) { alert('Error: ' + e.message); });
-        }
-
-        // ==================== Projects CRUD ====================
-
-        function loadProjectsSettings() {
-            fetch('/api/projects').then(function(r) { return r.json(); }).then(function(data) {
-                projects = data.projects || [];
-                renderProjectsSettings();
-                populateAllocationSelects();
-            }).catch(function(e) {
-                console.error('Error loading projects:', e);
-            });
-        }
-
-        function renderProjectsSettings() {
-            var html = '';
-            projects.forEach(function(p) {
-                // Client is now stored as text (name), not ID
-                var clientName = p.client || '-';
-                var statusClass = p.status === 'Active' ? 'ok' : (p.status === 'Completed' ? '' : 'pending');
-                html += '<tr>';
-                html += '<td>' + (p.name || '-') + '</td>';
-                html += '<td>' + clientName + '</td>';
-                html += '<td><span class="status ' + statusClass + '">' + (p.status || 'Active') + '</span></td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="editProject(\'' + p.id + '\')">Editar</button> ';
-                html += '<button class="btn btn-sm btn-outline" onclick="deleteProject(\'' + p.id + '\')" style="color:var(--danger);">X</button></td>';
-                html += '</tr>';
-            });
-            document.getElementById('projects-table').innerHTML = html || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay proyectos</td></tr>';
-        }
-
-        function saveProject() {
-            var data = {
-                name: document.getElementById('new-project-name').value,
-                client: document.getElementById('new-project-client').value,
-                status: document.getElementById('new-project-status').value
-            };
-
-            if (!data.name) {
-                alert('Por favor ingresa un nombre');
-                return;
-            }
-
-            fetch('/api/project', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('add-project');
-                    document.getElementById('new-project-name').value = '';
-                    document.getElementById('new-project-client').value = '';
-                    loadProjectsSettings();
-                    loadData(); // reload main data
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function editProject(id) {
-            var project = projects.find(function(p) { return p.id === id; });
-            if (!project) return;
-            document.getElementById('edit-project-id').value = id;
-            document.getElementById('edit-project-name').value = project.name || '';
-            document.getElementById('edit-project-client').value = project.client || '';
-            document.getElementById('edit-project-status').value = project.status || 'Active';
-            openModal('edit-project');
-        }
-
-        function updateProject() {
-            var id = document.getElementById('edit-project-id').value;
-            var data = {
-                name: document.getElementById('edit-project-name').value,
-                client: document.getElementById('edit-project-client').value,
-                status: document.getElementById('edit-project-status').value
-            };
-
-            fetch('/api/project/' + id, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('edit-project');
-                    loadProjectsSettings();
-                    loadData();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function deleteProject(id) {
-            if (!confirm('Eliminar este proyecto?')) return;
-            fetch('/api/project/' + id, { method: 'DELETE' })
-            .then(function(r) { return r.json(); })
-            .then(function(result) {
-                if (result.error) alert('Error: ' + result.error);
-                else { loadProjectsSettings(); loadData(); }
-            }).catch(function(e) { alert('Error: ' + e.message); });
-        }
-
-        // ==================== Categories CRUD ====================
-
-        function loadCategories() {
-            fetch('/api/categories').then(function(r) { return r.json(); }).then(function(data) {
-                categories = data.categories || [];
-                renderCategoriesSettings();
-            }).catch(function(e) {
-                console.error('Error loading categories:', e);
-            });
-        }
-
-        function renderCategoriesSettings() {
-            var html = '';
-            categories.forEach(function(c) {
-                var typeLabel = c.type === 'Income' ? 'Ingreso' : 'Gasto';
-                var typeClass = c.type === 'Income' ? 'ok' : '';
-                html += '<tr>';
-                html += '<td>' + (c.name || '-') + '</td>';
-                html += '<td><span class="status ' + typeClass + '">' + typeLabel + '</span></td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="editCategory(\'' + c.id + '\')">Editar</button> ';
-                html += '<button class="btn btn-sm btn-outline" onclick="deleteCategory(\'' + c.id + '\')" style="color:var(--danger);">X</button></td>';
-                html += '</tr>';
-            });
-            document.getElementById('categories-table').innerHTML = html || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">No hay categorias. Crea la tabla "Categories" en Airtable con campos: Name, Type (Income/Expense)</td></tr>';
-        }
-
-        function saveCategory() {
-            var data = {
-                name: document.getElementById('new-category-name').value,
-                type: document.getElementById('new-category-type').value
-            };
-
-            if (!data.name) {
-                alert('Por favor ingresa un nombre');
-                return;
-            }
-
-            fetch('/api/category', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('add-category');
-                    document.getElementById('new-category-name').value = '';
-                    loadCategories();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function editCategory(id) {
-            var category = categories.find(function(c) { return c.id === id; });
-            if (!category) return;
-            document.getElementById('edit-category-id').value = id;
-            document.getElementById('edit-category-name').value = category.name || '';
-            document.getElementById('edit-category-type').value = category.type || 'Expense';
-            openModal('edit-category');
-        }
-
-        function updateCategory() {
-            var id = document.getElementById('edit-category-id').value;
-            var data = {
-                name: document.getElementById('edit-category-name').value,
-                type: document.getElementById('edit-category-type').value
-            };
-
-            fetch('/api/category/' + id, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('edit-category');
-                    loadCategories();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function deleteCategory(id) {
-            if (!confirm('Eliminar esta categoria?')) return;
-            fetch('/api/category/' + id, { method: 'DELETE' })
-            .then(function(r) { return r.json(); })
-            .then(function(result) {
-                if (result.error) alert('Error: ' + result.error);
-                else loadCategories();
-            }).catch(function(e) { alert('Error: ' + e.message); });
-        }
-
-        // ==================== Clients CRUD ====================
-
-        function loadClients() {
-            fetch('/api/clients').then(function(r) { return r.json(); }).then(function(data) {
-                clients = data.clients || [];
-                renderClientsSettings();
-                populateProjectClientSelect();
-            }).catch(function(e) {
-                console.error('Error loading clients:', e);
-            });
-        }
-
-        function renderClientsSettings() {
-            var html = '';
-            clients.forEach(function(c) {
-                html += '<tr>';
-                html += '<td>' + (c.name || '-') + '</td>';
-                html += '<td>' + (c.contact || '-') + '</td>';
-                html += '<td>' + (c.email || '-') + '</td>';
-                html += '<td>' + (c.phone || '-') + '</td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="editClient(\'' + c.id + '\')">Editar</button> ';
-                html += '<button class="btn btn-sm btn-outline" onclick="deleteClient(\'' + c.id + '\')" style="color:var(--danger);">X</button></td>';
-                html += '</tr>';
-            });
-            document.getElementById('clients-table').innerHTML = html || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">No hay clientes</td></tr>';
-        }
-
-        function saveClient() {
-            var data = {
-                name: document.getElementById('new-client-name').value,
-                contact: document.getElementById('new-client-contact').value,
-                email: document.getElementById('new-client-email').value,
-                phone: document.getElementById('new-client-phone').value,
-                notes: document.getElementById('new-client-notes').value
-            };
-
-            if (!data.name) {
-                alert('Por favor ingresa un nombre');
-                return;
-            }
-
-            fetch('/api/client', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('add-client');
-                    document.getElementById('new-client-name').value = '';
-                    document.getElementById('new-client-contact').value = '';
-                    document.getElementById('new-client-email').value = '';
-                    document.getElementById('new-client-phone').value = '';
-                    document.getElementById('new-client-notes').value = '';
-                    loadClients();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function editClient(id) {
-            var client = clients.find(function(c) { return c.id === id; });
-            if (!client) return;
-            document.getElementById('edit-client-id').value = id;
-            document.getElementById('edit-client-name').value = client.name || '';
-            document.getElementById('edit-client-contact').value = client.contact || '';
-            document.getElementById('edit-client-email').value = client.email || '';
-            document.getElementById('edit-client-phone').value = client.phone || '';
-            document.getElementById('edit-client-notes').value = client.notes || '';
-            openModal('edit-client');
-        }
-
-        function updateClient() {
-            var id = document.getElementById('edit-client-id').value;
-            var data = {
-                name: document.getElementById('edit-client-name').value,
-                contact: document.getElementById('edit-client-contact').value,
-                email: document.getElementById('edit-client-email').value,
-                phone: document.getElementById('edit-client-phone').value,
-                notes: document.getElementById('edit-client-notes').value
-            };
-
-            fetch('/api/client/' + id, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('edit-client');
-                    loadClients();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function deleteClient(id) {
-            if (!confirm('Eliminar este cliente?')) return;
-            fetch('/api/client/' + id, { method: 'DELETE' })
-            .then(function(r) { return r.json(); })
-            .then(function(result) {
-                if (result.error) alert('Error: ' + result.error);
-                else loadClients();
-            }).catch(function(e) { alert('Error: ' + e.message); });
-        }
-
-        function populateProjectClientSelect() {
-            // For add project modal - use client NAME as value (text field in Airtable)
-            var addSelect = document.getElementById('new-project-client');
-            if (addSelect) {
-                var html = '<option value="">Sin cliente</option>';
-                clients.forEach(function(c) {
-                    html += '<option value="' + c.name + '">' + c.name + '</option>';
-                });
-                addSelect.innerHTML = html;
-            }
-            // For edit project modal
-            var editSelect = document.getElementById('edit-project-client');
-            if (editSelect) {
-                var html = '<option value="">Sin cliente</option>';
-                clients.forEach(function(c) {
-                    html += '<option value="' + c.name + '">' + c.name + '</option>';
-                });
-                editSelect.innerHTML = html;
-            }
-        }
-
-        // ==================== Transaction Category Assignment ====================
-
-        function updateTransactionCategory(txId, category) {
-            fetch('/api/transaction/' + txId, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ category: category })
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) alert('Error: ' + result.error);
-                else {
-                    // Update local data
-                    transactions.forEach(function(t) { if (t.id === txId) t.category = category; });
-                    renderPL();
-                }
-            }).catch(function(e) { alert('Error: ' + e.message); });
-        }
-
-        function updateTransactionProject(txId, projectId) {
-            fetch('/api/transaction/' + txId, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ project_id: projectId })
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) alert('Error: ' + result.error);
-                else {
-                    transactions.forEach(function(t) { if (t.id === txId) t.project_id = projectId; });
-                    renderProjects();
-                }
-            }).catch(function(e) { alert('Error: ' + e.message); });
-        }
-
-        function updateTransactionClient(txId, clientId) {
-            fetch('/api/transaction/' + txId, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ client_id: clientId })
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) alert('Error: ' + result.error);
-                else {
-                    transactions.forEach(function(t) { if (t.id === txId) t.client_id = clientId; });
-                }
-            }).catch(function(e) { alert('Error: ' + e.message); });
-        }
-
-        // ==================== Salary Allocations ====================
-
-        function initAllocationMonths() {
-            var select = document.getElementById('allocation-month');
-            var now = new Date();
-            var html = '';
-
-            // Generate last 6 months and next 6 months
-            for (var i = -6; i <= 6; i++) {
-                var d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-                var value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-                var label = d.toLocaleString('es-ES', {month: 'long', year: 'numeric'});
-                var selected = i === 0 ? ' selected' : '';
-                html += '<option value="' + value + '"' + selected + '>' + label.charAt(0).toUpperCase() + label.slice(1) + '</option>';
-            }
-            select.innerHTML = html;
-        }
-
-        function loadSalaryAllocations() {
-            var month = document.getElementById('allocation-month').value;
-            if (!month) return;
-
-            fetch('/api/salary-allocations?month=' + month).then(function(r) { return r.json(); }).then(function(data) {
-                salaryAllocations = data.allocations || [];
-                renderSalaryAllocations();
-            }).catch(function(e) {
-                console.error('Error loading allocations:', e);
-            });
-        }
-
-        function renderSalaryAllocations() {
-            var container = document.getElementById('allocations-container');
-            if (salaryAllocations.length === 0) {
-                container.innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">No hay asignaciones para este mes</div>';
-                return;
-            }
-
-            var html = '<table><thead><tr><th>Miembro</th><th>Proyecto</th><th style="text-align:right">%</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>';
-            salaryAllocations.forEach(function(a) {
-                html += '<tr>';
-                html += '<td>' + (a.team_member_name || '-') + '</td>';
-                html += '<td>' + (a.project_name || '-') + '</td>';
-                html += '<td style="text-align:right">' + a.percentage + '%</td>';
-                html += '<td style="text-align:right" class="amount">' + fmt(a.amount) + '</td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="deleteAllocation(\'' + a.id + '\')" style="color:var(--danger);">X</button></td>';
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-
-            // Add total
-            var total = salaryAllocations.reduce(function(sum, a) { return sum + (a.amount || 0); }, 0);
-            html += '<div style="padding:12px 16px;background:var(--bg);font-weight:600;display:flex;justify-content:space-between;border-top:1px solid var(--border);">';
-            html += '<span>Total Asignado</span><span class="amount">' + fmt(total) + '</span></div>';
-
-            container.innerHTML = html;
-        }
-
-        function populateAllocationSelects() {
-            var memberSelect = document.getElementById('alloc-member');
-            var projectSelect = document.getElementById('alloc-project');
-
-            // Populate members
-            var memberHtml = '<option value="">Seleccionar miembro...</option>';
-            teamMembers.forEach(function(m) {
-                memberHtml += '<option value="' + m.id + '" data-salary="' + m.salary + '" data-name="' + m.name + '">' + m.name + ' (' + fmt(m.salary) + '/mes)</option>';
-            });
-            memberSelect.innerHTML = memberHtml;
-
-            // Populate projects
-            var projectHtml = '<option value="">Seleccionar proyecto...</option>';
-            projects.forEach(function(p) {
-                projectHtml += '<option value="' + p.id + '" data-name="' + p.name + '">' + p.name + '</option>';
-            });
-            projectSelect.innerHTML = projectHtml;
-        }
-
-        // Calculate amount when member or percentage changes
-        document.addEventListener('change', function(e) {
-            if (e.target.id === 'alloc-member' || e.target.id === 'alloc-percentage') {
-                calculateAllocationAmount();
-            }
-        });
-        document.addEventListener('input', function(e) {
-            if (e.target.id === 'alloc-percentage') {
-                calculateAllocationAmount();
-            }
-        });
-
-        function calculateAllocationAmount() {
-            var memberSelect = document.getElementById('alloc-member');
-            var percentage = parseFloat(document.getElementById('alloc-percentage').value) || 0;
-            var amountInput = document.getElementById('alloc-amount');
-
-            var selectedOption = memberSelect.options[memberSelect.selectedIndex];
-            var salary = parseFloat(selectedOption.getAttribute('data-salary')) || 0;
-
-            var amount = salary * percentage / 100;
-            amountInput.value = amount.toFixed(2);
-        }
-
-        function saveSalaryAllocation() {
-            var month = document.getElementById('allocation-month').value;
-            var memberSelect = document.getElementById('alloc-member');
-            var projectSelect = document.getElementById('alloc-project');
-            var percentage = parseFloat(document.getElementById('alloc-percentage').value) || 0;
-            var amount = parseFloat(document.getElementById('alloc-amount').value) || 0;
-
-            var selectedMember = memberSelect.options[memberSelect.selectedIndex];
-            var selectedProject = projectSelect.options[projectSelect.selectedIndex];
-
-            if (!memberSelect.value || !projectSelect.value) {
-                alert('Por favor selecciona miembro y proyecto');
-                return;
-            }
-
-            var data = {
-                month: month,
-                team_member_id: memberSelect.value,
-                team_member_name: selectedMember.getAttribute('data-name') || '',
-                project_id: projectSelect.value,
-                project_name: selectedProject.getAttribute('data-name') || '',
-                percentage: percentage,
-                amount: amount
-            };
-
-            fetch('/api/salary-allocation', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('add-allocation');
-                    document.getElementById('alloc-percentage').value = '100';
-                    document.getElementById('alloc-amount').value = '';
-                    loadSalaryAllocations();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function deleteAllocation(id) {
-            if (!confirm('Eliminar esta asignacion?')) return;
-
-            fetch('/api/salary-allocation/' + id, {
-                method: 'DELETE'
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    loadSalaryAllocations();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        // ==================== Transaction Allocations ====================
-
-        function loadTransactionAllocations() {
-            fetch('/api/transaction-allocations').then(function(r) { return r.json(); }).then(function(data) {
-                transactionAllocations = data.allocations || [];
-                renderTransactions();
-            }).catch(function(e) {
-                console.error('Error loading transaction allocations:', e);
-            });
-        }
-
-        function openTxAllocation(txId) {
-            currentAllocTxId = txId;
-            var tx = transactions.find(function(t) { return t.id === txId; });
-            if (!tx) return;
-
-            // Set transaction info
-            document.getElementById('tx-alloc-desc').textContent = tx.counterparty_name || tx.label || '-';
-            document.getElementById('tx-alloc-amount').textContent = fmt(tx.amount);
-
-            // Populate category select
-            var catHtml = '<option value="">Sin categoria</option>';
-            categories.forEach(function(c) {
-                catHtml += '<option value="' + c.name + '">' + c.name + '</option>';
-            });
-            document.getElementById('tx-alloc-category').innerHTML = catHtml;
-
-            // Populate project select
-            var projHtml = '<option value="">Sin proyecto</option>';
-            projects.forEach(function(p) {
-                projHtml += '<option value="' + p.id + '">' + p.name + '</option>';
-            });
-            document.getElementById('tx-alloc-project').innerHTML = projHtml;
-
-            // Populate client select
-            var clientHtml = '<option value="">Sin cliente</option>';
-            clients.forEach(function(c) {
-                clientHtml += '<option value="' + c.id + '">' + c.name + '</option>';
-            });
-            document.getElementById('tx-alloc-client').innerHTML = clientHtml;
-
-            // Reset form
-            document.getElementById('tx-alloc-category').value = '';
-            document.getElementById('tx-alloc-project').value = '';
-            document.getElementById('tx-alloc-client').value = '';
-            document.getElementById('tx-alloc-pct').value = '100';
-
-            // Render current allocations
-            renderTxAllocations();
-
-            openModal('tx-allocation');
-        }
-
-        function renderTxAllocations() {
-            var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === currentAllocTxId; });
-            var container = document.getElementById('tx-alloc-list');
-
-            if (txAllocs.length === 0) {
-                container.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">Sin asignaciones. Usa el formulario abajo para asignar categoria, proyecto y/o cliente.</div>';
-                document.getElementById('tx-alloc-total-pct').textContent = '0%';
-                return;
-            }
-
-            var html = '<table style="font-size:13px;width:100%;"><thead><tr><th>Categoria</th><th>Proyecto</th><th>Cliente</th><th style="text-align:right">%</th><th></th></tr></thead><tbody>';
-            var totalPct = 0;
-            txAllocs.forEach(function(a) {
-                var catName = a.category || '-';
-                var projName = '-';
-                var clientName = '-';
-                if (a.project_id) {
-                    var proj = projects.find(function(p) { return p.id === a.project_id; });
-                    if (proj) projName = proj.name;
-                }
-                if (a.client_id) {
-                    var client = clients.find(function(c) { return c.id === a.client_id; });
-                    if (client) clientName = client.name;
-                }
-                totalPct += a.percentage;
-                html += '<tr>';
-                html += '<td>' + catName + '</td>';
-                html += '<td>' + projName + '</td>';
-                html += '<td>' + clientName + '</td>';
-                html += '<td style="text-align:right">' + a.percentage + '%</td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="deleteTxAllocation(\'' + a.id + '\')" style="color:var(--danger);padding:2px 6px;">X</button></td>';
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            container.innerHTML = html;
-            document.getElementById('tx-alloc-total-pct').textContent = totalPct + '%';
-            document.getElementById('tx-alloc-total-pct').style.color = totalPct === 100 ? 'var(--success)' : (totalPct > 100 ? 'var(--danger)' : 'inherit');
-        }
-
-        function addTransactionAllocation() {
-            var category = document.getElementById('tx-alloc-category').value;
-            var projectId = document.getElementById('tx-alloc-project').value;
-            var clientId = document.getElementById('tx-alloc-client').value;
-            var percentage = parseFloat(document.getElementById('tx-alloc-pct').value) || 0;
-
-            if (!category && !projectId && !clientId) {
-                alert('Selecciona al menos una categoria, proyecto o cliente');
-                return;
-            }
-            if (percentage <= 0 || percentage > 100) {
-                alert('El porcentaje debe estar entre 1 y 100');
-                return;
-            }
-
-            fetch('/api/transaction-allocation', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    transaction_id: currentAllocTxId,
-                    category: category || '',
-                    project_id: projectId || null,
-                    client_id: clientId || null,
-                    percentage: percentage
-                })
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    loadTransactionAllocations();
-                    setTimeout(renderTxAllocations, 300);
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function deleteTxAllocation(id) {
-            if (!confirm('Eliminar esta asignacion?')) return;
-
-            fetch('/api/transaction-allocation/' + id, {
-                method: 'DELETE'
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    loadTransactionAllocations();
-                    setTimeout(renderTxAllocations, 300);
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        // ==================== Qonto Extended Sync ====================
-
-        function syncQontoMembers() {
-            if (!confirm('Importar miembros del equipo desde Qonto? (Los existentes no se duplicaran)')) return;
-
-            fetch('/api/qonto/sync-members', { method: 'POST' })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                } else {
-                    var msg = 'Miembros en Qonto: ' + data.qonto_memberships + '\n';
-                    msg += 'Miembros creados: ' + data.created + '\n';
-                    msg += 'Ya existian: ' + data.skipped + '\n\n';
-                    msg += 'Nota: Los salarios se importan en 0, debes actualizarlos manualmente.';
-                    alert(msg);
-                    loadTeamMembers();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function loadQontoOrganization() {
-            fetch('/api/qonto/organization')
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                } else {
-                    document.getElementById('qonto-org-name').textContent = data.legal_name || data.slug || '-';
-                    var balance = 0;
-                    if (data.bank_accounts && data.bank_accounts.length > 0) {
-                        balance = data.bank_accounts[0].balance || 0;
-                    }
-                    document.getElementById('qonto-balance').textContent = fmt(balance);
-                    document.getElementById('qonto-org-info').style.display = 'block';
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        // Init
-        console.log('G4U Finance Dashboard v6 - with Qonto Extended Data');
-        checkStatus();
-        loadData();
-        initAllocationMonths();
-        loadTeamMembers();
-        loadClients();
-        loadProjectsSettings();
-        loadCategories();
-        loadSalaryAllocations();
-        loadTransactionAllocations();
-    </script>
+    <!-- Scripts -->
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/views.js"></script>
 </body>
 </html>
