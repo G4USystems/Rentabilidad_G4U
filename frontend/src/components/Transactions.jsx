@@ -149,7 +149,7 @@ export default function Transactions({ transactions, projects, clients, categori
               </tr>
             ) : (
               filtered.map(tx => (
-                <TransactionRow key={tx.id} tx={tx} onAssign={onAssign} />
+                <TransactionRow key={tx.id} tx={tx} projects={projects} clients={clients} onAssign={onAssign} />
               ))
             )}
           </tbody>
@@ -168,20 +168,26 @@ function Stat({ label, value, valueClass = '' }) {
   );
 }
 
-function TransactionRow({ tx, onAssign }) {
+function TransactionRow({ tx, projects, clients, onAssign }) {
   const amount = parseFloat(tx.amount) || 0;
   const income = isIncome(tx);
-  const proj = tx.project || tx.project_id;
-  const client = tx.client || tx.client_id;
+  const projId = tx.project || tx.project_id;
+  const clientId = tx.client || tx.client_id;
+
+  // Resolve IDs to names
+  const projInfo = projId ? projects.find(p => p.id === projId || p.name === projId) : null;
+  const clientInfo = clientId ? clients.find(c => c.id === clientId || c.name === clientId) : null;
+  const projName = projInfo?.name || (projId && !projId.startsWith('rec') ? projId : null);
+  const clientName = clientInfo?.name || (clientId && !clientId.startsWith('rec') ? clientId : null);
 
   return (
     <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-      <td className="px-4 py-3 text-sm text-slate-600">
+      <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">
         {formatDate(tx.settled_at || tx.emitted_at)}
       </td>
-      <td className="px-4 py-3">
-        <p className="font-medium text-slate-900">{tx.counterparty_name || tx.label || '-'}</p>
-        {tx.note && <p className="text-sm text-slate-500">{tx.note}</p>}
+      <td className="px-4 py-3 max-w-xs">
+        <p className="font-medium text-slate-900 truncate">{tx.counterparty_name || tx.label || '-'}</p>
+        {tx.note && <p className="text-sm text-slate-500 truncate">{tx.note}</p>}
       </td>
       <td className="px-4 py-3">
         <span className="inline-block px-2 py-1 bg-slate-100 rounded text-xs text-slate-700">
@@ -189,18 +195,18 @@ function TransactionRow({ tx, onAssign }) {
         </span>
       </td>
       <td className="px-4 py-3 text-sm">
-        {proj ? (
+        {projName ? (
           <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">
-            {proj}
+            {projName}
           </span>
         ) : (
-          <span className="text-slate-400 italic">-</span>
+          <span className="text-slate-400">-</span>
         )}
       </td>
       <td className="px-4 py-3 text-sm text-slate-700">
-        {client || <span className="text-slate-400 italic">-</span>}
+        {clientName || <span className="text-slate-400">-</span>}
       </td>
-      <td className={`px-4 py-3 text-right font-mono font-semibold ${income ? 'text-emerald-600' : 'text-red-500'}`}>
+      <td className={`px-4 py-3 text-right font-mono font-semibold whitespace-nowrap ${income ? 'text-emerald-600' : 'text-red-500'}`}>
         {income ? '+' : ''}{formatCurrency(amount)}
       </td>
       <td className="px-4 py-3">
