@@ -3613,16 +3613,83 @@
             });
         }
 
-        // Init
+        // Init - Load data in optimal order
         console.log('G4U Finance Dashboard v7 - Business Overview');
+
+        // First: Load all cached data from Airtable in parallel (fast)
+        Promise.all([
+            fetch('/api/data').then(function(r) { return r.json(); }),
+            fetch('/api/clients').then(function(r) { return r.json(); }),
+            fetch('/api/projects').then(function(r) { return r.json(); }),
+            fetch('/api/categories').then(function(r) { return r.json(); }),
+            fetch('/api/team-members').then(function(r) { return r.json(); }),
+            fetch('/api/transaction-allocations').then(function(r) { return r.json(); })
+        ]).then(function(results) {
+            // Process main data
+            var data = results[0];
+            if (!data.error) {
+                transactions = data.transactions || [];
+                categories = data.categories || [];
+                projects = data.projects || [];
+            }
+
+            // Process clients
+            var clientsData = results[1];
+            if (!clientsData.error) {
+                clients = clientsData.clients || [];
+            }
+
+            // Process projects (may have more detail)
+            var projectsData = results[2];
+            if (!projectsData.error && projectsData.projects) {
+                projects = projectsData.projects;
+            }
+
+            // Process categories
+            var catsData = results[3];
+            if (!catsData.error && catsData.categories) {
+                categories = catsData.categories;
+            }
+
+            // Process team members
+            var teamData = results[4];
+            if (!teamData.error) {
+                teamMembers = teamData.members || [];
+            }
+
+            // Process allocations
+            var allocData = results[5];
+            if (!allocData.error) {
+                transactionAllocations = allocData.allocations || [];
+            }
+
+            // Now render everything
+            populateTransactionFilters();
+            applyFilters();
+            renderAll();
+            renderTeamMembers();
+            renderClientsSettings();
+            renderProjectsSettings();
+            renderCategories();
+
+            console.log('Data loaded:', transactions.length, 'transactions');
+
+            // Then: Sync from Qonto in background (slower)
+            setTimeout(function() {
+                autoSync();
+            }, 500);
+        }).catch(function(e) {
+            console.error('Error loading initial data:', e);
+            // Fallback to individual loads
+            loadData();
+            loadClients();
+            loadTeamMembers();
+            loadTransactionAllocations();
+        });
+
+        // Status check (fast, independent)
         checkStatus();
         loadQontoOrgAuto();
-        autoSync();
-        loadTeamMembers();
-        loadClients();
-        loadProjectsSettings();
-        loadCategories();
-        loadTransactionAllocations();
     </script>
 </body>
 </html>
