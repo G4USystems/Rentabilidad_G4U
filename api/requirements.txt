@@ -1,0 +1,26 @@
+# API Framework
+flask==3.0.0
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# HTTP Client for Qonto API
+httpx==0.25.2
+
+# Data validation
+pydantic==2.5.2
+pydantic-settings==2.1.0
+
+# Date/Time handling
+python-dateutil==2.8.2
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Data processing & Excel
+pandas==2.1.4
+openpyxl==3.1.2
+
+# Google Sheets (for production on Vercel)
+gspread==5.12.0
+google-auth==2.23.4
