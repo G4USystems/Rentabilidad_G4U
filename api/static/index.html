@@ -628,9 +628,7 @@
                                         <div><strong>Qonto:</strong> <span id="status-qonto">-</span></div>
                                         <div><strong>Airtable:</strong> <span id="status-airtable">-</span></div>
                                     </div>
-                                    <p class="text-sm text-muted">Las transacciones se sincronizan automaticamente al cargar la pagina.</p>
-                                    <button class="btn btn-sm btn-outline" onclick="syncVAT()" style="margin-top:12px;">Sincronizar IVA desde Qonto</button>
-                                    <span id="vat-sync-status" style="margin-left:8px;font-size:12px;"></span>
+                                    <p class="text-sm text-muted">Las transacciones (incluyendo IVA) se sincronizan automaticamente al cargar la pagina.</p>
                                 </div>
                                 <div id="qonto-org-info" style="padding:16px;background:var(--bg);border-radius:8px;">
                                     <h4 style="margin-bottom:12px;">Organizacion Qonto</h4>
@@ -1202,7 +1200,6 @@
         var clients = [];
         var filteredTransactions = [];
         var teamMembers = [];
-        var salaryAllocations = [];
         var transactionAllocations = [];
         var selectedTransactions = [];
         var currentAllocTxId = null;
@@ -2009,30 +2006,19 @@
         }
 
         function renderPLProjects() {
-            // Fetch all salary allocations for project profitability
-            fetch('/api/salary-allocations').then(function(r) { return r.json(); }).then(function(data) {
-                var allAllocations = data.allocations || [];
-                renderPLProjectsWithAllocations(allAllocations);
-            }).catch(function(e) {
-                console.error('Error fetching allocations for projects:', e);
-                renderPLProjectsWithAllocations([]);
-            });
-        }
-
-        function renderPLProjectsWithAllocations(allAllocations) {
             var byProject = {};
             var byClient = {};
             var totalIncome = 0;
 
             projects.forEach(function(p) {
-                byProject[p.id] = {name: p.name, income: 0, expense: 0, salaries: 0};
+                byProject[p.id] = {name: p.name, income: 0, expense: 0};
             });
             clients.forEach(function(c) {
                 byClient[c.id] = {name: c.name, income: 0, expense: 0};
             });
 
             // Also add "Sin proyecto" for unassigned
-            byProject['_none'] = {name: 'Sin asignar', income: 0, expense: 0, salaries: 0};
+            byProject['_none'] = {name: 'Sin asignar', income: 0, expense: 0};
             byClient['_none'] = {name: 'Sin cliente', income: 0, expense: 0};
 
             // Add transaction costs using transaction allocations
@@ -2089,14 +2075,6 @@
                 if (t.side === 'credit') totalIncome += amt;
             });
 
-            // Add salary allocations (all months)
-            allAllocations.forEach(function(a) {
-                var pid = a.project_id;
-                if (byProject[pid]) {
-                    byProject[pid].salaries += a.amount || 0;
-                }
-            });
-
             var excludeUnassigned = document.getElementById('pl-projects-exclude-unassigned').checked;
             var statusFilter = document.getElementById('pl-projects-status').value;
             var sortBy = document.getElementById('pl-projects-sort').value;
@@ -2109,14 +2087,14 @@
                 var p = byProject[id];
                 p.id = id;
                 p.status = projectStatus[id] || 'Active';
-                p.totalCosts = p.expense + p.salaries;
+                p.totalCosts = p.expense;
                 p.net = p.income - p.totalCosts;
                 p.margin = p.income > 0 ? (p.net / p.income * 100) : 0;
                 return p;
             }).filter(function(p) {
                 if (excludeUnassigned && p.id === '_none') return false;
                 if (statusFilter !== 'all' && p.id !== '_none' && p.status !== statusFilter) return false;
-                return p.income > 0 || p.expense > 0 || p.salaries > 0;
+                return p.income > 0 || p.expense > 0;
             });
 
             // Sorting
@@ -2161,11 +2139,6 @@
                 html += '<div style="padding:10px;background:' + (p.net >= 0 ? '#f0fdf4' : '#fef2f2') + ';border-radius:6px;text-align:center;">';
                 html += '<div style="font-size:11px;color:#666;">Resultado Neto</div>';
                 html += '<div style="font-size:20px;font-weight:700;color:' + (p.net >= 0 ? '#10b981' : '#ef4444') + ';">' + fmt(p.net) + '</div>';
-                html += '</div>';
-                // Desglose
-                html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:11px;color:#666;">';
-                html += '<div style="display:flex;justify-content:space-between;"><span>Gastos directos:</span><span>' + fmt(p.expense) + '</span></div>';
-                html += '<div style="display:flex;justify-content:space-between;"><span>Salarios:</span><span>' + fmt(p.salaries) + '</span></div>';
                 html += '</div>';
                 html += '</div>';
             });
@@ -3002,165 +2975,6 @@
             }).catch(function(e) { alert('Error: ' + e.message); });
         }
 
-        // ==================== Salary Allocations ====================
-
-        function initAllocationMonths() {
-            var select = document.getElementById('allocation-month');
-            var now = new Date();
-            var html = '';
-
-            // Generate last 6 months and next 6 months
-            for (var i = -6; i <= 6; i++) {
-                var d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-                var value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-                var label = d.toLocaleString('es-ES', {month: 'long', year: 'numeric'});
-                var selected = i === 0 ? ' selected' : '';
-                html += '<option value="' + value + '"' + selected + '>' + label.charAt(0).toUpperCase() + label.slice(1) + '</option>';
-            }
-            select.innerHTML = html;
-        }
-
-        function loadSalaryAllocations() {
-            var month = document.getElementById('allocation-month').value;
-            if (!month) return;
-
-            fetch('/api/salary-allocations?month=' + month).then(function(r) { return r.json(); }).then(function(data) {
-                salaryAllocations = data.allocations || [];
-                renderSalaryAllocations();
-            }).catch(function(e) {
-                console.error('Error loading allocations:', e);
-            });
-        }
-
-        function renderSalaryAllocations() {
-            var container = document.getElementById('allocations-container');
-            if (salaryAllocations.length === 0) {
-                container.innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">No hay asignaciones para este mes</div>';
-                return;
-            }
-
-            var html = '<table><thead><tr><th>Miembro</th><th>Proyecto</th><th style="text-align:right">%</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>';
-            salaryAllocations.forEach(function(a) {
-                html += '<tr>';
-                html += '<td>' + (a.team_member_name || '-') + '</td>';
-                html += '<td>' + (a.project_name || '-') + '</td>';
-                html += '<td style="text-align:right">' + a.percentage + '%</td>';
-                html += '<td style="text-align:right" class="amount">' + fmt(a.amount) + '</td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="deleteAllocation(\'' + a.id + '\')" style="color:var(--danger);">X</button></td>';
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-
-            // Add total
-            var total = salaryAllocations.reduce(function(sum, a) { return sum + (a.amount || 0); }, 0);
-            html += '<div style="padding:12px 16px;background:var(--bg);font-weight:600;display:flex;justify-content:space-between;border-top:1px solid var(--border);">';
-            html += '<span>Total Asignado</span><span class="amount">' + fmt(total) + '</span></div>';
-
-            container.innerHTML = html;
-        }
-
-        function populateAllocationSelects() {
-            var memberSelect = document.getElementById('alloc-member');
-            var projectSelect = document.getElementById('alloc-project');
-
-            // Populate members
-            var memberHtml = '<option value="">Seleccionar miembro...</option>';
-            teamMembers.forEach(function(m) {
-                memberHtml += '<option value="' + m.id + '" data-salary="' + m.salary + '" data-name="' + m.name + '">' + m.name + ' (' + fmt(m.salary) + '/mes)</option>';
-            });
-            memberSelect.innerHTML = memberHtml;
-
-            // Populate projects
-            var projectHtml = '<option value="">Seleccionar proyecto...</option>';
-            projects.forEach(function(p) {
-                projectHtml += '<option value="' + p.id + '" data-name="' + p.name + '">' + p.name + '</option>';
-            });
-            projectSelect.innerHTML = projectHtml;
-        }
-
-        // Calculate amount when member or percentage changes
-        document.addEventListener('change', function(e) {
-            if (e.target.id === 'alloc-member' || e.target.id === 'alloc-percentage') {
-                calculateAllocationAmount();
-            }
-        });
-        document.addEventListener('input', function(e) {
-            if (e.target.id === 'alloc-percentage') {
-                calculateAllocationAmount();
-            }
-        });
-
-        function calculateAllocationAmount() {
-            var memberSelect = document.getElementById('alloc-member');
-            var percentage = parseFloat(document.getElementById('alloc-percentage').value) || 0;
-            var amountInput = document.getElementById('alloc-amount');
-
-            var selectedOption = memberSelect.options[memberSelect.selectedIndex];
-            var salary = parseFloat(selectedOption.getAttribute('data-salary')) || 0;
-
-            var amount = salary * percentage / 100;
-            amountInput.value = amount.toFixed(2);
-        }
-
-        function saveSalaryAllocation() {
-            var month = document.getElementById('allocation-month').value;
-            var memberSelect = document.getElementById('alloc-member');
-            var projectSelect = document.getElementById('alloc-project');
-            var percentage = parseFloat(document.getElementById('alloc-percentage').value) || 0;
-            var amount = parseFloat(document.getElementById('alloc-amount').value) || 0;
-
-            var selectedMember = memberSelect.options[memberSelect.selectedIndex];
-            var selectedProject = projectSelect.options[projectSelect.selectedIndex];
-
-            if (!memberSelect.value || !projectSelect.value) {
-                alert('Por favor selecciona miembro y proyecto');
-                return;
-            }
-
-            var data = {
-                month: month,
-                team_member_id: memberSelect.value,
-                team_member_name: selectedMember.getAttribute('data-name') || '',
-                project_id: projectSelect.value,
-                project_name: selectedProject.getAttribute('data-name') || '',
-                percentage: percentage,
-                amount: amount
-            };
-
-            fetch('/api/salary-allocation', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    closeModal('add-allocation');
-                    document.getElementById('alloc-percentage').value = '100';
-                    document.getElementById('alloc-amount').value = '';
-                    loadSalaryAllocations();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
-        function deleteAllocation(id) {
-            if (!confirm('Eliminar esta asignacion?')) return;
-
-            fetch('/api/salary-allocation/' + id, {
-                method: 'DELETE'
-            }).then(function(r) { return r.json(); }).then(function(result) {
-                if (result.error) {
-                    alert('Error: ' + result.error);
-                } else {
-                    loadSalaryAllocations();
-                }
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
-        }
-
         // ==================== Transaction Allocations ====================
 
         function loadTransactionAllocations() {
@@ -3609,31 +3423,6 @@
             }).catch(function(e) {
                 alert('Error: ' + e.message);
             });
-        }
-
-        // Auto sync on load
-        function syncVAT() {
-            var statusEl = document.getElementById('vat-sync-status');
-            statusEl.textContent = 'Sincronizando...';
-            statusEl.style.color = 'var(--primary)';
-
-            fetch('/api/qonto/update-vat', { method: 'POST' })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data.error) {
-                        statusEl.textContent = 'Error: ' + data.error;
-                        statusEl.style.color = 'var(--danger)';
-                    } else {
-                        statusEl.textContent = 'Actualizado: ' + data.updated + ' transacciones';
-                        statusEl.style.color = 'var(--success)';
-                        // Reload data to show updated VAT
-                        loadData();
-                    }
-                })
-                .catch(function(e) {
-                    statusEl.textContent = 'Error: ' + e.message;
-                    statusEl.style.color = 'var(--danger)';
-                });
         }
 
         function autoSync() {

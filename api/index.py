@@ -847,49 +847,67 @@ def api_sync():
                 if len(errors) >= 3:
                     break
 
-        # ===== UPDATE CATEGORIES ON EXISTING TRANSACTIONS =====
+        # ===== UPDATE CATEGORIES AND VAT ON EXISTING TRANSACTIONS =====
         categories_updated = 0
-        if qonto_category_field:
-            # Build map of Qonto transaction_id -> category
-            qonto_category_map = {}
-            for tx in qonto_txs:
-                tx_id = tx.get("transaction_id", "")
-                category = tx.get("category", "")
-                if tx_id and category:
-                    qonto_category_map[tx_id] = category
+        vat_updated = 0
 
-            # Re-fetch existing records to get fresh data
-            try:
-                existing = airtable.get_all(table_name)
-            except:
-                existing = []
+        # Build map of Qonto transaction_id -> data (category and VAT)
+        qonto_data_map = {}
+        for tx in qonto_txs:
+            tx_id = tx.get("transaction_id", "")
+            if tx_id:
+                qonto_data_map[tx_id] = {
+                    "category": tx.get("category", ""),
+                    "vat_amount": tx.get("vat_amount") or tx.get("vat_amount_cents") or 0
+                }
 
-            for record in existing:
-                record_id = record.get("id")
-                # Find Qonto transaction ID
-                qonto_id = None
-                for key in ["Qonto Transaction ID", "qonto_id", "transaction_id", "ID", "Name"]:
-                    if record.get(key):
-                        qonto_id = record.get(key)
-                        break
+        # Re-fetch existing records to get fresh data
+        try:
+            existing = airtable.get_all(table_name)
+        except:
+            existing = []
 
-                if not qonto_id:
-                    continue
+        for record in existing:
+            record_id = record.get("id")
+            # Find Qonto transaction ID
+            qonto_id = None
+            for key in ["Qonto Transaction ID", "qonto_id", "transaction_id", "ID", "Name"]:
+                if record.get(key):
+                    qonto_id = record.get(key)
+                    break
 
-                # Check if already has category
+            if not qonto_id or qonto_id not in qonto_data_map:
+                continue
+
+            qonto_data = qonto_data_map[qonto_id]
+            updates = {}
+
+            # Check if needs category update
+            if qonto_category_field:
                 current_category = record.get(qonto_category_field) or ""
-                if current_category:
-                    continue
+                new_category = qonto_data.get("category", "")
+                if not current_category and new_category:
+                    updates[qonto_category_field] = new_category
 
-                # Get category from Qonto
-                new_category = qonto_category_map.get(qonto_id, "")
-                if not new_category:
-                    continue
+            # Check if needs VAT update
+            if vat_amount_field:
+                current_vat = record.get(vat_amount_field) or 0
+                new_vat = qonto_data.get("vat_amount", 0)
+                if new_vat and not current_vat:
+                    # Convert from cents if needed
+                    vat_float = float(new_vat)
+                    if vat_float > 1000:  # Likely cents
+                        vat_float = vat_float / 100
+                    updates[vat_amount_field] = vat_float
 
-                # Update record
+            # Apply updates if any
+            if updates:
                 try:
-                    airtable.update(table_name, record_id, {qonto_category_field: new_category})
-                    categories_updated += 1
+                    airtable.update(table_name, record_id, updates)
+                    if qonto_category_field in updates:
+                        categories_updated += 1
+                    if vat_amount_field in updates:
+                        vat_updated += 1
                 except:
                     pass
 
@@ -898,6 +916,7 @@ def api_sync():
             "synced": synced,
             "skipped": skipped,
             "categories_updated": categories_updated,
+            "vat_updated": vat_updated,
             "existing_count": len(existing),
             "table_name": table_name,
             "fields_found": {
@@ -906,7 +925,8 @@ def api_sync():
                 "description": desc_field,
                 "type": type_field,
                 "date": date_field,
-                "qonto_category": qonto_category_field
+                "qonto_category": qonto_category_field,
+                "vat_amount": vat_amount_field
             },
             "errors": errors if errors else None
         })
