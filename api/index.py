@@ -689,17 +689,37 @@ def api_data():
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
-@app.route("/api/qonto/transaction-detail/<tx_id>")
-def api_qonto_transaction_detail(tx_id):
-    """Get full detail of a single transaction to see all available fields."""
+@app.route("/api/qonto/transaction-fields")
+def api_qonto_transaction_fields():
+    """Get ALL fields that Qonto returns for transactions."""
     try:
         qonto = Qonto()
-        detail = qonto.get_transaction_detail(tx_id)
-        if detail:
-            return jsonify({"transaction": detail, "all_keys": list(detail.keys())})
-        return jsonify({"error": "Transaction not found"})
+        slug = qonto.get_bank_account_id()
+
+        with httpx.Client(timeout=30) as client:
+            # Get one transaction to see all fields
+            r = client.get(
+                f"{qonto.base_url}/transactions",
+                headers=qonto.headers,
+                params={"slug": slug, "status": "completed", "per_page": 5}
+            )
+            if r.status_code == 200:
+                txs = r.json().get("transactions", [])
+                if txs:
+                    # Get all unique keys across transactions
+                    all_keys = set()
+                    for tx in txs:
+                        all_keys.update(tx.keys())
+
+                    return jsonify({
+                        "all_fields_available": sorted(list(all_keys)),
+                        "sample_transactions": txs
+                    })
+
+            return jsonify({"error": "Could not fetch transactions", "status": r.status_code})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/qonto/debug-vat")
 def api_debug_vat():
