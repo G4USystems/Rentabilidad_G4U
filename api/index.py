@@ -1657,25 +1657,13 @@ def api_transaction_allocations():
         records = airtable.get_all("Transaction Allocations")
         allocations = []
         for r in records:
-            # Transaction is a linked record - returns array
-            tx_field = r.get("Transaction") or []
-            tx_id = tx_field[0] if isinstance(tx_field, list) and tx_field else ""
-            # Project is a linked record
-            proj_field = r.get("Project") or []
-            proj_id = proj_field[0] if isinstance(proj_field, list) and proj_field else ""
-            # Client is a linked record
-            client_field = r.get("Client") or []
-            client_id = client_field[0] if isinstance(client_field, list) and client_field else ""
-            # Category is text
-            category = r.get("Category") or ""
-
             allocations.append({
                 "id": r.get("id"),
-                "transaction_id": tx_id,
-                "project_id": proj_id,
-                "client_id": client_id,
-                "category": category,
-                "percentage": float(r.get("Percentage") or 0)
+                "transaction_id": r.get("transaction_id") or "",
+                "project_id": r.get("project_id") or "",
+                "client_id": r.get("client_name") or "",
+                "category": r.get("category") or "",
+                "percentage": float(r.get("percentage") or 0)
             })
         return jsonify({"allocations": allocations})
     except Exception as e:
@@ -1690,23 +1678,15 @@ def api_transaction_allocations_by_tx(transaction_id):
         records = airtable.get_all("Transaction Allocations")
         allocations = []
         for r in records:
-            tx_field = r.get("Transaction") or []
-            tx_id = tx_field[0] if isinstance(tx_field, list) and tx_field else ""
-            if tx_id != transaction_id:
+            if r.get("transaction_id") != transaction_id:
                 continue
-            proj_field = r.get("Project") or []
-            proj_id = proj_field[0] if isinstance(proj_field, list) and proj_field else ""
-            client_field = r.get("Client") or []
-            client_id = client_field[0] if isinstance(client_field, list) and client_field else ""
-            category = r.get("Category") or ""
-
             allocations.append({
                 "id": r.get("id"),
-                "transaction_id": tx_id,
-                "project_id": proj_id,
-                "client_id": client_id,
-                "category": category,
-                "percentage": float(r.get("Percentage") or 0)
+                "transaction_id": r.get("transaction_id") or "",
+                "project_id": r.get("project_id") or "",
+                "client_id": r.get("client_name") or "",
+                "category": r.get("category") or "",
+                "percentage": float(r.get("percentage") or 0)
             })
         return jsonify({"allocations": allocations})
     except Exception as e:
@@ -1719,24 +1699,13 @@ def api_create_transaction_allocation():
         data = request.json
         airtable = Airtable()
 
-        record = {}
-
-        # Transaction is required
-        if data.get("transaction_id"):
-            record["Transaction"] = [data["transaction_id"]]
-
-        # Project and Client are optional linked records
-        if data.get("project_id"):
-            record["Project"] = [data["project_id"]]
-        if data.get("client_id"):
-            record["Client"] = [data["client_id"]]
-
-        # Category is optional text
-        if data.get("category"):
-            record["Category"] = data["category"]
-
-        # Percentage is required
-        record["Percentage"] = float(data.get("percentage", 100))
+        record = {
+            "transaction_id": data.get("transaction_id") or "",
+            "project_id": data.get("project_id") or "",
+            "client_name": data.get("client_id") or "",
+            "category": data.get("category") or "",
+            "percentage": float(data.get("percentage", 100))
+        }
 
         result = airtable.create("Transaction Allocations", record)
         return jsonify({"ok": True, "id": result.get("id")})
@@ -1753,11 +1722,13 @@ def api_update_transaction_allocation(allocation_id):
 
         record = {}
         if "project_id" in data:
-            record["Project"] = [data["project_id"]] if data["project_id"] else []
+            record["project_id"] = data["project_id"] or ""
         if "client_id" in data:
-            record["Client"] = [data["client_id"]] if data["client_id"] else []
+            record["client_name"] = data["client_id"] or ""
+        if "category" in data:
+            record["category"] = data["category"] or ""
         if "percentage" in data:
-            record["Percentage"] = float(data["percentage"])
+            record["percentage"] = float(data["percentage"])
 
         airtable.update("Transaction Allocations", allocation_id, record)
         return jsonify({"ok": True})
