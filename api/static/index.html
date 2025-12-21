@@ -1088,6 +1088,20 @@
                         <input type="text" id="tx-alloc-desc-input" style="width:100%;font-weight:600;" onchange="saveTxDescription()">
                     </div>
                     <span class="text-muted">Monto: </span><span id="tx-alloc-amount">-</span>
+                    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <span class="text-muted">IVA:</span>
+                            <select id="tx-alloc-vat-rate" onchange="updateVatFromRate()" style="width:120px;">
+                                <option value="0">Sin IVA</option>
+                                <option value="21">21% (General)</option>
+                                <option value="10">10% (Reducido)</option>
+                                <option value="4">4% (Super reducido)</option>
+                            </select>
+                            <span class="text-muted">=</span>
+                            <span id="tx-alloc-vat-amount" style="font-weight:600;">€0.00</span>
+                            <span class="text-muted" style="font-size:11px;">(Base: <span id="tx-alloc-base-amount">€0.00</span>)</span>
+                        </div>
+                    </div>
                 </div>
                 <div id="tx-alloc-list" style="margin-bottom:16px;">
                     <!-- Allocations will be rendered here -->
@@ -3258,10 +3272,87 @@
             document.getElementById('tx-alloc-client').value = '';
             document.getElementById('tx-alloc-pct').value = '100';
 
+            // Set VAT info
+            var vatAmount = parseFloat(tx.vat_amount) || 0;
+            var amount = Math.abs(parseFloat(tx.amount) || 0);
+
+            // Try to determine VAT rate from existing VAT amount
+            // Formula: vat_amount = amount × rate / (100 + rate)
+            // Therefore: rate = (vat_amount × 100) / (amount - vat_amount)
+            var vatRate = 0;
+            if (vatAmount > 0 && amount > vatAmount) {
+                var base = amount - vatAmount;
+                var calculatedRate = (vatAmount * 100) / base;
+                // Round to nearest common rate
+                if (calculatedRate >= 19 && calculatedRate <= 23) vatRate = 21;
+                else if (calculatedRate >= 8 && calculatedRate <= 12) vatRate = 10;
+                else if (calculatedRate >= 3 && calculatedRate <= 5) vatRate = 4;
+            }
+
+            document.getElementById('tx-alloc-vat-rate').value = vatRate;
+            updateVatDisplay(amount, vatRate, vatAmount);
+
             // Render current allocations
             renderTxAllocations();
 
             openModal('tx-allocation');
+        }
+
+        function updateVatDisplay(amount, vatRate, existingVat) {
+            // Calculate VAT and base from rate
+            // amount = base + vat, so base = amount / (1 + rate/100) = amount × 100 / (100 + rate)
+            var vatAmount, base;
+            if (vatRate > 0) {
+                base = amount * 100 / (100 + vatRate);
+                vatAmount = amount - base;
+            } else if (existingVat > 0) {
+                vatAmount = existingVat;
+                base = amount - vatAmount;
+            } else {
+                vatAmount = 0;
+                base = amount;
+            }
+
+            document.getElementById('tx-alloc-vat-amount').textContent = '€' + vatAmount.toFixed(2);
+            document.getElementById('tx-alloc-base-amount').textContent = '€' + base.toFixed(2);
+        }
+
+        function updateVatFromRate() {
+            if (!currentAllocTxId) return;
+
+            var tx = transactions.find(function(t) { return t.id === currentAllocTxId; });
+            if (!tx) return;
+
+            var vatRate = parseFloat(document.getElementById('tx-alloc-vat-rate').value) || 0;
+            var amount = Math.abs(parseFloat(tx.amount) || 0);
+
+            // Calculate VAT: amount includes VAT, so VAT = amount × rate / (100 + rate)
+            var vatAmount = 0;
+            if (vatRate > 0) {
+                vatAmount = amount * vatRate / (100 + vatRate);
+            }
+
+            updateVatDisplay(amount, vatRate, 0);
+
+            // Save to Airtable
+            fetch('/api/transaction/' + currentAllocTxId, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    vat_rate: vatRate,
+                    amount: tx.amount  // Pass amount for calculation
+                })
+            }).then(function(r) { return r.json(); }).then(function(result) {
+                if (result.error) {
+                    alert('Error guardando IVA: ' + result.error);
+                } else {
+                    // Update local data
+                    tx.vat_amount = vatAmount;
+                    renderTransactions();
+                }
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
+            });
         }
 
         function saveTxDescription() {

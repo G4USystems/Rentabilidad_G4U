@@ -1666,6 +1666,19 @@ def api_update_transaction(tx_id):
             # Try multiple possible field names
             record["Counterparty Name"] = data["counterparty_name"]
             record["Description"] = data["counterparty_name"]  # Also update Description
+        if "vat_amount" in data:
+            # VAT Amount - user can edit this directly
+            record["VAT Amount"] = float(data["vat_amount"]) if data["vat_amount"] else 0
+        if "vat_rate" in data:
+            # VAT Rate (%) - calculate VAT from rate and amount
+            # Formula: amount includes VAT, so VAT = amount × rate / (100 + rate)
+            vat_rate = float(data.get("vat_rate", 0))
+            amount = float(data.get("amount", 0))
+            if vat_rate > 0 and amount > 0:
+                vat_amount = abs(amount) * vat_rate / (100 + vat_rate)
+                record["VAT Amount"] = round(vat_amount, 2)
+            elif vat_rate == 0:
+                record["VAT Amount"] = 0
 
         if record:
             airtable.update("Transactions", tx_id, record)
