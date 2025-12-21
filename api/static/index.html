@@ -1256,7 +1256,7 @@
 
         // Utilities
         function fmt(n) {
-            return new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR'}).format(n || 0);
+            return new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR', minimumFractionDigits:0, maximumFractionDigits:0}).format(n || 0);
         }
 
         function formatDate(d) {
@@ -2019,11 +2019,11 @@
 
             Object.keys(byCategory).sort().forEach(function(cat) {
                 var d = byCategory[cat];
-                rows.push([cat, d.income.toFixed(2), d.expense.toFixed(2), (d.income - d.expense).toFixed(2)]);
+                rows.push([cat, Math.round(d.income), Math.round(d.expense), Math.round(d.income - d.expense)]);
             });
 
             rows.push(['']);
-            rows.push(['TOTAL', income.toFixed(2), expenses.toFixed(2), (income - expenses).toFixed(2)]);
+            rows.push(['TOTAL', Math.round(income), Math.round(expenses), Math.round(income - expenses)]);
 
             if (format === 'csv') {
                 var csv = rows.map(function(r) { return r.join(','); }).join('\n');
