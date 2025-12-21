@@ -610,7 +610,6 @@
                 <!-- Tabs for Settings sections -->
                 <div class="tabs mb-4">
                     <div class="tab active" onclick="showSettingsTab('connections', event)">Estado</div>
-                    <div class="tab" onclick="showSettingsTab('unassigned', event)">Asignacion de Gastos</div>
                     <div class="tab" onclick="showSettingsTab('team', event)">Equipo</div>
                     <div class="tab" onclick="showSettingsTab('clients', event)">Clientes</div>
                     <div class="tab" onclick="showSettingsTab('projects', event)">Proyectos</div>
@@ -637,66 +636,6 @@
                                     <div style="margin-top:8px;"><strong>Saldo:</strong> <span id="qonto-balance" style="font-size:20px;font-weight:600;">-</span></div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Unassigned Expenses Section -->
-                <div id="settings-unassigned" class="settings-section hidden">
-                    <!-- Total de egresos sin asignar -->
-                    <div class="card" style="margin-bottom:20px;text-align:center;padding:24px;">
-                        <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px;">Total Egresos Sin Asignar</div>
-                        <div style="font-size:36px;font-weight:700;color:#ef4444;" id="unassigned-total">$0</div>
-                        <div style="font-size:13px;color:var(--text-muted);margin-top:8px;"><span id="unassigned-count">0</span> transacciones</div>
-                    </div>
-
-                    <!-- Distribucion por proyectos -->
-                    <div class="card">
-                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-                            <span>Distribuir entre Proyectos</span>
-                            <div style="display:flex;gap:8px;align-items:center;">
-                                <button class="btn btn-sm btn-outline" onclick="distributeEqual()">Repartir Igual</button>
-                                <button class="btn btn-sm btn-primary" onclick="applyDistribution()">Aplicar Distribucion</button>
-                            </div>
-                        </div>
-                        <div class="card-body" style="padding:16px;">
-                            <div style="margin-bottom:16px;padding:12px;background:#fef3c7;border-radius:8px;font-size:13px;color:#92400e;">
-                                Asigna el porcentaje que cada proyecto absorbe de los gastos indirectos. El total debe sumar 100%.
-                            </div>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th style="text-align:left;">Proyecto</th>
-                                        <th style="width:120px;text-align:center;">Porcentaje</th>
-                                        <th style="width:150px;text-align:right;">Monto Asignado</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="distribution-table">
-                                    <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr style="background:#f1f5f9;font-weight:600;">
-                                        <td>TOTAL</td>
-                                        <td style="text-align:center;" id="dist-total-pct">0%</td>
-                                        <td style="text-align:right;" id="dist-total-amount">$0</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Detalle de egresos -->
-                    <div class="card" style="margin-top:20px;">
-                        <div class="card-header">Detalle de Egresos Sin Asignar</div>
-                        <div class="card-body" style="padding:0;max-height:250px;overflow-y:auto;">
-                            <table>
-                                <thead>
-                                    <tr><th>Fecha</th><th>Descripcion</th><th style="text-align:right">Monto</th></tr>
-                                </thead>
-                                <tbody id="unassigned-table">
-                                    <tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
-                                </tbody>
-                            </table>
                         </div>
                     </div>
                 </div>
@@ -1193,41 +1132,59 @@
 
     <!-- Bulk Allocation Modal -->
     <div class="modal-overlay" id="modal-bulk-allocation">
-        <div class="modal" style="max-width:500px;">
+        <div class="modal" style="max-width:650px;">
             <div class="modal-header">
                 <h2>Asignar Multiples Transacciones</h2>
                 <span class="modal-close" onclick="closeModal('bulk-allocation')">&times;</span>
             </div>
             <div class="modal-body">
-                <div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;text-align:center;">
-                    <strong id="bulk-alloc-count">0</strong> transacciones seleccionadas
+                <div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div><strong id="bulk-alloc-count">0</strong> transacciones seleccionadas</div>
+                        <div class="text-muted">Total: <strong id="bulk-alloc-total-amount">$0</strong></div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Categoria</label>
-                    <select id="bulk-alloc-category" style="width:100%;">
-                        <option value="">Sin categoria</option>
-                    </select>
+                <div id="bulk-alloc-list" style="margin-bottom:16px;max-height:200px;overflow-y:auto;">
+                    <div class="text-muted" style="text-align:center;padding:16px;">Sin asignaciones. Agrega asignaciones abajo.</div>
                 </div>
-                <div class="form-group">
-                    <label>Proyecto</label>
-                    <select id="bulk-alloc-project" style="width:100%;">
-                        <option value="">Sin proyecto</option>
-                    </select>
+                <div id="bulk-alloc-total-row" style="margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:8px;display:flex;justify-content:space-between;">
+                    <span>Total asignado:</span>
+                    <strong id="bulk-alloc-total-pct" style="color:inherit;">0%</strong>
                 </div>
-                <div class="form-group">
-                    <label>Cliente</label>
-                    <select id="bulk-alloc-client" style="width:100%;">
-                        <option value="">Sin cliente</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Porcentaje</label>
-                    <input type="number" id="bulk-alloc-pct" min="0" max="100" value="100" style="width:100%;">
+                <div style="border-top:1px solid var(--border);padding-top:16px;">
+                    <h4 style="margin-bottom:12px;">Agregar asignacion</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Categoria</label>
+                            <select id="bulk-alloc-category" style="width:100%;">
+                                <option value="">Sin categoria</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Proyecto</label>
+                            <select id="bulk-alloc-project" style="width:100%;">
+                                <option value="">Sin proyecto</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cliente</label>
+                            <select id="bulk-alloc-client" style="width:100%;">
+                                <option value="">Sin cliente</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:0 0 100px;">
+                            <label>%</label>
+                            <input type="number" id="bulk-alloc-pct" min="0" max="100" value="100" style="width:100%;">
+                        </div>
+                    </div>
+                    <button class="btn btn-outline" onclick="addBulkAllocationRow()" style="width:100%;">+ Agregar Asignacion</button>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('bulk-allocation')">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveBulkAllocation()">Asignar a Todas</button>
+                <button class="btn btn-primary" onclick="applyBulkAllocations()">Aplicar a Todas</button>
             </div>
         </div>
     </div>
@@ -1295,7 +1252,6 @@
             if (event && event.target) event.target.classList.add('active');
             document.getElementById('settings-' + name).classList.remove('hidden');
             // Load tab-specific data
-            if (name === 'unassigned') renderUnassigned();
             if (name === 'team') applyColumnVisibility('team');
             if (name === 'clients') applyColumnVisibility('clients');
             if (name === 'projects') applyColumnVisibility('projects');
@@ -2890,197 +2846,6 @@
             }
         });
 
-        // ==================== Egresos Sin Asignar ====================
-        var unassignedExpenses = [];
-        var totalUnassignedAmount = 0;
-        var projectDistribution = {};
-
-        function renderUnassigned() {
-            // Solo egresos sin asignar
-            unassignedExpenses = transactions.filter(function(tx) {
-                if (tx.side === 'credit') return false; // No incluir ingresos
-                var hasAlloc = transactionAllocations.some(function(a) { return a.transaction_id === tx.id; });
-                return !hasAlloc;
-            });
-
-            // Calcular total
-            totalUnassignedAmount = unassignedExpenses.reduce(function(sum, tx) {
-                return sum + (parseFloat(tx.amount) || 0);
-            }, 0);
-
-            // Actualizar resumen
-            document.getElementById('unassigned-total').textContent = fmt(totalUnassignedAmount);
-            document.getElementById('unassigned-count').textContent = unassignedExpenses.length;
-
-            // Renderizar tabla de distribucion
-            renderDistributionTable();
-
-            // Renderizar lista de egresos
-            var html = '';
-            unassignedExpenses.forEach(function(tx) {
-                html += '<tr>';
-                html += '<td style="white-space:nowrap;">' + formatDate(tx.settled_at) + '</td>';
-                html += '<td>' + (tx.counterparty_name || tx.label || '-') + '</td>';
-                html += '<td style="text-align:right;font-weight:600;color:#ef4444;">' + fmt(tx.amount) + '</td>';
-                html += '</tr>';
-            });
-            document.getElementById('unassigned-table').innerHTML = html || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">No hay egresos sin asignar</td></tr>';
-        }
-
-        function renderDistributionTable() {
-            var activeProjects = projects.filter(function(p) { return p.status === 'Active'; });
-
-            // Inicializar distribucion
-            activeProjects.forEach(function(p) {
-                if (projectDistribution[p.id] === undefined) projectDistribution[p.id] = 0;
-            });
-
-            var html = '';
-            var totalPct = 0;
-            activeProjects.forEach(function(p) {
-                var pct = projectDistribution[p.id] || 0;
-                totalPct += pct;
-                var montoAsignado = totalUnassignedAmount * pct / 100;
-                html += '<tr>';
-                html += '<td>' + p.name + '</td>';
-                html += '<td style="text-align:center;"><input type="number" min="0" max="100" value="' + pct + '" onchange="updateDistribution(\'' + p.id + '\', this.value)" style="width:80px;text-align:center;padding:6px;border:1px solid #ddd;border-radius:4px;"></td>';
-                html += '<td style="text-align:right;color:#ef4444;font-weight:500;">' + fmt(montoAsignado) + '</td>';
-                html += '</tr>';
-            });
-
-            document.getElementById('distribution-table').innerHTML = html || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">No hay proyectos activos</td></tr>';
-
-            // Total
-            var pctColor = totalPct === 100 ? '#10b981' : (totalPct > 100 ? '#ef4444' : '#f59e0b');
-            document.getElementById('dist-total-pct').innerHTML = '<span style="color:' + pctColor + ';">' + totalPct + '%</span>';
-            document.getElementById('dist-total-amount').textContent = fmt(totalUnassignedAmount * totalPct / 100);
-        }
-
-        function updateDistribution(projectId, value) {
-            projectDistribution[projectId] = parseFloat(value) || 0;
-            renderDistributionTable();
-        }
-
-        function distributeEqual() {
-            var activeProjects = projects.filter(function(p) { return p.status === 'Active'; });
-            if (activeProjects.length === 0) return;
-
-            var equalPct = Math.floor(100 / activeProjects.length);
-            var remainder = 100 - (equalPct * activeProjects.length);
-
-            activeProjects.forEach(function(p, i) {
-                projectDistribution[p.id] = equalPct + (i === 0 ? remainder : 0);
-            });
-            renderDistributionTable();
-        }
-
-        function applyDistribution() {
-            var totalPct = Object.values(projectDistribution).reduce(function(sum, v) { return sum + v; }, 0);
-
-            if (totalPct === 0) {
-                alert('Asigna al menos un porcentaje');
-                return;
-            }
-
-            // Normalizar porcentajes para que sumen exactamente 100%
-            var normalizedDistribution = {};
-            var pids = Object.keys(projectDistribution).filter(function(pid) { return projectDistribution[pid] > 0; });
-            var runningTotal = 0;
-            pids.forEach(function(pid, i) {
-                if (i === pids.length - 1) {
-                    // Ultimo proyecto recibe el resto para asegurar suma = 100
-                    normalizedDistribution[pid] = Math.round((100 - runningTotal) * 100) / 100;
-                } else {
-                    var normalized = Math.round((projectDistribution[pid] / totalPct) * 10000) / 100;
-                    normalizedDistribution[pid] = normalized;
-                    runningTotal += normalized;
-                }
-            });
-
-            var numAllocations = Object.keys(normalizedDistribution).length;
-
-            if (totalPct !== 100) {
-                var msg = 'Los porcentajes suman ' + totalPct + '%. Se normalizaran a 100%:\n\n';
-                Object.keys(normalizedDistribution).forEach(function(pid) {
-                    var proj = projects.find(function(p) { return p.id === pid; });
-                    msg += '• ' + (proj ? proj.name : pid) + ': ' + normalizedDistribution[pid].toFixed(1) + '%\n';
-                });
-                msg += '\nContinuar?';
-                if (!confirm(msg)) {
-                    return;
-                }
-            }
-
-            if (!confirm('Se asignaran ' + unassignedExpenses.length + ' egresos a ' + numAllocations + ' proyectos. Continuar?')) {
-                return;
-            }
-
-            // Build list of allocations to create
-            var allocations = [];
-            unassignedExpenses.forEach(function(tx) {
-                Object.keys(normalizedDistribution).forEach(function(projectId) {
-                    var pct = normalizedDistribution[projectId];
-                    if (pct > 0) {
-                        allocations.push({
-                            transaction_id: tx.id,
-                            project_id: projectId,
-                            percentage: pct
-                        });
-                    }
-                });
-            });
-
-            // Process sequentially to avoid overwhelming the server
-            var completed = 0;
-            var errors = 0;
-            var statusEl = document.createElement('div');
-            statusEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:24px 32px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.2);z-index:10000;text-align:center;';
-            statusEl.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">Procesando asignaciones...</div><div id="alloc-progress">0 / ' + allocations.length + '</div>';
-            document.body.appendChild(statusEl);
-
-            function processNext(index) {
-                if (index >= allocations.length) {
-                    document.body.removeChild(statusEl);
-                    if (errors > 0) {
-                        alert('Completado con ' + errors + ' errores. ' + completed + ' asignaciones creadas.');
-                    } else {
-                        alert('Distribucion aplicada: ' + completed + ' asignaciones creadas');
-                    }
-                    projectDistribution = {};
-                    loadTransactionAllocations();
-                    return;
-                }
-
-                var alloc = allocations[index];
-                fetch('/api/transaction-allocation', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(alloc)
-                }).then(function(r) {
-                    if (!r.ok) throw new Error('HTTP ' + r.status);
-                    return r.json();
-                }).then(function(result) {
-                    if (result.error) {
-                        console.error('Allocation error:', result.error);
-                        errors++;
-                    } else {
-                        completed++;
-                    }
-                    document.getElementById('alloc-progress').textContent = (index + 1) + ' / ' + allocations.length;
-                    // Small delay to avoid Airtable rate limiting
-                    setTimeout(function() { processNext(index + 1); }, 100);
-                }).catch(function(e) {
-                    console.error('Fetch error:', e);
-                    errors++;
-                    document.getElementById('alloc-progress').textContent = (index + 1) + ' / ' + allocations.length;
-                    // Delay extra on error before retry next
-                    setTimeout(function() { processNext(index + 1); }, 500);
-                });
-            }
-
-            processNext(0);
-        }
-
         function saveClient() {
             var data = {
                 name: document.getElementById('new-client-name').value,
@@ -3446,8 +3211,17 @@
             }
         }
 
+        var bulkAllocations = []; // Temporary allocations for bulk modal
+
         function openBulkAllocation() {
             if (selectedTransactions.length === 0) return;
+
+            // Calculate total amount
+            var totalAmount = 0;
+            selectedTransactions.forEach(function(txId) {
+                var tx = transactions.find(function(t) { return t.id === txId; });
+                if (tx) totalAmount += Math.abs(parseFloat(tx.amount) || 0);
+            });
 
             // Populate selects
             var catHtml = '<option value="">Sin categoria</option>';
@@ -3468,48 +3242,168 @@
             });
             document.getElementById('bulk-alloc-client').innerHTML = clientHtml;
 
-            // Reset form
+            // Reset
+            bulkAllocations = [];
             document.getElementById('bulk-alloc-category').value = '';
             document.getElementById('bulk-alloc-project').value = '';
             document.getElementById('bulk-alloc-client').value = '';
             document.getElementById('bulk-alloc-pct').value = '100';
 
             document.getElementById('bulk-alloc-count').textContent = selectedTransactions.length;
+            document.getElementById('bulk-alloc-total-amount').textContent = fmt(totalAmount);
+            renderBulkAllocationList();
             openModal('bulk-allocation');
         }
 
-        function saveBulkAllocation() {
+        function renderBulkAllocationList() {
+            var container = document.getElementById('bulk-alloc-list');
+            if (bulkAllocations.length === 0) {
+                container.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">Sin asignaciones. Agrega asignaciones abajo.</div>';
+                document.getElementById('bulk-alloc-total-pct').textContent = '0%';
+                document.getElementById('bulk-alloc-total-pct').style.color = 'inherit';
+                return;
+            }
+
+            var html = '<table style="font-size:13px;width:100%;"><thead><tr><th>Categoria</th><th>Proyecto</th><th>Cliente</th><th style="text-align:right">%</th><th></th></tr></thead><tbody>';
+            var totalPct = 0;
+            bulkAllocations.forEach(function(a, idx) {
+                var catName = a.category || '-';
+                var projName = '-';
+                var clientName = '-';
+                if (a.project_id) {
+                    var proj = projects.find(function(p) { return p.id === a.project_id; });
+                    if (proj) projName = proj.name;
+                }
+                if (a.client_id) {
+                    var cli = clients.find(function(c) { return c.id === a.client_id; });
+                    if (cli) clientName = cli.name;
+                }
+                totalPct += a.percentage;
+                html += '<tr>';
+                html += '<td>' + catName + '</td>';
+                html += '<td>' + projName + '</td>';
+                html += '<td>' + clientName + '</td>';
+                html += '<td style="text-align:right">' + a.percentage + '%</td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="removeBulkAllocation(' + idx + ')" style="color:var(--danger);padding:2px 6px;">X</button></td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            document.getElementById('bulk-alloc-total-pct').textContent = Math.round(totalPct) + '%';
+            document.getElementById('bulk-alloc-total-pct').style.color = totalPct === 100 ? 'var(--success)' : (totalPct > 100 ? 'var(--danger)' : 'inherit');
+        }
+
+        function addBulkAllocationRow() {
             var cat = document.getElementById('bulk-alloc-category').value;
             var proj = document.getElementById('bulk-alloc-project').value;
             var cli = document.getElementById('bulk-alloc-client').value;
-            var pct = parseInt(document.getElementById('bulk-alloc-pct').value) || 100;
+            var pct = parseFloat(document.getElementById('bulk-alloc-pct').value) || 0;
 
             if (!cat && !proj && !cli) {
                 alert('Selecciona al menos una categoria, proyecto o cliente');
                 return;
             }
+            if (pct <= 0 || pct > 100) {
+                alert('El porcentaje debe estar entre 1 y 100');
+                return;
+            }
 
-            var promises = selectedTransactions.map(function(txId) {
-                return fetch('/api/transaction-allocation', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
+            bulkAllocations.push({
+                category: cat || null,
+                project_id: proj || null,
+                client_id: cli || null,
+                percentage: pct
+            });
+
+            // Reset form for next entry
+            document.getElementById('bulk-alloc-category').value = '';
+            document.getElementById('bulk-alloc-project').value = '';
+            document.getElementById('bulk-alloc-client').value = '';
+            var totalPct = bulkAllocations.reduce(function(sum, a) { return sum + a.percentage; }, 0);
+            document.getElementById('bulk-alloc-pct').value = Math.max(0, 100 - totalPct);
+
+            renderBulkAllocationList();
+        }
+
+        function removeBulkAllocation(idx) {
+            bulkAllocations.splice(idx, 1);
+            renderBulkAllocationList();
+        }
+
+        function applyBulkAllocations() {
+            if (bulkAllocations.length === 0) {
+                alert('Agrega al menos una asignacion');
+                return;
+            }
+
+            var totalPct = bulkAllocations.reduce(function(sum, a) { return sum + a.percentage; }, 0);
+            if (totalPct !== 100) {
+                if (!confirm('El total es ' + Math.round(totalPct) + '% (no 100%). Continuar de todos modos?')) {
+                    return;
+                }
+            }
+
+            // Build all allocations to create
+            var allAllocations = [];
+            selectedTransactions.forEach(function(txId) {
+                bulkAllocations.forEach(function(a) {
+                    allAllocations.push({
                         transaction_id: txId,
-                        category: cat || null,
-                        project_id: proj || null,
-                        client_id: cli || null,
-                        percentage: pct
-                    })
+                        category: a.category,
+                        project_id: a.project_id,
+                        client_id: a.client_id,
+                        percentage: a.percentage
+                    });
                 });
             });
 
-            Promise.all(promises).then(function() {
-                closeModal('bulk-allocation');
-                clearSelection();
-                loadTransactionAllocations();
-            }).catch(function(e) {
-                alert('Error: ' + e.message);
-            });
+            // Show progress
+            var statusEl = document.createElement('div');
+            statusEl.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:24px 32px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.2);z-index:10001;text-align:center;';
+            statusEl.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">Procesando asignaciones...</div><div id="bulk-progress">0 / ' + allAllocations.length + '</div>';
+            document.body.appendChild(statusEl);
+
+            var completed = 0;
+            var errors = 0;
+
+            function processNext(index) {
+                if (index >= allAllocations.length) {
+                    document.body.removeChild(statusEl);
+                    closeModal('bulk-allocation');
+                    if (errors > 0) {
+                        alert('Completado con ' + errors + ' errores. ' + completed + ' asignaciones creadas.');
+                    } else {
+                        alert('Asignaciones aplicadas: ' + completed + ' creadas');
+                    }
+                    clearSelection();
+                    loadTransactionAllocations();
+                    return;
+                }
+
+                var alloc = allAllocations[index];
+                fetch('/api/transaction-allocation', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(alloc)
+                }).then(function(r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                }).then(function(result) {
+                    if (result.error) {
+                        errors++;
+                    } else {
+                        completed++;
+                    }
+                    document.getElementById('bulk-progress').textContent = (index + 1) + ' / ' + allAllocations.length;
+                    setTimeout(function() { processNext(index + 1); }, 50);
+                }).catch(function(e) {
+                    errors++;
+                    document.getElementById('bulk-progress').textContent = (index + 1) + ' / ' + allAllocations.length;
+                    setTimeout(function() { processNext(index + 1); }, 200);
+                });
+            }
+
+            processNext(0);
         }
 
         function openTxAllocation(txId) {
