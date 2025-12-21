@@ -2052,22 +2052,19 @@
                         }
                     });
                 } else {
-                    // Use direct project_id/client_id assignment (100%)
-                    var pid = t.project_id || '_none';
-                    var cid = t.client_id || '_none';
-
-                    if (byProject[pid]) {
+                    // No allocations - goes to "Sin asignar"
+                    if (byProject['_none']) {
                         if (t.side === 'credit') {
-                            byProject[pid].income += amt;
+                            byProject['_none'].income += amt;
                         } else {
-                            byProject[pid].expense += amt;
+                            byProject['_none'].expense += amt;
                         }
                     }
-                    if (byClient[cid]) {
+                    if (byClient['_none']) {
                         if (t.side === 'credit') {
-                            byClient[cid].income += amt;
+                            byClient['_none'].income += amt;
                         } else {
-                            byClient[cid].expense += amt;
+                            byClient['_none'].expense += amt;
                         }
                     }
                 }
