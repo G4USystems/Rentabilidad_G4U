@@ -141,6 +141,14 @@ class Qonto:
 
         return transactions
 
+    def get_transaction_detail(self, transaction_id):
+        """Fetch detailed info for a single transaction."""
+        with httpx.Client(timeout=30) as client:
+            r = client.get(f"{self.base_url}/transactions/{transaction_id}", headers=self.headers)
+            if r.status_code == 200:
+                return r.json().get("transaction", {})
+        return None
+
     def get_labels(self):
         """Fetch all labels from Qonto."""
         labels = []
@@ -680,6 +688,18 @@ def api_data():
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/api/qonto/transaction-detail/<tx_id>")
+def api_qonto_transaction_detail(tx_id):
+    """Get full detail of a single transaction to see all available fields."""
+    try:
+        qonto = Qonto()
+        detail = qonto.get_transaction_detail(tx_id)
+        if detail:
+            return jsonify({"transaction": detail, "all_keys": list(detail.keys())})
+        return jsonify({"error": "Transaction not found"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/qonto/debug-vat")
 def api_debug_vat():
