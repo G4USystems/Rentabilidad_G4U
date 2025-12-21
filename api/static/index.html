@@ -2982,16 +2982,27 @@
                 return;
             }
 
+            // Normalizar porcentajes para que sumen 100%
+            var normalizedDistribution = {};
+            Object.keys(projectDistribution).forEach(function(pid) {
+                if (projectDistribution[pid] > 0) {
+                    normalizedDistribution[pid] = (projectDistribution[pid] / totalPct) * 100;
+                }
+            });
+
+            var numAllocations = Object.keys(normalizedDistribution).length;
+
             if (totalPct !== 100) {
-                if (!confirm('El total es ' + totalPct + '% (no 100%). Continuar de todos modos?')) {
+                var msg = 'Los porcentajes suman ' + totalPct + '%. Se normalizaran a 100%:\n\n';
+                Object.keys(normalizedDistribution).forEach(function(pid) {
+                    var proj = projects.find(function(p) { return p.id === pid; });
+                    msg += '• ' + (proj ? proj.name : pid) + ': ' + normalizedDistribution[pid].toFixed(1) + '%\n';
+                });
+                msg += '\nContinuar?';
+                if (!confirm(msg)) {
                     return;
                 }
             }
-
-            var numAllocations = 0;
-            Object.keys(projectDistribution).forEach(function(pid) {
-                if (projectDistribution[pid] > 0) numAllocations++;
-            });
 
             if (!confirm('Se asignaran ' + unassignedExpenses.length + ' egresos a ' + numAllocations + ' proyectos. Continuar?')) {
                 return;
@@ -3000,8 +3011,8 @@
             // Build list of allocations to create
             var allocations = [];
             unassignedExpenses.forEach(function(tx) {
-                Object.keys(projectDistribution).forEach(function(projectId) {
-                    var pct = projectDistribution[projectId];
+                Object.keys(normalizedDistribution).forEach(function(projectId) {
+                    var pct = normalizedDistribution[projectId];
                     if (pct > 0) {
                         allocations.push({
                             transaction_id: tx.id,
