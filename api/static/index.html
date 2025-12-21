@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>G4U - Dashboard Financiero</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --purple: #8b5cf6;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+        .app { display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: #0f172a; position: fixed; height: 100vh; overflow-y: auto; }
+        .main { flex: 1; margin-left: 260px; padding: 32px; }
+
+        .logo { padding: 24px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #1e293b; }
+        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #60a5fa, #3b82f6); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 14px; }
+        .logo-text { color: white; font-size: 18px; font-weight: 600; }
+        .logo-sub { color: #64748b; font-size: 12px; }
+
+        .nav-section { padding: 20px 20px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: #94a3b8; cursor: pointer; transition: all 0.15s; margin: 2px 8px; border-radius: 8px; font-weight: 500; }
+        .nav-item:hover { background: #1e293b; color: #e2e8f0; }
+        .nav-item.active { background: var(--primary); color: white; }
+        .nav-item svg { width: 20px; height: 20px; margin-right: 12px; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header h1 { font-size: 28px; font-weight: 700; color: #0f172a; }
+        .header-sub { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+        .header-actions { display: flex; gap: 12px; align-items: center; }
+
+        .period-selector { display: flex; background: #f1f5f9; border-radius: 10px; padding: 4px; }
+        .period-btn { padding: 8px 16px; border: none; background: transparent; color: var(--text-muted); font-weight: 500; cursor: pointer; border-radius: 6px; font-size: 13px; }
+        .period-btn.active { background: white; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        .card { background: var(--card); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .card-header { padding: 20px 24px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .card-body { padding: 24px; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+        .kpi { background: var(--card); border-radius: 16px; padding: 20px 24px; border: 1px solid var(--border); }
+        .kpi-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+        .kpi-label { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; }
+        .kpi-value { font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .kpi-value.positive { color: var(--success); }
+        .kpi-value.negative { color: var(--danger); }
+
+        .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px; }
+        .dashboard-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+        .donut-chart { width: 180px; height: 180px; margin: 0 auto 16px; }
+        .chart-legend { display: flex; flex-direction: column; gap: 8px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .legend-color { width: 12px; height: 12px; border-radius: 3px; }
+        .legend-value { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+
+        .ranking-list { display: flex; flex-direction: column; gap: 12px; }
+        .ranking-item { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg); border-radius: 10px; }
+        .ranking-pos { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+        .ranking-pos.gold { background: #fef3c7; color: #92400e; }
+        .ranking-pos.silver { background: #f1f5f9; color: #475569; }
+        .ranking-pos.bronze { background: #fed7aa; color: #9a3412; }
+        .ranking-name { flex: 1; font-weight: 500; }
+        .ranking-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .summary-item { text-align: center; padding: 16px; }
+        .summary-value { font-size: 24px; font-weight: 700; color: var(--text); }
+        .summary-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+        .tabs { display: flex; gap: 4px; background: var(--bg); padding: 4px; border-radius: 10px; margin-bottom: 24px; width: fit-content; }
+        .tab { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 500; color: var(--text-muted); transition: all 0.15s; border: none; background: transparent; }
+        .tab:hover { color: var(--text); }
+        .tab.active { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 14px 20px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: var(--bg); border-bottom: 1px solid var(--border); }
+        td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; }
+        tr:hover { background: #fafafa; }
+        .amount { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 14px; }
+        .amount.positive { color: var(--success); }
+        .amount.negative { color: var(--danger); }
+
+        .tag { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .tag.ingreso { background: #dcfce7; color: #166534; }
+        .tag.egreso { background: #fee2e2; color: #991b1b; }
+
+        .btn { padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+        .profit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .profit-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+        .profit-header { padding: 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: flex-start; }
+        .profit-name { font-weight: 600; font-size: 16px; }
+        .profit-client { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+        .profit-margin { padding: 8px 16px; border-radius: 20px; text-align: center; }
+        .profit-margin-value { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .profit-margin-label { font-size: 10px; font-weight: 600; }
+        .profit-body { padding: 20px; }
+        .profit-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+        .profit-metric { padding: 12px; background: var(--bg); border-radius: 8px; text-align: center; }
+        .profit-metric-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+        .profit-metric-value { font-size: 14px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+        .profit-bar { height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+        .profit-bar-fill { height: 100%; border-radius: 3px; }
+
+        .view { display: none; }
+        .view.active { display: block; }
+
+        .status { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .status.ok { background: #dcfce7; color: #166534; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--card); border-radius: 16px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { font-size: 18px; font-weight: 600; }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted); }
+        .modal-body { padding: 24px; }
+        .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+        .form-group input, .form-group select { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        .settings-section { display: none; }
+        .settings-section.active { display: block; }
+        .settings-card { background: var(--card); border-radius: 16px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .settings-card-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .settings-card-body { padding: 24px; }
+
+        .org-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+        .org-stat { padding: 16px; background: var(--bg); border-radius: 12px; }
+        .org-stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .org-stat-value { font-size: 18px; font-weight: 600; }
+
+        @media (max-width: 1280px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } .dashboard-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 1024px) { .sidebar { display: none; } .main { margin-left: 0; } .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 640px) { .kpi-grid { grid-template-columns: 1fr; } .form-row { grid-template-columns: 1fr; } }
+
+        .hidden { display: none !important; }
+        .text-muted { color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">G4U</div>
+                <div>
+                    <div class="logo-text">Rentabilidad</div>
+                    <div class="logo-sub">Financial Dashboard</div>
+                </div>
+            </div>
+            <nav>
+                <div class="nav-section">Menu</div>
+                <div class="nav-item active" data-view="dashboard">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Dashboard
+                </div>
+                <div class="nav-item" data-view="pl">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Estado P&L
+                </div>
+                <div class="nav-item" data-view="transactions">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    Transacciones
+                </div>
+                <div class="nav-section">Configuracion</div>
+                <div class="nav-item" data-view="settings">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Ajustes
+                </div>
+            </nav>
+            <div style="padding: 16px; margin-top: auto; border-top: 1px solid #1e293b;">
+                <div id="sync-status" style="display: flex; align-items: center; gap: 8px; padding: 10px; background: rgba(30,41,59,0.5); border-radius: 8px;">
+                    <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></span>
+                    <span style="font-size: 12px; color: #94a3b8;">Sincronizado</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <!-- Dashboard -->
+            <div id="view-dashboard" class="view active">
+                <div class="header">
+                    <div>
+                        <h1>Dashboard Ejecutivo</h1>
+                        <div class="header-sub">Vista general del estado del negocio</div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="period-selector">
+                            <button class="period-btn" data-period="week">7 dias</button>
+                            <button class="period-btn active" data-period="month">30 dias</button>
+                            <button class="period-btn" data-period="quarter">90 dias</button>
+                            <button class="period-btn" data-period="year">1 ano</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi">
+                        <div class="kpi-icon" style="background: #ecfdf5;"><svg width="20" height="20" fill="none" stroke="#10b981" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+                        <div class="kpi-label">Ingresos</div>
+                        <div class="kpi-value positive" id="kpi-income">-</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-icon" style="background: #fef2f2;"><svg width="20" height="20" fill="none" stroke="#ef4444" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg></div>
+                        <div class="kpi-label">Gastos</div>
+                        <div class="kpi-value negative" id="kpi-expenses">-</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-icon" style="background: #eff6ff;"><svg width="20" height="20" fill="none" stroke="#3b82f6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>
+                        <div class="kpi-label">Resultado Neto</div>
+                        <div class="kpi-value" id="kpi-net">-</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-icon" style="background: #f5f3ff;"><svg width="20" height="20" fill="none" stroke="#8b5cf6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg></div>
+                        <div class="kpi-label">Margen</div>
+                        <div class="kpi-value" id="kpi-margin">-</div>
+                    </div>
+                    <div class="kpi">
+                        <div class="kpi-icon" style="background: #fef3c7;"><svg width="20" height="20" fill="none" stroke="#f59e0b" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg></div>
+                        <div class="kpi-label">Saldo Actual</div>
+                        <div class="kpi-value" id="kpi-balance">-</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="dashboard-charts">
+                        <div class="card">
+                            <div class="card-header">Distribucion de Gastos</div>
+                            <div class="card-body">
+                                <svg class="donut-chart" id="expense-chart" viewBox="0 0 42 42"></svg>
+                                <div class="chart-legend" id="expense-legend"></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">Distribucion de Ingresos</div>
+                            <div class="card-body">
+                                <svg class="donut-chart" id="income-chart" viewBox="0 0 42 42"></svg>
+                                <div class="chart-legend" id="income-legend"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">Top Rankings</div>
+                        <div class="card-body">
+                            <div style="margin-bottom: 20px;">
+                                <div style="font-weight: 600; margin-bottom: 12px; color: var(--success);">Top Ingresos</div>
+                                <div class="ranking-list" id="top-income"></div>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <div style="font-weight: 600; margin-bottom: 12px; color: var(--danger);">Top Gastos</div>
+                                <div class="ranking-list" id="top-expenses"></div>
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 12px; color: var(--primary);">Top Clientes</div>
+                                <div class="ranking-list" id="top-clients"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Resumen General</div>
+                    <div class="card-body">
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <div class="summary-value" id="summary-clients">0</div>
+                                <div class="summary-label">Clientes</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value" id="summary-projects">0</div>
+                                <div class="summary-label">Proyectos</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value" id="summary-transactions">0</div>
+                                <div class="summary-label">Transacciones</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value" id="summary-categories">0</div>
+                                <div class="summary-label">Categorias</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- P&L View -->
+            <div id="view-pl" class="view">
+                <div class="header">
+                    <div>
+                        <h1>Estado P&L</h1>
+                        <div class="header-sub">Analisis de rentabilidad</div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="period-selector">
+                            <button class="period-btn" data-period="week">7 dias</button>
+                            <button class="period-btn active" data-period="month">30 dias</button>
+                            <button class="period-btn" data-period="quarter">90 dias</button>
+                            <button class="period-btn" data-period="year">1 ano</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" data-pl-tab="global">Global</button>
+                    <button class="tab" data-pl-tab="projects">Por Proyecto</button>
+                    <button class="tab" data-pl-tab="clients">Por Cliente</button>
+                </div>
+
+                <div id="pl-global" class="pl-section">
+                    <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+                        <div class="kpi">
+                            <div class="kpi-label">Ingresos Totales</div>
+                            <div class="kpi-value positive" id="pl-income">-</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="kpi-label">Gastos Totales</div>
+                            <div class="kpi-value negative" id="pl-expenses">-</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="kpi-label">Resultado Neto</div>
+                            <div class="kpi-value" id="pl-net">-</div>
+                        </div>
+                        <div class="kpi">
+                            <div class="kpi-label">Margen Neto</div>
+                            <div class="kpi-value" id="pl-margin">-</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">Estado de Resultados</div>
+                        <div class="card-body" style="padding: 0;" id="pl-statement"></div>
+                    </div>
+                </div>
+
+                <div id="pl-projects" class="pl-section hidden">
+                    <div class="profit-grid" id="projects-profit-grid"></div>
+                </div>
+
+                <div id="pl-clients" class="pl-section hidden">
+                    <div class="profit-grid" id="clients-profit-grid"></div>
+                </div>
+            </div>
+
+            <!-- Transactions View -->
+            <div id="view-transactions" class="view">
+                <div class="header">
+                    <div>
+                        <h1>Transacciones</h1>
+                        <div class="header-sub">Historial de movimientos</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+                    <select id="tx-filter-type" onchange="renderTransactions()" style="padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; min-width: 120px;">
+                        <option value="">Todos los tipos</option>
+                        <option value="credit">Ingresos</option>
+                        <option value="debit">Gastos</option>
+                    </select>
+                    <select id="tx-filter-category" onchange="renderTransactions()" style="padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; min-width: 150px;">
+                        <option value="">Todas las categorias</option>
+                    </select>
+                    <input type="text" id="tx-search" placeholder="Buscar..." onkeyup="renderTransactions()" style="padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; min-width: 200px;">
+                </div>
+
+                <div class="card">
+                    <div class="card-body" style="padding: 0; overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Descripcion</th>
+                                    <th>Categoria</th>
+                                    <th>Proyecto</th>
+                                    <th>Cliente</th>
+                                    <th>IVA</th>
+                                    <th style="text-align: right;">Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-table">
+                                <tr><td colspan="8" class="text-muted" style="text-align: center; padding: 40px;">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="view-settings" class="view">
+                <div class="header">
+                    <div>
+                        <h1>Ajustes</h1>
+                        <div class="header-sub">Configuracion del sistema</div>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" data-settings-tab="connections">Conexiones</button>
+                    <button class="tab" data-settings-tab="team">Equipo</button>
+                    <button class="tab" data-settings-tab="clients">Clientes</button>
+                    <button class="tab" data-settings-tab="projects">Proyectos</button>
+                    <button class="tab" data-settings-tab="categories">Categorias</button>
+                </div>
+
+                <div id="settings-connections" class="settings-section active">
+                    <div class="org-info">
+                        <div class="org-stat">
+                            <div class="org-stat-label">Organizacion</div>
+                            <div class="org-stat-value" id="org-name">-</div>
+                        </div>
+                        <div class="org-stat">
+                            <div class="org-stat-label">Saldo Disponible</div>
+                            <div class="org-stat-value" id="org-balance">-</div>
+                        </div>
+                        <div class="org-stat">
+                            <div class="org-stat-label">Estado</div>
+                            <div class="org-stat-value"><span class="status ok">Conectado</span></div>
+                        </div>
+                    </div>
+                    <div class="settings-card">
+                        <div class="settings-card-header">Estado de Conexiones</div>
+                        <div class="settings-card-body">
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                                <div style="padding: 16px; background: var(--bg); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 40px; height: 40px; background: #e0f2fe; border-radius: 10px; display: flex; align-items: center; justify-content: center;">Q</div>
+                                    <div>
+                                        <div style="font-weight: 600;">Qonto</div>
+                                        <div style="font-size: 12px; color: var(--text-muted);">Conectado</div>
+                                    </div>
+                                </div>
+                                <div style="padding: 16px; background: var(--bg); border-radius: 12px; display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 40px; height: 40px; background: #fef3c7; border-radius: 10px; display: flex; align-items: center; justify-content: center;">A</div>
+                                    <div>
+                                        <div style="font-weight: 600;">Airtable</div>
+                                        <div style="font-size: 12px; color: var(--text-muted);">Conectado</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="settings-team" class="settings-section">
+                    <div class="settings-card">
+                        <div class="settings-card-header">Miembros del Equipo<button class="btn btn-sm btn-primary" onclick="openModal('add-member')">+ Nuevo</button></div>
+                        <div class="settings-card-body" style="padding: 0;">
+                            <table><thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th style="width: 100px;"></th></tr></thead><tbody id="team-members-table"><tr><td colspan="4" class="text-muted" style="text-align: center; padding: 20px;">Cargando...</td></tr></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="settings-clients" class="settings-section">
+                    <div class="settings-card">
+                        <div class="settings-card-header">Clientes<button class="btn btn-sm btn-primary" onclick="openModal('add-client')">+ Nuevo</button></div>
+                        <div class="settings-card-body" style="padding: 0;">
+                            <table><thead><tr><th>Nombre</th><th>Contacto</th><th>Email</th><th style="width: 100px;"></th></tr></thead><tbody id="clients-table"><tr><td colspan="4" class="text-muted" style="text-align: center; padding: 20px;">Cargando...</td></tr></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="settings-projects" class="settings-section">
+                    <div class="settings-card">
+                        <div class="settings-card-header">Proyectos<button class="btn btn-sm btn-primary" onclick="openModal('add-project')">+ Nuevo</button></div>
+                        <div class="settings-card-body" style="padding: 0;">
+                            <table><thead><tr><th>Nombre</th><th>Cliente</th><th>Estado</th><th style="width: 100px;"></th></tr></thead><tbody id="projects-table"><tr><td colspan="4" class="text-muted" style="text-align: center; padding: 20px;">Cargando...</td></tr></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="settings-categories" class="settings-section">
+                    <div class="settings-card">
+                        <div class="settings-card-header">Categorias<button class="btn btn-sm btn-primary" onclick="openModal('add-category')">+ Nueva</button></div>
+                        <div class="settings-card-body" style="padding: 0;">
+                            <table><thead><tr><th>Nombre</th><th>Tipo</th><th style="width: 100px;"></th></tr></thead><tbody id="categories-table"><tr><td colspan="3" class="text-muted" style="text-align: center; padding: 20px;">Cargando...</td></tr></tbody></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="modal-add-client"><div class="modal"><div class="modal-header"><h3>Nuevo Cliente</h3><button class="modal-close" onclick="closeModal('add-client')">&times;</button></div><div class="modal-body"><div class="form-group"><label>Nombre</label><input type="text" id="new-client-name"></div><div class="form-group"><label>Contacto</label><input type="text" id="new-client-contact"></div><div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="new-client-email"></div><div class="form-group"><label>Telefono</label><input type="text" id="new-client-phone"></div></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('add-client')">Cancelar</button><button class="btn btn-primary" onclick="saveClient()">Guardar</button></div></div></div>
+    <div class="modal-overlay" id="modal-add-project"><div class="modal"><div class="modal-header"><h3>Nuevo Proyecto</h3><button class="modal-close" onclick="closeModal('add-project')">&times;</button></div><div class="modal-body"><div class="form-group"><label>Nombre</label><input type="text" id="new-project-name"></div><div class="form-group"><label>Cliente</label><select id="new-project-client"></select></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('add-project')">Cancelar</button><button class="btn btn-primary" onclick="saveProject()">Guardar</button></div></div></div>
+    <div class="modal-overlay" id="modal-add-category"><div class="modal"><div class="modal-header"><h3>Nueva Categoria</h3><button class="modal-close" onclick="closeModal('add-category')">&times;</button></div><div class="modal-body"><div class="form-group"><label>Nombre</label><input type="text" id="new-category-name"></div><div class="form-group"><label>Tipo</label><select id="new-category-type"><option value="Expense">Gasto</option><option value="Income">Ingreso</option></select></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('add-category')">Cancelar</button><button class="btn btn-primary" onclick="saveCategory()">Guardar</button></div></div></div>
+    <div class="modal-overlay" id="modal-add-member"><div class="modal"><div class="modal-header"><h3>Nuevo Miembro</h3><button class="modal-close" onclick="closeModal('add-member')">&times;</button></div><div class="modal-body"><div class="form-group"><label>Nombre</label><input type="text" id="new-member-name"></div><div class="form-group"><label>Email</label><input type="email" id="new-member-email"></div><div class="form-group"><label>Rol</label><input type="text" id="new-member-role"></div></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('add-member')">Cancelar</button><button class="btn btn-primary" onclick="saveMember()">Guardar</button></div></div></div>
+
+    <script>
+        var transactions = [], categories = [], projects = [], clients = [], teamMembers = [], currentPeriod = 'month';
+
+        function fmt(n) { return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n || 0); }
+        function formatDate(d) { if (!d) return '-'; return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }); }
+        function getDateRange(period) { var end = new Date(), start = new Date(); switch(period) { case 'week': start.setDate(end.getDate() - 7); break; case 'month': start.setDate(end.getDate() - 30); break; case 'quarter': start.setDate(end.getDate() - 90); break; case 'year': start.setFullYear(end.getFullYear() - 1); break; } return { start: start, end: end }; }
+        function filterByPeriod(items, period) { var range = getDateRange(period); return items.filter(function(t) { var d = new Date(t.settled_at || t.transaction_date); return d >= range.start && d <= range.end; }); }
+
+        document.querySelectorAll('.nav-item').forEach(function(item) { item.addEventListener('click', function() { var view = this.getAttribute('data-view'); if (view) showView(view); }); });
+        function showView(name) { document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); }); document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); }); var navItem = document.querySelector('.nav-item[data-view="' + name + '"]'); if (navItem) navItem.classList.add('active'); document.getElementById('view-' + name).classList.add('active'); }
+
+        document.querySelectorAll('.period-btn').forEach(function(btn) { btn.addEventListener('click', function() { this.parentElement.querySelectorAll('.period-btn').forEach(function(b) { b.classList.remove('active'); }); this.classList.add('active'); currentPeriod = this.getAttribute('data-period'); renderAll(); }); });
+        document.querySelectorAll('[data-pl-tab]').forEach(function(tab) { tab.addEventListener('click', function() { document.querySelectorAll('[data-pl-tab]').forEach(function(t) { t.classList.remove('active'); }); this.classList.add('active'); document.querySelectorAll('.pl-section').forEach(function(s) { s.classList.add('hidden'); }); document.getElementById('pl-' + this.getAttribute('data-pl-tab')).classList.remove('hidden'); }); });
+        document.querySelectorAll('[data-settings-tab]').forEach(function(tab) { tab.addEventListener('click', function() { document.querySelectorAll('[data-settings-tab]').forEach(function(t) { t.classList.remove('active'); }); this.classList.add('active'); document.querySelectorAll('.settings-section').forEach(function(s) { s.classList.remove('active'); }); document.getElementById('settings-' + this.getAttribute('data-settings-tab')).classList.add('active'); }); });
+
+        function openModal(name) { document.getElementById('modal-' + name).classList.add('active'); }
+        function closeModal(name) { document.getElementById('modal-' + name).classList.remove('active'); }
+
+        function updateSyncStatus(status, text) { var el = document.getElementById('sync-status'); var colors = { ok: '#10b981', syncing: '#3b82f6', error: '#ef4444' }; el.innerHTML = '<span style="width:8px;height:8px;background:' + colors[status] + ';border-radius:50%;"></span><span style="font-size:12px;color:#94a3b8;">' + text + '</span>'; }
+
+        function loadData() { updateSyncStatus('syncing', 'Sincronizando...'); fetch('/api/data').then(function(r) { return r.json(); }).then(function(data) { if (data.error) { updateSyncStatus('error', 'Error'); return; } transactions = data.transactions || []; categories = data.categories || []; projects = data.projects || []; clients = data.clients || []; teamMembers = data.team_members || []; transactions.sort(function(a, b) { return (b.settled_at || '').localeCompare(a.settled_at || ''); }); renderAll(); loadOrgInfo(); updateSyncStatus('ok', 'Sincronizado'); }).catch(function(e) { updateSyncStatus('error', 'Error'); }); }
+
+        function loadOrgInfo() { fetch('/api/qonto/organization').then(function(r) { return r.json(); }).then(function(data) { if (data.organization) document.getElementById('org-name').textContent = data.organization.legal_name || '-'; if (data.balance !== undefined) { document.getElementById('org-balance').textContent = fmt(data.balance); document.getElementById('kpi-balance').textContent = fmt(data.balance); } }).catch(function(e) {}); }
+
+        function renderAll() { renderDashboard(); renderPL(); renderTransactions(); renderSettings(); }
+
+        function renderDashboard() { var filtered = filterByPeriod(transactions, currentPeriod); var income = 0, expenses = 0; filtered.forEach(function(t) { var amt = Math.abs(parseFloat(t.amount) || 0); if (t.side === 'credit') income += amt; else expenses += amt; }); var net = income - expenses; var margin = income > 0 ? (net / income * 100) : 0; document.getElementById('kpi-income').textContent = fmt(income); document.getElementById('kpi-expenses').textContent = fmt(expenses); document.getElementById('kpi-net').textContent = fmt(net); document.getElementById('kpi-net').className = 'kpi-value ' + (net >= 0 ? 'positive' : 'negative'); document.getElementById('kpi-margin').textContent = margin.toFixed(1) + '%'; document.getElementById('kpi-margin').className = 'kpi-value ' + (margin >= 20 ? 'positive' : margin >= 0 ? '' : 'negative'); document.getElementById('summary-clients').textContent = clients.length; document.getElementById('summary-projects').textContent = projects.length; document.getElementById('summary-transactions').textContent = filtered.length; document.getElementById('summary-categories').textContent = categories.length; renderCharts(filtered); renderRankings(filtered); }
+
+        function renderCharts(filtered) { var expByCat = {}, incByCat = {}; filtered.forEach(function(t) { var cat = t.category || 'Sin categoria'; var amt = Math.abs(parseFloat(t.amount) || 0); if (t.side === 'debit') expByCat[cat] = (expByCat[cat] || 0) + amt; else incByCat[cat] = (incByCat[cat] || 0) + amt; }); var expData = Object.entries(expByCat).sort(function(a,b) { return b[1]-a[1]; }).slice(0,5); var incData = Object.entries(incByCat).sort(function(a,b) { return b[1]-a[1]; }).slice(0,5); var expTotal = expData.reduce(function(s,e) { return s+e[1]; }, 0); var incTotal = incData.reduce(function(s,e) { return s+e[1]; }, 0); renderDonut('expense-chart', 'expense-legend', expData, expTotal, ['#ef4444','#f97316','#eab308','#84cc16','#06b6d4']); renderDonut('income-chart', 'income-legend', incData, incTotal, ['#10b981','#14b8a6','#06b6d4','#0ea5e9','#6366f1']); }
+
+        function renderDonut(chartId, legendId, data, total, colors) { var svg = document.getElementById(chartId); var legend = document.getElementById(legendId); if (data.length === 0) { svg.innerHTML = '<circle cx="21" cy="21" r="15.9" fill="none" stroke="#e2e8f0" stroke-width="3"/><text x="21" y="23" text-anchor="middle" font-size="4" fill="#94a3b8">Sin datos</text>'; legend.innerHTML = ''; return; } var paths = '', offset = 0; data.forEach(function(item, i) { var pct = (item[1] / total) * 100; paths += '<circle cx="21" cy="21" r="15.9" fill="none" stroke="' + colors[i] + '" stroke-width="3" stroke-dasharray="' + pct + ' ' + (100-pct) + '" stroke-dashoffset="' + (-offset+25) + '"/>'; offset += pct; }); paths += '<circle cx="21" cy="21" r="12" fill="white"/>'; svg.innerHTML = paths; var legendHtml = ''; data.forEach(function(item, i) { legendHtml += '<div class="legend-item"><span class="legend-color" style="background:' + colors[i] + ';"></span><span>' + item[0] + '</span><span class="legend-value">' + ((item[1]/total)*100).toFixed(1) + '%</span></div>'; }); legend.innerHTML = legendHtml; }
+
+        function renderRankings(filtered) { var topIncome = filtered.filter(function(t) { return t.side === 'credit'; }).sort(function(a,b) { return Math.abs(b.amount)-Math.abs(a.amount); }).slice(0,3); var topExpenses = filtered.filter(function(t) { return t.side === 'debit'; }).sort(function(a,b) { return Math.abs(b.amount)-Math.abs(a.amount); }).slice(0,3); var byClient = {}; filtered.forEach(function(t) { if (!t.client_id) return; var client = clients.find(function(c) { return c.id === t.client_id; }); var name = client ? client.name : t.client_id; if (!byClient[name]) byClient[name] = 0; if (t.side === 'credit') byClient[name] += Math.abs(parseFloat(t.amount) || 0); }); var topClients = Object.entries(byClient).sort(function(a,b) { return b[1]-a[1]; }).slice(0,3); var posClasses = ['gold', 'silver', 'bronze']; document.getElementById('top-income').innerHTML = topIncome.map(function(t,i) { return '<div class="ranking-item"><div class="ranking-pos ' + posClasses[i] + '">' + (i+1) + '</div><div class="ranking-name">' + (t.counterparty_name || t.label || '-') + '</div><div class="ranking-value positive">+' + fmt(Math.abs(t.amount)) + '</div></div>'; }).join('') || '<div class="text-muted">Sin datos</div>'; document.getElementById('top-expenses').innerHTML = topExpenses.map(function(t,i) { return '<div class="ranking-item"><div class="ranking-pos ' + posClasses[i] + '">' + (i+1) + '</div><div class="ranking-name">' + (t.counterparty_name || t.label || '-') + '</div><div class="ranking-value negative">-' + fmt(Math.abs(t.amount)) + '</div></div>'; }).join('') || '<div class="text-muted">Sin datos</div>'; document.getElementById('top-clients').innerHTML = topClients.map(function(c,i) { return '<div class="ranking-item"><div class="ranking-pos ' + posClasses[i] + '">' + (i+1) + '</div><div class="ranking-name">' + c[0] + '</div><div class="ranking-value">' + fmt(c[1]) + '</div></div>'; }).join('') || '<div class="text-muted">Sin datos</div>'; }
+
+        function renderPL() { var filtered = filterByPeriod(transactions, currentPeriod); var income = 0, expenses = 0, byCategory = {}; filtered.forEach(function(t) { var amt = Math.abs(parseFloat(t.amount) || 0); var cat = t.category || 'Sin categoria'; if (!byCategory[cat]) byCategory[cat] = { income: 0, expense: 0 }; if (t.side === 'credit') { income += amt; byCategory[cat].income += amt; } else { expenses += amt; byCategory[cat].expense += amt; } }); var net = income - expenses; var margin = income > 0 ? (net / income * 100) : 0; document.getElementById('pl-income').textContent = fmt(income); document.getElementById('pl-expenses').textContent = fmt(expenses); document.getElementById('pl-net').textContent = fmt(net); document.getElementById('pl-net').className = 'kpi-value ' + (net >= 0 ? 'positive' : 'negative'); document.getElementById('pl-margin').textContent = margin.toFixed(1) + '%'; document.getElementById('pl-margin').className = 'kpi-value ' + (margin >= 20 ? 'positive' : margin >= 0 ? '' : 'negative'); var html = '<div style="padding:16px 20px;background:#ecfdf5;font-weight:600;color:#166534;display:flex;justify-content:space-between;"><span>INGRESOS</span><span>' + fmt(income) + '</span></div>'; Object.entries(byCategory).filter(function(e) { return e[1].income > 0; }).sort(function(a,b) { return b[1].income - a[1].income; }).forEach(function(e) { html += '<div style="padding:12px 20px 12px 36px;display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;"><span>' + e[0] + '</span><span style="font-family:JetBrains Mono;color:#10b981;">' + fmt(e[1].income) + '</span></div>'; }); html += '<div style="padding:16px 20px;background:#fef2f2;font-weight:600;color:#991b1b;display:flex;justify-content:space-between;margin-top:8px;"><span>GASTOS</span><span>' + fmt(expenses) + '</span></div>'; Object.entries(byCategory).filter(function(e) { return e[1].expense > 0; }).sort(function(a,b) { return b[1].expense - a[1].expense; }).forEach(function(e) { html += '<div style="padding:12px 20px 12px 36px;display:flex;justify-content:space-between;border-bottom:1px solid #f1f5f9;"><span>' + e[0] + '</span><span style="font-family:JetBrains Mono;color:#ef4444;">-' + fmt(e[1].expense) + '</span></div>'; }); html += '<div style="padding:16px 20px;background:#eff6ff;font-weight:700;display:flex;justify-content:space-between;margin-top:8px;border-top:2px solid #3b82f6;"><span>RESULTADO NETO</span><span style="font-family:JetBrains Mono;color:' + (net >= 0 ? '#10b981' : '#ef4444') + ';">' + fmt(net) + '</span></div>'; document.getElementById('pl-statement').innerHTML = html; renderProjectsPL(filtered); renderClientsPL(filtered); }
+
+        function renderProjectsPL(filtered) { var byProject = {}; filtered.forEach(function(t) { if (!t.project_id) return; var project = projects.find(function(p) { return p.id === t.project_id; }); var name = project ? project.name : t.project_id; var clientName = project && project.client_id ? (clients.find(function(c) { return c.id === project.client_id; }) || {}).name : ''; if (!byProject[t.project_id]) byProject[t.project_id] = { name: name, client: clientName, income: 0, expenses: 0 }; var amt = Math.abs(parseFloat(t.amount) || 0); if (t.side === 'credit') byProject[t.project_id].income += amt; else byProject[t.project_id].expenses += amt; }); var html = ''; Object.values(byProject).sort(function(a,b) { return b.income - a.income; }).forEach(function(p) { var net = p.income - p.expenses; var margin = p.income > 0 ? (net / p.income * 100) : 0; var marginColor = margin >= 20 ? '#10b981' : margin >= 0 ? '#f59e0b' : '#ef4444'; var marginBg = margin >= 20 ? '#ecfdf5' : margin >= 0 ? '#fffbeb' : '#fef2f2'; html += '<div class="profit-card"><div class="profit-header"><div><div class="profit-name">' + p.name + '</div>' + (p.client ? '<div class="profit-client">' + p.client + '</div>' : '') + '</div><div class="profit-margin" style="background:' + marginBg + ';"><div class="profit-margin-value" style="color:' + marginColor + ';">' + margin.toFixed(1) + '%</div><div class="profit-margin-label" style="color:' + marginColor + ';">Margen</div></div></div><div class="profit-body"><div class="profit-metrics"><div class="profit-metric"><div class="profit-metric-label">Ingresos</div><div class="profit-metric-value" style="color:#10b981;">' + fmt(p.income) + '</div></div><div class="profit-metric"><div class="profit-metric-label">Gastos</div><div class="profit-metric-value" style="color:#ef4444;">' + fmt(p.expenses) + '</div></div><div class="profit-metric"><div class="profit-metric-label">Neto</div><div class="profit-metric-value" style="color:' + (net >= 0 ? '#3b82f6' : '#ef4444') + ';">' + fmt(net) + '</div></div></div><div class="profit-bar"><div class="profit-bar-fill" style="width:' + Math.min(Math.max(margin, 0), 100) + '%;background:' + marginColor + ';"></div></div></div></div>'; }); document.getElementById('projects-profit-grid').innerHTML = html || '<div style="padding:40px;text-align:center;color:var(--text-muted);">No hay proyectos con transacciones</div>'; }
+
+        function renderClientsPL(filtered) { var byClient = {}; filtered.forEach(function(t) { if (!t.client_id) return; var client = clients.find(function(c) { return c.id === t.client_id; }); var name = client ? client.name : t.client_id; if (!byClient[t.client_id]) byClient[t.client_id] = { name: name, income: 0, expenses: 0 }; var amt = Math.abs(parseFloat(t.amount) || 0); if (t.side === 'credit') byClient[t.client_id].income += amt; else byClient[t.client_id].expenses += amt; }); var html = ''; Object.values(byClient).sort(function(a,b) { return b.income - a.income; }).forEach(function(c) { var net = c.income - c.expenses; var margin = c.income > 0 ? (net / c.income * 100) : 0; var marginColor = margin >= 20 ? '#10b981' : margin >= 0 ? '#f59e0b' : '#ef4444'; var marginBg = margin >= 20 ? '#ecfdf5' : margin >= 0 ? '#fffbeb' : '#fef2f2'; html += '<div class="profit-card"><div class="profit-header"><div><div class="profit-name">' + c.name + '</div></div><div class="profit-margin" style="background:' + marginBg + ';"><div class="profit-margin-value" style="color:' + marginColor + ';">' + margin.toFixed(1) + '%</div><div class="profit-margin-label" style="color:' + marginColor + ';">Margen</div></div></div><div class="profit-body"><div class="profit-metrics"><div class="profit-metric"><div class="profit-metric-label">Ingresos</div><div class="profit-metric-value" style="color:#10b981;">' + fmt(c.income) + '</div></div><div class="profit-metric"><div class="profit-metric-label">Gastos</div><div class="profit-metric-value" style="color:#ef4444;">' + fmt(c.expenses) + '</div></div><div class="profit-metric"><div class="profit-metric-label">Neto</div><div class="profit-metric-value" style="color:' + (net >= 0 ? '#3b82f6' : '#ef4444') + ';">' + fmt(net) + '</div></div></div><div class="profit-bar"><div class="profit-bar-fill" style="width:' + Math.min(Math.max(margin, 0), 100) + '%;background:' + marginColor + ';"></div></div></div></div>'; }); document.getElementById('clients-profit-grid').innerHTML = html || '<div style="padding:40px;text-align:center;color:var(--text-muted);">No hay clientes con transacciones</div>'; }
+
+        function renderTransactions() { var filterType = document.getElementById('tx-filter-type').value; var filterCat = document.getElementById('tx-filter-category').value; var search = (document.getElementById('tx-search').value || '').toLowerCase(); var catSelect = document.getElementById('tx-filter-category'); if (catSelect.options.length <= 1) { categories.forEach(function(c) { var opt = document.createElement('option'); opt.value = c.name; opt.textContent = c.name; catSelect.appendChild(opt); }); } var filtered = transactions.filter(function(t) { if (filterType && t.side !== filterType) return false; if (filterCat && t.category !== filterCat) return false; if (search && ((t.counterparty_name || '') + ' ' + (t.label || '') + ' ' + (t.category || '')).toLowerCase().indexOf(search) === -1) return false; return true; }); var html = ''; filtered.slice(0, 100).forEach(function(t) { var isCredit = t.side === 'credit'; var type = isCredit ? 'ingreso' : 'egreso'; var projName = '-', clientName = '-'; if (t.project_id) { var proj = projects.find(function(p) { return p.id === t.project_id; }); projName = proj ? proj.name : t.project_id; } if (t.client_id) { var client = clients.find(function(c) { return c.id === t.client_id; }); clientName = client ? client.name : t.client_id; } var amount = Math.abs(parseFloat(t.amount) || 0); var ivaAmount = t.vat_amount || (amount * 0.21 / 1.21); html += '<tr><td>' + formatDate(t.settled_at) + '</td><td><span class="tag ' + type + '">' + type.toUpperCase() + '</span></td><td>' + (t.counterparty_name || t.label || '-') + '</td><td>' + (t.category || '-') + '</td><td>' + projName + '</td><td>' + clientName + '</td><td style="font-family:JetBrains Mono;font-size:12px;color:var(--text-muted);">' + fmt(ivaAmount) + '</td><td style="text-align:right;" class="amount ' + (isCredit ? 'positive' : 'negative') + '">' + (isCredit ? '+' : '-') + fmt(amount) + '</td></tr>'; }); document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>'; }
+
+        function renderSettings() { document.getElementById('team-members-table').innerHTML = teamMembers.map(function(m) { return '<tr><td>' + (m.name || '-') + '</td><td>' + (m.email || '-') + '</td><td>' + (m.role || '-') + '</td><td><button class="btn btn-sm btn-outline">Editar</button></td></tr>'; }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay miembros</td></tr>'; document.getElementById('clients-table').innerHTML = clients.map(function(c) { return '<tr><td>' + (c.name || '-') + '</td><td>' + (c.contact || '-') + '</td><td>' + (c.email || '-') + '</td><td><button class="btn btn-sm btn-outline">Editar</button></td></tr>'; }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay clientes</td></tr>'; document.getElementById('projects-table').innerHTML = projects.map(function(p) { var clientName = p.client_id ? (clients.find(function(c) { return c.id === p.client_id; }) || {}).name || '' : ''; return '<tr><td>' + (p.name || '-') + '</td><td>' + (clientName || '-') + '</td><td><span class="status ok">Activo</span></td><td><button class="btn btn-sm btn-outline">Editar</button></td></tr>'; }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:20px;">No hay proyectos</td></tr>'; document.getElementById('categories-table').innerHTML = categories.map(function(c) { return '<tr><td>' + (c.name || '-') + '</td><td>' + (c.type === 'Income' ? 'Ingreso' : 'Gasto') + '</td><td><button class="btn btn-sm btn-outline">Editar</button></td></tr>'; }).join('') || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:20px;">No hay categorias</td></tr>'; var clientSelect = document.getElementById('new-project-client'); if (clientSelect && clientSelect.options.length === 0) { clientSelect.innerHTML = '<option value="">Sin cliente</option>' + clients.map(function(c) { return '<option value="' + c.id + '">' + c.name + '</option>'; }).join(''); } }
+
+        function saveClient() { fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('new-client-name').value, contact: document.getElementById('new-client-contact').value, email: document.getElementById('new-client-email').value, phone: document.getElementById('new-client-phone').value }) }).then(function() { closeModal('add-client'); loadData(); }); }
+        function saveProject() { fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('new-project-name').value, client_id: document.getElementById('new-project-client').value }) }).then(function() { closeModal('add-project'); loadData(); }); }
+        function saveCategory() { fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('new-category-name').value, type: document.getElementById('new-category-type').value }) }).then(function() { closeModal('add-category'); loadData(); }); }
+        function saveMember() { fetch('/api/team', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: document.getElementById('new-member-name').value, email: document.getElementById('new-member-email').value, role: document.getElementById('new-member-role').value }) }).then(function() { closeModal('add-member'); loadData(); }); }
+
+        function autoSync() { updateSyncStatus('syncing', 'Sincronizando...'); fetch('/api/sync', { method: 'POST' }).then(function() { loadData(); }).catch(function() { updateSyncStatus('error', 'Error de sync'); }); }
+
+        document.addEventListener('DOMContentLoaded', function() { loadData(); autoSync(); setInterval(function() { loadData(); }, 30000); });
+    </script>
+</body>
+</html>
