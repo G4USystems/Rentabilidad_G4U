@@ -376,8 +376,20 @@
                             <div class="kpi-value positive" id="pl-projects-income">-</div>
                         </div>
                         <div class="kpi">
-                            <div class="kpi-label">Margen Promedio</div>
+                            <div class="kpi-label">Margen Global</div>
                             <div class="kpi-value" id="pl-projects-margin">-</div>
+                        </div>
+                    </div>
+                    <div class="card mb-4">
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            Distribucion por Proyecto
+                            <select id="pl-projects-chart-type" onchange="renderPLProjectsChart()" style="width:auto;">
+                                <option value="margin">Margen %</option>
+                                <option value="income-expense">Ingresos vs Egresos</option>
+                            </select>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chart-projects" height="250"></canvas>
                         </div>
                     </div>
                     <div class="project-grid" id="pl-projects-grid">
@@ -397,8 +409,20 @@
                             <div class="kpi-value positive" id="pl-clients-income">-</div>
                         </div>
                         <div class="kpi">
-                            <div class="kpi-label">Margen Promedio</div>
+                            <div class="kpi-label">Margen Global</div>
                             <div class="kpi-value" id="pl-clients-margin">-</div>
+                        </div>
+                    </div>
+                    <div class="card mb-4">
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            Distribucion por Cliente
+                            <select id="pl-clients-chart-type" onchange="renderPLClientsChart()" style="width:auto;">
+                                <option value="margin">Margen %</option>
+                                <option value="income-expense">Ingresos vs Egresos</option>
+                            </select>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chart-clients" height="250"></canvas>
                         </div>
                     </div>
                     <div id="pl-clients-grid">
@@ -996,6 +1020,10 @@
         var qontoBalance = 0;
         var expensesChart = null;
         var incomeChart = null;
+        var projectsChart = null;
+        var clientsChart = null;
+        var plProjectsData = [];
+        var plClientsData = [];
 
         // Utilities
         function fmt(n) {
@@ -1638,16 +1666,20 @@
                 return b.income - a.income;
             });
 
-            // KPIs
+            // KPIs - Margen global (no promedio)
+            var totalExpenses = projectList.reduce(function(sum, p) { return sum + p.totalCosts; }, 0);
+            var globalNet = totalIncome - totalExpenses;
+            var globalMargin = totalIncome > 0 ? (globalNet / totalIncome * 100) : 0;
+
             document.getElementById('pl-projects-count').textContent = projectList.filter(function(p) { return p.id !== '_none'; }).length;
             document.getElementById('pl-projects-income').textContent = fmt(totalIncome);
+            document.getElementById('pl-projects-margin').textContent = globalMargin.toFixed(1) + '%';
+            document.getElementById('pl-projects-margin').className = 'kpi-value ' + (globalMargin >= 0 ? 'positive' : 'negative');
 
-            var avgMargin = 0;
-            if (projectList.length > 0) {
-                avgMargin = projectList.reduce(function(sum, p) { return sum + p.margin; }, 0) / projectList.length;
-            }
-            document.getElementById('pl-projects-margin').textContent = avgMargin.toFixed(1) + '%';
-            document.getElementById('pl-projects-margin').className = 'kpi-value ' + (avgMargin >= 0 ? 'positive' : 'negative');
+            // Sort by margin descending and store for chart
+            projectList.sort(function(a, b) { return b.margin - a.margin; });
+            plProjectsData = projectList;
+            renderPLProjectsChart();
 
             // Project cards
             var html = '';
@@ -1671,6 +1703,55 @@
             });
 
             document.getElementById('pl-projects-grid').innerHTML = html || '<div style="padding:40px;text-align:center;color:var(--text-muted);">No hay proyectos con transacciones</div>';
+        }
+
+        function renderPLProjectsChart() {
+            var chartType = document.getElementById('pl-projects-chart-type').value;
+            var ctx = document.getElementById('chart-projects');
+            if (!ctx || plProjectsData.length === 0) return;
+
+            if (projectsChart) projectsChart.destroy();
+
+            var labels = plProjectsData.map(function(p) { return p.name; });
+
+            if (chartType === 'margin') {
+                var data = plProjectsData.map(function(p) { return p.margin; });
+                var colors = data.map(function(v) { return v >= 0 ? '#10b981' : '#ef4444'; });
+                projectsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Margen %',
+                            data: data,
+                            backgroundColor: colors
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return v + '%'; } } } }
+                    }
+                });
+            } else {
+                var incomes = plProjectsData.map(function(p) { return p.income; });
+                var expenses = plProjectsData.map(function(p) { return p.totalCosts; });
+                projectsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Ingresos', data: incomes, backgroundColor: '#10b981' },
+                            { label: 'Egresos', data: expenses, backgroundColor: '#ef4444' }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'top' } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
         }
 
         function renderPLClients() {
@@ -1722,14 +1803,21 @@
                 c.net = c.income - c.expense;
                 c.margin = c.income > 0 ? (c.net / c.income * 100) : 0;
                 return c;
-            }).sort(function(a,b) { return b.income - a.income; });
+            }).sort(function(a,b) { return b.margin - a.margin; });
 
-            // KPIs
+            // KPIs - Margen global (no promedio)
+            var totalExpenses = clientList.reduce(function(sum, c) { return sum + c.expense; }, 0);
+            var globalNet = totalIncome - totalExpenses;
+            var globalMargin = totalIncome > 0 ? (globalNet / totalIncome * 100) : 0;
+
             document.getElementById('pl-clients-count').textContent = clientList.filter(function(c) { return c.id !== '_none'; }).length;
             document.getElementById('pl-clients-income').textContent = fmt(totalIncome);
-            var avgMargin = clientList.length > 0 ? clientList.reduce(function(sum,c) { return sum + c.margin; }, 0) / clientList.length : 0;
-            document.getElementById('pl-clients-margin').textContent = avgMargin.toFixed(1) + '%';
-            document.getElementById('pl-clients-margin').className = 'kpi-value ' + (avgMargin >= 0 ? 'positive' : 'negative');
+            document.getElementById('pl-clients-margin').textContent = globalMargin.toFixed(1) + '%';
+            document.getElementById('pl-clients-margin').className = 'kpi-value ' + (globalMargin >= 0 ? 'positive' : 'negative');
+
+            // Store for chart
+            plClientsData = clientList;
+            renderPLClientsChart();
 
             // Client cards with projects
             var html = '';
@@ -1762,6 +1850,55 @@
                 html += '</div>';
             });
             document.getElementById('pl-clients-grid').innerHTML = html || '<div style="padding:40px;text-align:center;color:var(--text-muted);">No hay clientes con transacciones</div>';
+        }
+
+        function renderPLClientsChart() {
+            var chartType = document.getElementById('pl-clients-chart-type').value;
+            var ctx = document.getElementById('chart-clients');
+            if (!ctx || plClientsData.length === 0) return;
+
+            if (clientsChart) clientsChart.destroy();
+
+            var labels = plClientsData.map(function(c) { return c.name; });
+
+            if (chartType === 'margin') {
+                var data = plClientsData.map(function(c) { return c.margin; });
+                var colors = data.map(function(v) { return v >= 0 ? '#10b981' : '#ef4444'; });
+                clientsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Margen %',
+                            data: data,
+                            backgroundColor: colors
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return v + '%'; } } } }
+                    }
+                });
+            } else {
+                var incomes = plClientsData.map(function(c) { return c.income; });
+                var expenses = plClientsData.map(function(c) { return c.expense; });
+                clientsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Ingresos', data: incomes, backgroundColor: '#10b981' },
+                            { label: 'Egresos', data: expenses, backgroundColor: '#ef4444' }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'top' } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
         }
 
         // Actions
