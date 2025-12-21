@@ -3448,8 +3448,19 @@
                 if (result.error) {
                     alert('Error: ' + result.error);
                 } else {
+                    // Add to local array immediately for instant UI feedback
+                    transactionAllocations.push({
+                        id: result.id || 'temp_' + Date.now(),
+                        transaction_id: currentAllocTxId,
+                        category: category || '',
+                        project_id: projectId || null,
+                        client_id: clientId || null,
+                        percentage: percentage
+                    });
+                    renderTxAllocations();
+                    renderTransactions();
+                    // Also reload from server to ensure sync
                     loadTransactionAllocations();
-                    setTimeout(renderTxAllocations, 300);
                 }
             }).catch(function(e) {
                 alert('Error: ' + e.message);
