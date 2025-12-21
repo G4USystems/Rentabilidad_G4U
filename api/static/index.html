@@ -111,6 +111,15 @@
         .status.pending { background: #fef3c7; color: #92400e; }
         .status.error { background: #fee2e2; color: #991b1b; }
 
+        /* Column Visibility Dropdown */
+        .column-toggle { position: relative; display: inline-block; }
+        .column-toggle-btn { background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 12px; color: var(--text-muted); }
+        .column-toggle-btn:hover { background: var(--bg); }
+        .column-toggle-menu { position: absolute; top: 100%; right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 8px 0; min-width: 150px; z-index: 100; display: none; }
+        .column-toggle-menu.show { display: block; }
+        .column-toggle-menu label { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; }
+        .column-toggle-menu label:hover { background: var(--bg); }
+
         /* Modal */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
         .modal-overlay.active { display: flex; }
@@ -265,11 +274,11 @@
                 <!-- Resumen general -->
                 <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
                     <div class="kpi" style="text-align:center;">
-                        <div class="kpi-label">Clientes</div>
+                        <div class="kpi-label">Clientes Activos</div>
                         <div class="kpi-value" id="kpi-clients">-</div>
                     </div>
                     <div class="kpi" style="text-align:center;">
-                        <div class="kpi-label">Proyectos</div>
+                        <div class="kpi-label">Proyectos Activos</div>
                         <div class="kpi-value" id="kpi-projects">-</div>
                     </div>
                     <div class="kpi" style="text-align:center;">
@@ -525,6 +534,7 @@
                 <!-- Tabs for Settings sections -->
                 <div class="tabs mb-4">
                     <div class="tab active" onclick="showSettingsTab('connections', event)">Estado</div>
+                    <div class="tab" onclick="showSettingsTab('unassigned', event)">Sin Asignar</div>
                     <div class="tab" onclick="showSettingsTab('team', event)">Equipo</div>
                     <div class="tab" onclick="showSettingsTab('clients', event)">Clientes</div>
                     <div class="tab" onclick="showSettingsTab('projects', event)">Proyectos</div>
@@ -555,15 +565,52 @@
                     </div>
                 </div>
 
+                <!-- Unassigned Transactions Section -->
+                <div id="settings-unassigned" class="settings-section hidden">
+                    <div class="card">
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>Transacciones Sin Asignar</span>
+                            <div style="display:flex;gap:12px;align-items:center;">
+                                <select id="unassigned-type" onchange="renderUnassigned()" style="width:auto;">
+                                    <option value="all">Todas</option>
+                                    <option value="income">Solo Ingresos</option>
+                                    <option value="expense">Solo Egresos</option>
+                                </select>
+                                <span id="unassigned-count" class="text-muted"></span>
+                            </div>
+                        </div>
+                        <div class="card-body" style="padding:0;max-height:500px;overflow-y:auto;">
+                            <table>
+                                <thead>
+                                    <tr><th>Fecha</th><th>Descripcion</th><th>Tipo</th><th style="text-align:right">Monto</th><th style="width:80px;"></th></tr>
+                                </thead>
+                                <tbody id="unassigned-table">
+                                    <tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">Cargando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Team Members Section -->
                 <div id="settings-team" class="settings-section hidden">
                     <div class="card">
                         <div class="card-header">
-                            Equipo
-                            <button class="btn btn-sm btn-primary" onclick="openModal('add-member')">+ Nuevo Miembro</button>
+                            <span>Equipo</span>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <div class="column-toggle">
+                                    <button class="column-toggle-btn" onclick="toggleColumnMenu('team')">⚙ Columnas</button>
+                                    <div id="column-menu-team" class="column-toggle-menu">
+                                        <label><input type="checkbox" checked onchange="toggleColumn('team', 0, this.checked)"> Nombre</label>
+                                        <label><input type="checkbox" checked onchange="toggleColumn('team', 1, this.checked)"> Rol</label>
+                                        <label><input type="checkbox" checked onchange="toggleColumn('team', 2, this.checked)"> Salario</label>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-primary" onclick="openModal('add-member')">+ Nuevo Miembro</button>
+                            </div>
                         </div>
                         <div class="card-body" style="padding:0;">
-                            <table>
+                            <table id="table-team">
                                 <thead>
                                     <tr><th>Nombre</th><th>Rol</th><th style="text-align:right">Salario Mensual</th><th style="width:100px;"></th></tr>
                                 </thead>
@@ -579,11 +626,23 @@
                 <div id="settings-clients" class="settings-section hidden">
                     <div class="card">
                         <div class="card-header">
-                            Clientes
-                            <button class="btn btn-sm btn-primary" onclick="openModal('add-client')">+ Nuevo Cliente</button>
+                            <span>Clientes</span>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <div class="column-toggle">
+                                    <button class="column-toggle-btn" onclick="toggleColumnMenu('clients')">⚙ Columnas</button>
+                                    <div id="column-menu-clients" class="column-toggle-menu">
+                                        <label><input type="checkbox" checked onchange="toggleColumn('clients', 0, this.checked)"> Nombre</label>
+                                        <label><input type="checkbox" checked onchange="toggleColumn('clients', 1, this.checked)"> Contacto</label>
+                                        <label><input type="checkbox" checked onchange="toggleColumn('clients', 2, this.checked)"> Email</label>
+                                        <label><input type="checkbox" checked onchange="toggleColumn('clients', 3, this.checked)"> Telefono</label>
+                                        <label><input type="checkbox" checked onchange="toggleColumn('clients', 4, this.checked)"> Estado</label>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-primary" onclick="openModal('add-client')">+ Nuevo Cliente</button>
+                            </div>
                         </div>
                         <div class="card-body" style="padding:0;">
-                            <table>
+                            <table id="table-clients">
                                 <thead>
                                     <tr><th>Nombre</th><th>Contacto</th><th>Email</th><th>Telefono</th><th>Estado</th><th style="width:100px;"></th></tr>
                                 </thead>
@@ -599,11 +658,21 @@
                 <div id="settings-projects" class="settings-section hidden">
                     <div class="card">
                         <div class="card-header">
-                            Proyectos
-                            <button class="btn btn-sm btn-primary" onclick="openModal('add-project')">+ Nuevo Proyecto</button>
+                            <span>Proyectos</span>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <div class="column-toggle">
+                                    <button class="column-toggle-btn" onclick="toggleColumnMenu('projects')">⚙ Columnas</button>
+                                    <div id="column-menu-projects" class="column-toggle-menu">
+                                        <label><input type="checkbox" checked onchange="toggleColumn('projects', 0, this.checked)"> Nombre</label>
+                                        <label><input type="checkbox" checked onchange="toggleColumn('projects', 1, this.checked)"> Cliente</label>
+                                        <label><input type="checkbox" checked onchange="toggleColumn('projects', 2, this.checked)"> Estado</label>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-primary" onclick="openModal('add-project')">+ Nuevo Proyecto</button>
+                            </div>
                         </div>
                         <div class="card-body" style="padding:0;">
-                            <table>
+                            <table id="table-projects">
                                 <thead>
                                     <tr><th>Nombre</th><th>Cliente</th><th>Estado</th><th style="width:100px;"></th></tr>
                                 </thead>
@@ -936,9 +1005,18 @@
                         <input type="text" id="edit-client-phone" placeholder="+34...">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Notas</label>
-                    <textarea id="edit-client-notes" rows="3" placeholder="Notas adicionales..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;"></textarea>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Notas</label>
+                        <textarea id="edit-client-notes" rows="2" placeholder="Notas adicionales..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select id="edit-client-status">
+                            <option value="Activo">Activo</option>
+                            <option value="Inactivo">Inactivo</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1056,6 +1134,11 @@
             document.querySelectorAll('.settings-section').forEach(function(s) { s.classList.add('hidden'); });
             if (event && event.target) event.target.classList.add('active');
             document.getElementById('settings-' + name).classList.remove('hidden');
+            // Load tab-specific data
+            if (name === 'unassigned') renderUnassigned();
+            if (name === 'team') applyColumnVisibility('team');
+            if (name === 'clients') applyColumnVisibility('clients');
+            if (name === 'projects') applyColumnVisibility('projects');
         }
 
         // P&L tabs
@@ -1189,8 +1272,9 @@
 
             // Counters
             var activeClients = clients.filter(function(c) { return c.status !== 'Inactivo'; });
+            var activeProjects = projects.filter(function(p) { return p.status === 'Active'; });
             document.getElementById('kpi-clients').textContent = activeClients.length;
-            document.getElementById('kpi-projects').textContent = projects.length;
+            document.getElementById('kpi-projects').textContent = activeProjects.length;
             document.getElementById('kpi-transactions').textContent = filteredTransactions.length;
             document.getElementById('kpi-team').textContent = teamMembers.length;
         }
@@ -1211,41 +1295,45 @@
 
             var colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
 
-            // Expenses chart
-            var expLabels = Object.keys(expensesByCategory).sort(function(a,b) { return expensesByCategory[b] - expensesByCategory[a]; });
+            // Expenses chart (bar)
+            var expLabels = Object.keys(expensesByCategory).sort(function(a,b) { return expensesByCategory[b] - expensesByCategory[a]; }).slice(0,8);
             var expData = expLabels.map(function(k) { return expensesByCategory[k]; });
 
             if (expensesChart) expensesChart.destroy();
             var expCtx = document.getElementById('chart-expenses');
             if (expCtx && expLabels.length > 0) {
                 expensesChart = new Chart(expCtx, {
-                    type: 'doughnut',
-                    data: { labels: expLabels, datasets: [{ data: expData, backgroundColor: colors }] },
-                    options: { responsive: true, plugins: { legend: { display: false } } }
+                    type: 'bar',
+                    data: { labels: expLabels, datasets: [{ label: 'Gastos', data: expData, backgroundColor: '#ef4444' }] },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { ticks: { callback: function(v) { return fmt(v); } } } }
+                    }
                 });
-                var legendHtml = expLabels.slice(0,5).map(function(l,i) {
-                    return '<span style="display:inline-block;width:10px;height:10px;background:'+colors[i]+';border-radius:50%;margin-right:4px;"></span>' + l + ': ' + fmt(expensesByCategory[l]);
-                }).join('<br>');
-                document.getElementById('chart-expenses-legend').innerHTML = legendHtml;
             }
+            document.getElementById('chart-expenses-legend').innerHTML = '';
 
-            // Income chart
-            var incLabels = Object.keys(incomeByCategory).sort(function(a,b) { return incomeByCategory[b] - incomeByCategory[a]; });
+            // Income chart (bar)
+            var incLabels = Object.keys(incomeByCategory).sort(function(a,b) { return incomeByCategory[b] - incomeByCategory[a]; }).slice(0,8);
             var incData = incLabels.map(function(k) { return incomeByCategory[k]; });
 
             if (incomeChart) incomeChart.destroy();
             var incCtx = document.getElementById('chart-income');
             if (incCtx && incLabels.length > 0) {
                 incomeChart = new Chart(incCtx, {
-                    type: 'doughnut',
-                    data: { labels: incLabels, datasets: [{ data: incData, backgroundColor: colors }] },
-                    options: { responsive: true, plugins: { legend: { display: false } } }
+                    type: 'bar',
+                    data: { labels: incLabels, datasets: [{ label: 'Ingresos', data: incData, backgroundColor: '#10b981' }] },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { ticks: { callback: function(v) { return fmt(v); } } } }
+                    }
                 });
-                var legendHtml = incLabels.slice(0,5).map(function(l,i) {
-                    return '<span style="display:inline-block;width:10px;height:10px;background:'+colors[i]+';border-radius:50%;margin-right:4px;"></span>' + l + ': ' + fmt(incomeByCategory[l]);
-                }).join('<br>');
-                document.getElementById('chart-income-legend').innerHTML = legendHtml;
             }
+            document.getElementById('chart-income-legend').innerHTML = '';
         }
 
         function renderTops() {
@@ -2277,7 +2365,7 @@
                 html += '<td>' + (c.email || '-') + '</td>';
                 html += '<td>' + (c.phone || '-') + '</td>';
                 html += '<td><span class="type-badge ' + statusCls + '" style="cursor:pointer;" onclick="toggleClientStatus(\'' + c.id + '\',\'' + status + '\')">' + status + '</span></td>';
-                html += '<td><button class="btn btn-sm btn-outline" onclick="deleteClient(\'' + c.id + '\')" style="color:var(--danger);">X</button></td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="editClient(\'' + c.id + '\')">Editar</button> <button class="btn btn-sm btn-outline" onclick="deleteClient(\'' + c.id + '\')" style="color:var(--danger);">X</button></td>';
                 html += '</tr>';
             });
             document.getElementById('clients-table').innerHTML = html || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px;">No hay clientes</td></tr>';
@@ -2298,6 +2386,79 @@
             }).catch(function(e) {
                 alert('Error: ' + e.message);
             });
+        }
+
+        // ==================== Column Visibility ====================
+        var columnVisibility = JSON.parse(localStorage.getItem('columnVisibility') || '{}');
+
+        function toggleColumnMenu(tableId) {
+            var menu = document.getElementById('column-menu-' + tableId);
+            var isOpen = menu.classList.contains('show');
+            // Close all menus
+            document.querySelectorAll('.column-toggle-menu').forEach(function(m) { m.classList.remove('show'); });
+            if (!isOpen) menu.classList.add('show');
+        }
+
+        function toggleColumn(tableId, colIndex, visible) {
+            var table = document.getElementById('table-' + tableId);
+            if (!table) return;
+            var rows = table.querySelectorAll('tr');
+            rows.forEach(function(row) {
+                var cells = row.querySelectorAll('th, td');
+                if (cells[colIndex]) {
+                    cells[colIndex].style.display = visible ? '' : 'none';
+                }
+            });
+            // Save preference
+            if (!columnVisibility[tableId]) columnVisibility[tableId] = {};
+            columnVisibility[tableId][colIndex] = visible;
+            localStorage.setItem('columnVisibility', JSON.stringify(columnVisibility));
+        }
+
+        function applyColumnVisibility(tableId) {
+            var prefs = columnVisibility[tableId] || {};
+            var menu = document.getElementById('column-menu-' + tableId);
+            if (menu) {
+                var checkboxes = menu.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(function(cb, i) {
+                    var visible = prefs[i] !== false;
+                    cb.checked = visible;
+                    toggleColumn(tableId, i, visible);
+                });
+            }
+        }
+
+        // Close column menus when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.column-toggle')) {
+                document.querySelectorAll('.column-toggle-menu').forEach(function(m) { m.classList.remove('show'); });
+            }
+        });
+
+        // ==================== Unassigned Transactions ====================
+        function renderUnassigned() {
+            var typeFilter = document.getElementById('unassigned-type').value;
+            var unassigned = transactions.filter(function(tx) {
+                var hasAlloc = allocations.some(function(a) { return a.transaction_id === tx.id; });
+                if (hasAlloc) return false;
+                if (typeFilter === 'income') return tx.type === 'Income';
+                if (typeFilter === 'expense') return tx.type === 'Expense';
+                return true;
+            });
+            document.getElementById('unassigned-count').textContent = unassigned.length + ' transacciones';
+            var html = '';
+            unassigned.forEach(function(tx) {
+                var typeClass = tx.type === 'Income' ? 'ingreso' : 'egreso';
+                var sign = tx.type === 'Income' ? '+' : '-';
+                html += '<tr>';
+                html += '<td>' + formatDate(tx.date) + '</td>';
+                html += '<td>' + (tx.description || '-') + '</td>';
+                html += '<td><span class="type-badge ' + typeClass + '">' + (tx.type === 'Income' ? 'Ingreso' : 'Egreso') + '</span></td>';
+                html += '<td style="text-align:right;font-weight:600;">' + sign + formatCurrency(Math.abs(tx.amount)) + '</td>';
+                html += '<td><button class="btn btn-sm btn-outline" onclick="openAllocationModal(\'' + tx.id + '\')">Asignar</button></td>';
+                html += '</tr>';
+            });
+            document.getElementById('unassigned-table').innerHTML = html || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:20px;">No hay transacciones sin asignar</td></tr>';
         }
 
         function saveClient() {
@@ -2345,6 +2506,7 @@
             document.getElementById('edit-client-email').value = client.email || '';
             document.getElementById('edit-client-phone').value = client.phone || '';
             document.getElementById('edit-client-notes').value = client.notes || '';
+            document.getElementById('edit-client-status').value = client.status || 'Activo';
             openModal('edit-client');
         }
 
@@ -2355,7 +2517,8 @@
                 contact: document.getElementById('edit-client-contact').value,
                 email: document.getElementById('edit-client-email').value,
                 phone: document.getElementById('edit-client-phone').value,
-                notes: document.getElementById('edit-client-notes').value
+                notes: document.getElementById('edit-client-notes').value,
+                status: document.getElementById('edit-client-status').value
             };
 
             fetch('/api/client/' + id, {
@@ -2826,18 +2989,11 @@
             });
         }
 
-        function autoImportMembers() {
-            fetch('/api/qonto/sync-members', { method: 'POST' }).then(function(r) { return r.json(); }).then(function(data) {
-                if (data.created > 0) loadTeamMembers();
-            }).catch(function(e) { console.error('Error importing members:', e); });
-        }
-
         // Init
         console.log('G4U Finance Dashboard v7 - Business Overview');
         checkStatus();
         loadQontoOrgAuto();
         autoSync();
-        autoImportMembers();
         loadTeamMembers();
         loadClients();
         loadProjectsSettings();
