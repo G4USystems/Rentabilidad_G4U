@@ -296,16 +296,16 @@
                     <!-- Grafico gastos -->
                     <div class="card">
                         <div class="card-header">Distribucion de Gastos</div>
-                        <div class="card-body">
-                            <canvas id="chart-expenses" height="200"></canvas>
+                        <div class="card-body" style="padding:12px;">
+                            <div style="height:160px;"><canvas id="chart-expenses"></canvas></div>
                             <div id="chart-expenses-legend"></div>
                         </div>
                     </div>
                     <!-- Grafico ingresos -->
                     <div class="card">
                         <div class="card-header">Distribucion de Ingresos</div>
-                        <div class="card-body">
-                            <canvas id="chart-income" height="200"></canvas>
+                        <div class="card-body" style="padding:12px;">
+                            <div style="height:160px;"><canvas id="chart-income"></canvas></div>
                             <div id="chart-income-legend"></div>
                         </div>
                     </div>
@@ -512,10 +512,18 @@
                 </div>
 
                 <div class="card">
+                    <div id="bulk-actions" class="hidden" style="padding:12px 16px;background:var(--primary);color:white;display:flex;justify-content:space-between;align-items:center;">
+                        <span><strong id="selected-count">0</strong> transacciones seleccionadas</span>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn btn-sm" style="background:white;color:var(--primary);" onclick="openBulkAllocation()">Asignar Seleccionadas</button>
+                            <button class="btn btn-sm btn-outline" style="border-color:white;color:white;" onclick="clearSelection()">Cancelar</button>
+                        </div>
+                    </div>
                     <div class="card-body" style="padding:0;overflow-x:auto;">
                         <table>
                             <thead>
                                 <tr>
+                                    <th style="width:40px;"><input type="checkbox" id="select-all-tx" onchange="toggleSelectAll(this.checked)"></th>
                                     <th class="sortable" onclick="sortTransactions('settled_at')">Fecha <span id="sort-settled_at"></span></th>
                                     <th class="sortable" onclick="sortTransactions('counterparty_name')">Descripcion <span id="sort-counterparty_name"></span></th>
                                     <th class="sortable" onclick="sortTransactions('side')">Tipo <span id="sort-side"></span></th>
@@ -529,7 +537,7 @@
                                 </tr>
                             </thead>
                             <tbody id="transactions-table">
-                                <tr><td colspan="10" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
+                                <tr><td colspan="11" class="text-muted" style="text-align:center;padding:40px;">Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1094,6 +1102,47 @@
         </div>
     </div>
 
+    <!-- Bulk Allocation Modal -->
+    <div class="modal-overlay" id="modal-bulk-allocation">
+        <div class="modal" style="max-width:500px;">
+            <div class="modal-header">
+                <h2>Asignar Multiples Transacciones</h2>
+                <span class="modal-close" onclick="closeModal('bulk-allocation')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;text-align:center;">
+                    <strong id="bulk-alloc-count">0</strong> transacciones seleccionadas
+                </div>
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <select id="bulk-alloc-category" style="width:100%;">
+                        <option value="">Sin categoria</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Proyecto</label>
+                    <select id="bulk-alloc-project" style="width:100%;">
+                        <option value="">Sin proyecto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Cliente</label>
+                    <select id="bulk-alloc-client" style="width:100%;">
+                        <option value="">Sin cliente</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Porcentaje</label>
+                    <input type="number" id="bulk-alloc-pct" min="0" max="100" value="100" style="width:100%;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('bulk-allocation')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveBulkAllocation()">Asignar a Todas</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // State
         var transactions = [];
@@ -1104,6 +1153,7 @@
         var teamMembers = [];
         var salaryAllocations = [];
         var transactionAllocations = [];
+        var selectedTransactions = [];
         var currentAllocTxId = null;
         var sortField = 'settled_at';
         var sortDirection = 'desc';
@@ -1583,8 +1633,10 @@
                 var category = t._category;
                 var projectName = t._project;
                 var clientName = t._client;
+                var isSelected = selectedTransactions.indexOf(t.id) !== -1;
 
-                html += '<tr>';
+                html += '<tr' + (isSelected ? ' style="background:#e0f2fe;"' : '') + '>';
+                html += '<td><input type="checkbox" class="tx-checkbox" data-id="' + t.id + '" onchange="toggleTxSelection(\'' + t.id + '\')"' + (isSelected ? ' checked' : '') + '></td>';
                 html += '<td style="white-space:nowrap;">' + formatDate(t.settled_at) + '</td>';
                 html += '<td>' + (t.counterparty_name || t.label || '-') + '</td>';
                 html += '<td><span class="type-badge ' + typeCls + '">' + typeLabel + '</span></td>';
@@ -1597,7 +1649,7 @@
                 html += '<td><button onclick="openTxAllocation(\'' + t.id + '\')" class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;">Asignar</button></td>';
                 html += '</tr>';
             });
-            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="10" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
+            document.getElementById('transactions-table').innerHTML = html || '<tr><td colspan="11" class="text-muted" style="text-align:center;padding:40px;">No hay transacciones</td></tr>';
         }
 
         function renderPL() {
@@ -2807,6 +2859,116 @@
                 renderTransactions();
             }).catch(function(e) {
                 console.error('Error loading transaction allocations:', e);
+            });
+        }
+
+        // ==================== Bulk Transaction Selection ====================
+        function toggleTxSelection(txId) {
+            var idx = selectedTransactions.indexOf(txId);
+            if (idx === -1) {
+                selectedTransactions.push(txId);
+            } else {
+                selectedTransactions.splice(idx, 1);
+            }
+            updateBulkActionsUI();
+        }
+
+        function toggleSelectAll(checked) {
+            var checkboxes = document.querySelectorAll('.tx-checkbox');
+            selectedTransactions = [];
+            if (checked) {
+                checkboxes.forEach(function(cb) {
+                    selectedTransactions.push(cb.dataset.id);
+                    cb.checked = true;
+                });
+            } else {
+                checkboxes.forEach(function(cb) { cb.checked = false; });
+            }
+            updateBulkActionsUI();
+        }
+
+        function clearSelection() {
+            selectedTransactions = [];
+            document.getElementById('select-all-tx').checked = false;
+            document.querySelectorAll('.tx-checkbox').forEach(function(cb) { cb.checked = false; });
+            updateBulkActionsUI();
+            renderTransactions();
+        }
+
+        function updateBulkActionsUI() {
+            var count = selectedTransactions.length;
+            document.getElementById('selected-count').textContent = count;
+            var bulkActions = document.getElementById('bulk-actions');
+            if (count > 0) {
+                bulkActions.classList.remove('hidden');
+            } else {
+                bulkActions.classList.add('hidden');
+            }
+        }
+
+        function openBulkAllocation() {
+            if (selectedTransactions.length === 0) return;
+
+            // Populate selects
+            var catHtml = '<option value="">Sin categoria</option>';
+            categories.forEach(function(c) {
+                catHtml += '<option value="' + c.name + '">' + c.name + '</option>';
+            });
+            document.getElementById('bulk-alloc-category').innerHTML = catHtml;
+
+            var projHtml = '<option value="">Sin proyecto</option>';
+            projects.forEach(function(p) {
+                projHtml += '<option value="' + p.id + '">' + p.name + '</option>';
+            });
+            document.getElementById('bulk-alloc-project').innerHTML = projHtml;
+
+            var clientHtml = '<option value="">Sin cliente</option>';
+            clients.forEach(function(c) {
+                clientHtml += '<option value="' + c.id + '">' + c.name + '</option>';
+            });
+            document.getElementById('bulk-alloc-client').innerHTML = clientHtml;
+
+            // Reset form
+            document.getElementById('bulk-alloc-category').value = '';
+            document.getElementById('bulk-alloc-project').value = '';
+            document.getElementById('bulk-alloc-client').value = '';
+            document.getElementById('bulk-alloc-pct').value = '100';
+
+            document.getElementById('bulk-alloc-count').textContent = selectedTransactions.length;
+            openModal('bulk-allocation');
+        }
+
+        function saveBulkAllocation() {
+            var cat = document.getElementById('bulk-alloc-category').value;
+            var proj = document.getElementById('bulk-alloc-project').value;
+            var cli = document.getElementById('bulk-alloc-client').value;
+            var pct = parseInt(document.getElementById('bulk-alloc-pct').value) || 100;
+
+            if (!cat && !proj && !cli) {
+                alert('Selecciona al menos una categoria, proyecto o cliente');
+                return;
+            }
+
+            var promises = selectedTransactions.map(function(txId) {
+                return fetch('/api/transaction-allocation', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        transaction_id: txId,
+                        category: cat || null,
+                        project_id: proj || null,
+                        client_id: cli || null,
+                        percentage: pct
+                    })
+                });
+            });
+
+            Promise.all(promises).then(function() {
+                closeModal('bulk-allocation');
+                clearSelection();
+                loadTransactionAllocations();
+            }).catch(function(e) {
+                alert('Error: ' + e.message);
             });
         }
 
