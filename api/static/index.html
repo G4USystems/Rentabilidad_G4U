@@ -3459,8 +3459,6 @@
                     });
                     renderTxAllocations();
                     renderTransactions();
-                    // Also reload from server to ensure sync
-                    loadTransactionAllocations();
                 }
             }).catch(function(e) {
                 alert('Error: ' + e.message);
@@ -3482,8 +3480,6 @@
                     });
                     renderTxAllocations();
                     renderTransactions();
-                    // Also reload from server to ensure sync
-                    loadTransactionAllocations();
                 }
             }).catch(function(e) {
                 alert('Error: ' + e.message);
