@@ -473,11 +473,11 @@
                                 <tr>
                                     <th class="sortable" onclick="sortTransactions('settled_at')">Fecha <span id="sort-settled_at"></span></th>
                                     <th class="sortable" onclick="sortTransactions('counterparty_name')">Descripcion <span id="sort-counterparty_name"></span></th>
-                                    <th>Tipo</th>
-                                    <th>Cat. Qonto</th>
-                                    <th>Categoria</th>
-                                    <th>Proyecto</th>
-                                    <th>Cliente</th>
+                                    <th class="sortable" onclick="sortTransactions('side')">Tipo <span id="sort-side"></span></th>
+                                    <th class="sortable" onclick="sortTransactions('qonto_category')">Cat. Qonto <span id="sort-qonto_category"></span></th>
+                                    <th class="sortable" onclick="sortTransactions('category')">Categoria <span id="sort-category"></span></th>
+                                    <th class="sortable" onclick="sortTransactions('project')">Proyecto <span id="sort-project"></span></th>
+                                    <th class="sortable" onclick="sortTransactions('client')">Cliente <span id="sort-client"></span></th>
                                     <th class="sortable" onclick="sortTransactions('vat_amount')" style="text-align:right">IVA <span id="sort-vat_amount"></span></th>
                                     <th class="sortable" onclick="sortTransactions('amount')" style="text-align:right">Monto <span id="sort-amount"></span></th>
                                     <th style="width:60px;"></th>
@@ -1289,7 +1289,7 @@
                 sortDirection = 'desc';
             }
             // Update sort indicators
-            ['settled_at', 'counterparty_name', 'qonto_category', 'vat_amount', 'amount'].forEach(function(f) {
+            ['settled_at', 'counterparty_name', 'side', 'qonto_category', 'category', 'project', 'client', 'vat_amount', 'amount'].forEach(function(f) {
                 var el = document.getElementById('sort-' + f);
                 if (el) el.textContent = (f === sortField) ? (sortDirection === 'asc' ? '▲' : '▼') : '';
             });
@@ -1386,10 +1386,50 @@
                 return true;
             });
 
+            // Add computed fields for sorting
+            filtered.forEach(function(t) {
+                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
+                t._category = '-';
+                t._project = '-';
+                t._client = '-';
+                if (txAllocs.length > 0) {
+                    var cats = txAllocs.map(function(a) { return a.category; }).filter(Boolean);
+                    if (cats.length > 0) t._category = cats.join(', ');
+                    var projNames = txAllocs.map(function(a) {
+                        if (a.project_id) {
+                            var p = projects.find(function(p) { return p.id === a.project_id; });
+                            return p ? p.name : null;
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    if (projNames.length > 0) t._project = projNames.join(', ');
+                    var clientNames = txAllocs.map(function(a) {
+                        if (a.client_id) {
+                            var c = clients.find(function(c) { return c.id === a.client_id; });
+                            return c ? c.name : null;
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    if (clientNames.length > 0) t._client = clientNames.join(', ');
+                }
+            });
+
             // Sort transactions
             filtered.sort(function(a, b) {
-                var aVal = a[sortField] || '';
-                var bVal = b[sortField] || '';
+                var aVal, bVal;
+                if (sortField === 'category') {
+                    aVal = a._category || '';
+                    bVal = b._category || '';
+                } else if (sortField === 'project') {
+                    aVal = a._project || '';
+                    bVal = b._project || '';
+                } else if (sortField === 'client') {
+                    aVal = a._client || '';
+                    bVal = b._client || '';
+                } else {
+                    aVal = a[sortField] || '';
+                    bVal = b[sortField] || '';
+                }
                 if (sortField === 'amount' || sortField === 'vat_amount') {
                     aVal = parseFloat(aVal) || 0;
                     bVal = parseFloat(bVal) || 0;
@@ -1406,32 +1446,9 @@
                 var typeLabel = t.side === 'credit' ? 'Ingreso' : 'Egreso';
                 var typeCls = t.side === 'credit' ? 'ingreso' : 'egreso';
                 var vatAmount = parseFloat(t.vat_amount) || 0;
-
-                // Get allocation info
-                var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
-                var category = '-';
-                var projectName = '-';
-                var clientName = '-';
-                if (txAllocs.length > 0) {
-                    var cats = txAllocs.map(function(a) { return a.category; }).filter(Boolean);
-                    if (cats.length > 0) category = cats.join(', ');
-                    var projNames = txAllocs.map(function(a) {
-                        if (a.project_id) {
-                            var p = projects.find(function(p) { return p.id === a.project_id; });
-                            return p ? p.name : null;
-                        }
-                        return null;
-                    }).filter(Boolean);
-                    if (projNames.length > 0) projectName = projNames.join(', ');
-                    var clientNames = txAllocs.map(function(a) {
-                        if (a.client_id) {
-                            var c = clients.find(function(c) { return c.id === a.client_id; });
-                            return c ? c.name : null;
-                        }
-                        return null;
-                    }).filter(Boolean);
-                    if (clientNames.length > 0) clientName = clientNames.join(', ');
-                }
+                var category = t._category;
+                var projectName = t._project;
+                var clientName = t._client;
 
                 html += '<tr>';
                 html += '<td style="white-space:nowrap;">' + formatDate(t.settled_at) + '</td>';
