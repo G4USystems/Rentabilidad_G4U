@@ -13,12 +13,18 @@ services:
       - QONTO_API_KEY=${QONTO_API_KEY}
       - QONTO_ORGANIZATION_SLUG=${QONTO_ORGANIZATION_SLUG}
       - QONTO_IBAN=${QONTO_IBAN}
+      - STORAGE_TYPE=${STORAGE_TYPE:-airtable}
+      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
+      - AIRTABLE_BASE_ID=${AIRTABLE_BASE_ID}
+      - FLASK_APP=api.index:app
+      - FLASK_DEBUG=1
     depends_on:
       - db
       - redis
     volumes:
       - ./app:/app/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./api:/app/api
+    command: flask run --host 0.0.0.0 --port 8000 --reload
 
   db:
     image: postgres:15-alpine
