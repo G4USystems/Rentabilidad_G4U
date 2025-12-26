@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     secret_key: str = "change-me-in-production"
 
+    # Google OAuth
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/auth/callback"
+    allowed_email_domains: str = "growth4u.io"
+
+    # JWT Settings
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_hours: int = 24
+
     # Qonto API
     qonto_api_key: str = ""
     qonto_organization_slug: str = ""

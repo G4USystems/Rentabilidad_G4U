@@ -7,15 +7,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/rentabilidad_g4u
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/rentabilidad_g4u
       - REDIS_URL=redis://redis:6379/0
-      - QONTO_API_KEY=${QONTO_API_KEY}
-      - QONTO_ORGANIZATION_SLUG=${QONTO_ORGANIZATION_SLUG}
-      - QONTO_IBAN=${QONTO_IBAN}
-      - STORAGE_TYPE=${STORAGE_TYPE:-airtable}
-      - AIRTABLE_TOKEN=${AIRTABLE_TOKEN}
-      - AIRTABLE_BASE_ID=${AIRTABLE_BASE_ID}
       - FLASK_APP=api.index:app
       - FLASK_DEBUG=1
     depends_on:
