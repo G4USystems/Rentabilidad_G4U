@@ -171,7 +171,12 @@ def auth_callback():
 
         # Validate domain
         domain = email.split('@')[-1].lower()
-        allowed_domains = os.getenv("ALLOWED_EMAIL_DOMAINS").lower().split(",")
+        allowed_domains_env = os.getenv("ALLOWED_EMAIL_DOMAINS", "")
+        if not allowed_domains_env:
+            return render_login_page(
+                error="Error de configuracion: ALLOWED_EMAIL_DOMAINS no esta definida"
+            )
+        allowed_domains = [d.strip().lower() for d in allowed_domains_env.split(",") if d.strip()]
         if domain not in allowed_domains:
             domains_list = ", ".join(f"@{d.strip()}" for d in allowed_domains)
             return render_login_page(
