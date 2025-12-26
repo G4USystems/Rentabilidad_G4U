@@ -5,15 +5,275 @@ Rentabilidad G4U - Simple P&L Dashboard
 import os
 import sys
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from urllib.parse import quote
-from flask import Flask, jsonify, request, render_template_string
+from functools import wraps
+from flask import Flask, jsonify, request, render_template_string, redirect, make_response
 import httpx
+import jwt as pyjwt
+from authlib.integrations.flask_client import OAuth
 
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 app = Flask(__name__)
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
+app.secret_key = SECRET_KEY
+
+# ==================== OAuth Configuration ====================
+
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'},
+)
+
+# ==================== Auth Helpers ====================
+
+def require_auth(f):
+    """Decorator to require authentication for Flask routes."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.cookies.get('auth_token')
+        if not token:
+            return jsonify({"error": "Not authenticated"}), 401
+        try:
+            payload = pyjwt.decode(
+                token,
+                SECRET_KEY,
+                algorithms=["HS256"]
+            )
+            request.current_user = payload
+        except pyjwt.ExpiredSignatureError:
+            return jsonify({"error": "Token expired"}), 401
+        except pyjwt.InvalidTokenError:
+            return jsonify({"error": "Invalid token"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+def render_login_page(error=None):
+    """Render the login page HTML."""
+    error_html = f"<div class='error'>{error}</div>" if error else ""
+    return f'''<!DOCTYPE html>
+<html>
+<head>
+    <title>G4U - Login</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }}
+        .login-container {{
+            background: white;
+            border-radius: 16px;
+            padding: 48px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }}
+        .logo {{ font-size: 32px; font-weight: 700; color: #4f46e5; margin-bottom: 8px; }}
+        .subtitle {{ color: #64748b; margin-bottom: 32px; font-size: 14px; }}
+        .google-btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #1e293b;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }}
+        .google-btn:hover {{
+            background: #f8fafc;
+            border-color: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+        }}
+        .google-btn svg {{ width: 20px; height: 20px; }}
+        .error {{
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            border: 1px solid #fecaca;
+        }}
+        .domain-note {{
+            margin-top: 32px;
+            font-size: 13px;
+            color: #94a3b8;
+        }}
+        .domain-note strong {{ color: #64748b; }}
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">G4U Finance</div>
+        <p class="subtitle">Dashboard de Rentabilidad</p>
+
+        {error_html}
+
+        <a href="/auth/login" class="google-btn">
+            <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Iniciar sesion con Google
+        </a>
+
+        <p class="domain-note">
+            Solo usuarios con email <strong>@growth4u.io</strong>
+        </p>
+    </div>
+</body>
+</html>'''
+
+
+# ==================== Auth Routes ====================
+
+@app.route("/auth/login")
+def auth_login():
+    """Initiate Google OAuth login."""
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
+    return google.authorize_redirect(redirect_uri)
+
+
+@app.route("/auth/callback")
+def auth_callback():
+    """Handle Google OAuth callback."""
+    try:
+        token = google.authorize_access_token()
+        user_info = token.get('userinfo')
+
+        # If userinfo not in token, fetch it from Google
+        if not user_info or not user_info.get('picture'):
+            user_info = google.userinfo()
+
+        if not user_info:
+            return render_login_page(error="No se pudo obtener informacion del usuario de Google")
+
+        email = user_info.get('email', '')
+
+        # Validate domain
+        domain = email.split('@')[-1].lower()
+        allowed_domains_env = os.getenv("ALLOWED_EMAIL_DOMAINS", "")
+        if not allowed_domains_env:
+            return render_login_page(
+                error="Error de configuracion: ALLOWED_EMAIL_DOMAINS no esta definida"
+            )
+        allowed_domains = [d.strip().lower() for d in allowed_domains_env.split(",") if d.strip()]
+        if domain not in allowed_domains:
+            domains_list = ", ".join(f"@{d.strip()}" for d in allowed_domains)
+            return render_login_page(
+                error=f"Acceso restringido a emails {domains_list}. Tu email: {email}"
+            )
+
+        # Create user data for JWT
+        user_data = {
+            "id": hash(user_info.get('sub')) % 10000000,
+            "email": email,
+            "google_id": user_info.get('sub'),
+            "name": user_info.get('name', email),
+            "picture": user_info.get('picture'),
+        }
+
+        # Create JWT token
+        expire = datetime.utcnow() + timedelta(hours=24)
+        jwt_payload = {
+            "sub": email,
+            "user_id": user_data["id"],
+            "name": user_data["name"],
+            "picture": user_data.get("picture"),
+            "exp": expire,
+            "iat": datetime.utcnow(),
+        }
+        jwt_token = pyjwt.encode(
+            jwt_payload,
+            SECRET_KEY,
+            algorithm="HS256"
+        )
+
+        # Set cookie and redirect to app
+        response = make_response(redirect('/'))
+        response.set_cookie(
+            'auth_token',
+            jwt_token,
+            httponly=True,
+            secure=os.getenv("APP_ENV") == "production",
+            samesite='Lax',
+            max_age=24 * 60 * 60  # 24 hours
+        )
+        return response
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return render_login_page(error=f"Error de autenticacion: {str(e)}")
+
+
+@app.route("/auth/logout")
+def auth_logout():
+    """Log out user by clearing cookie."""
+    response = make_response(redirect('/auth/login-page'))
+    response.delete_cookie('auth_token')
+    return response
+
+
+@app.route("/auth/login-page")
+def auth_login_page():
+    """Show login page. Redirect to / if already authenticated."""
+    token = request.cookies.get('auth_token')
+    if token:
+        try:
+            pyjwt.decode(
+                token,
+                SECRET_KEY,
+                algorithms=["HS256"]
+            )
+            return redirect('/')
+        except:
+            pass  # Token invalid, show login page
+    return render_login_page()
+
+
+@app.route("/auth/me")
+def auth_me():
+    """Get current user info."""
+    token = request.cookies.get('auth_token')
+    if not token:
+        return jsonify({"authenticated": False}), 401
+
+    try:
+        payload = pyjwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=["HS256"]
+        )
+        return jsonify({
+            "authenticated": True,
+            "user": {
+                "email": payload.get("sub"),
+                "name": payload.get("name"),
+                "picture": payload.get("picture"),
+            }
+        })
+    except:
+        return jsonify({"authenticated": False}), 401
 
 # ==================== Airtable Client ====================
 
@@ -533,8 +793,23 @@ HTML = """
 
 @app.route("/")
 def index():
+    """Serve main app - requires authentication."""
     from flask import send_from_directory
-    import os
+
+    # Check authentication
+    token = request.cookies.get('auth_token')
+    if not token:
+        return redirect('/auth/login-page')
+
+    try:
+        pyjwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=["HS256"]
+        )
+    except:
+        return redirect('/auth/login-page')
+
     static_dir = os.path.join(os.path.dirname(__file__), 'static')
     return send_from_directory(static_dir, 'index.html')
 
@@ -551,6 +826,7 @@ def api_status():
     })
 
 @app.route("/api/data")
+@require_auth
 def api_data():
     try:
         airtable = Airtable()
@@ -762,6 +1038,7 @@ def api_debug_vat():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/sync", methods=["POST"])
+@require_auth
 def api_sync():
     try:
         qonto = Qonto()
@@ -1030,6 +1307,7 @@ def api_assign_project():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/transaction", methods=["POST"])
+@require_auth
 def api_create_transaction():
     """Create a manual transaction."""
     try:
@@ -1346,6 +1624,7 @@ def api_diagnostics():
 # ==================== Salary Allocation ====================
 
 @app.route("/api/team-members")
+@require_auth
 def api_team_members():
     """Get all team members."""
     try:
@@ -1370,6 +1649,7 @@ def api_team_members():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/team-member", methods=["POST"])
+@require_auth
 def api_create_team_member():
     """Create a team member."""
     try:
@@ -1388,6 +1668,7 @@ def api_create_team_member():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/team-member/<member_id>", methods=["PUT"])
+@require_auth
 def api_update_team_member(member_id):
     """Update a team member."""
     try:
@@ -1406,6 +1687,7 @@ def api_update_team_member(member_id):
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/team-member/<member_id>", methods=["DELETE"])
+@require_auth
 def api_delete_team_member(member_id):
     """Delete a team member."""
     try:
@@ -1418,6 +1700,7 @@ def api_delete_team_member(member_id):
 # ==================== Projects CRUD ====================
 
 @app.route("/api/projects")
+@require_auth
 def api_projects():
     """Get all projects."""
     try:
@@ -1441,6 +1724,7 @@ def api_projects():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/project", methods=["POST"])
+@require_auth
 def api_create_project():
     """Create a project."""
     try:
@@ -1461,6 +1745,7 @@ def api_create_project():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/project/<project_id>", methods=["PUT"])
+@require_auth
 def api_update_project(project_id):
     """Update a project."""
     try:
@@ -1483,6 +1768,7 @@ def api_update_project(project_id):
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/project/<project_id>", methods=["DELETE"])
+@require_auth
 def api_delete_project(project_id):
     """Delete a project."""
     try:
@@ -1495,6 +1781,7 @@ def api_delete_project(project_id):
 # ==================== Clients CRUD ====================
 
 @app.route("/api/clients")
+@require_auth
 def api_clients():
     """Get all clients."""
     try:
@@ -1520,6 +1807,7 @@ def api_clients():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/client", methods=["POST"])
+@require_auth
 def api_create_client():
     """Create a client."""
     try:
@@ -1541,6 +1829,7 @@ def api_create_client():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/client/<client_id>", methods=["PUT"])
+@require_auth
 def api_update_client(client_id):
     """Update a client."""
     try:
@@ -1566,6 +1855,7 @@ def api_update_client(client_id):
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/client/<client_id>", methods=["DELETE"])
+@require_auth
 def api_delete_client(client_id):
     """Delete a client."""
     try:
@@ -1578,6 +1868,7 @@ def api_delete_client(client_id):
 # ==================== Categories CRUD ====================
 
 @app.route("/api/categories")
+@require_auth
 def api_categories():
     """Get all categories from Categories table."""
     try:
@@ -1599,6 +1890,7 @@ def api_categories():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/category", methods=["POST"])
+@require_auth
 def api_create_category():
     """Create a category in Categories table."""
     try:
@@ -1616,6 +1908,7 @@ def api_create_category():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/category/<category_id>", methods=["PUT"])
+@require_auth
 def api_update_category(category_id):
     """Update a category in Categories table."""
     try:
@@ -1633,6 +1926,7 @@ def api_update_category(category_id):
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/category/<category_id>", methods=["DELETE"])
+@require_auth
 def api_delete_category(category_id):
     """Delete a category from Categories table."""
     try:
@@ -1645,6 +1939,7 @@ def api_delete_category(category_id):
 # ==================== Transaction Updates ====================
 
 @app.route("/api/transaction/<tx_id>", methods=["PUT"])
+@require_auth
 def api_update_transaction(tx_id):
     """Update a transaction (category, project, client assignment, etc)."""
     try:
@@ -1688,6 +1983,7 @@ def api_update_transaction(tx_id):
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/salary-allocations")
+@require_auth
 def api_salary_allocations():
     """Get salary allocations. Optional ?month=YYYY-MM parameter."""
     try:
@@ -1720,6 +2016,7 @@ def api_salary_allocations():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/salary-allocation", methods=["POST"])
+@require_auth
 def api_save_salary_allocation():
     """Save or update a salary allocation for a specific month."""
     try:
@@ -1771,6 +2068,7 @@ def api_save_salary_allocation():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/salary-allocation/<allocation_id>", methods=["DELETE"])
+@require_auth
 def api_delete_salary_allocation(allocation_id):
     """Delete a salary allocation."""
     try:
@@ -1783,6 +2081,7 @@ def api_delete_salary_allocation(allocation_id):
 # ==================== Transaction Allocations ====================
 
 @app.route("/api/transaction-allocations")
+@require_auth
 def api_transaction_allocations():
     """Get all transaction allocations."""
     try:
@@ -1812,6 +2111,7 @@ def api_transaction_allocations():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/transaction-allocations/<transaction_id>")
+@require_auth
 def api_transaction_allocations_by_tx(transaction_id):
     """Get allocations for a specific transaction."""
     try:
@@ -1841,6 +2141,7 @@ def api_transaction_allocations_by_tx(transaction_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/transaction-allocation", methods=["POST"])
+@require_auth
 def api_create_transaction_allocation():
     """Create a new transaction allocation."""
     try:
@@ -1870,6 +2171,7 @@ def api_create_transaction_allocation():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/transaction-allocation/<allocation_id>", methods=["PUT"])
+@require_auth
 def api_update_transaction_allocation(allocation_id):
     """Update a transaction allocation."""
     try:
@@ -1891,6 +2193,7 @@ def api_update_transaction_allocation(allocation_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/transaction-allocation/<allocation_id>", methods=["DELETE"])
+@require_auth
 def api_delete_transaction_allocation(allocation_id):
     """Delete a transaction allocation."""
     try:
@@ -1901,6 +2204,7 @@ def api_delete_transaction_allocation(allocation_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/project-costs")
+@require_auth
 def api_project_costs():
     """Get project costs including salary allocations for a given month."""
     try:
