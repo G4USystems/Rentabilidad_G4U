@@ -183,6 +183,15 @@ def auth_callback():
                 error=f"Acceso restringido a emails {domains_list}. Tu email: {email}"
             )
 
+        # Validate email against allowed list (if configured)
+        allowed_emails_env = os.getenv("ALLOWED_EMAILS", "")
+        if allowed_emails_env:
+            allowed_emails = [e.strip().lower() for e in allowed_emails_env.split(",") if e.strip()]
+            if email.lower() not in allowed_emails:
+                return render_login_page(
+                    error=f"Tu email ({email}) no esta en la lista de usuarios autorizados"
+                )
+
         # Create user data for JWT
         user_data = {
             "id": hash(user_info.get('sub')) % 10000000,
