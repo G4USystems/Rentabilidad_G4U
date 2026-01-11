@@ -1,0 +1,37 @@
+{
+  "service_offerings": [
+    {
+      "id": "GTM",
+      "name": "GTM (Go-To-Market)"
+    },
+    {
+      "id": "Consulting",
+      "name": "Consulting"
+    },
+    {
+      "id": "Training",
+      "name": "Training"
+    },
+    {
+      "id": "Development",
+      "name": "Development"
+    },
+    {
+      "id": "Marketing",
+      "name": "Marketing"
+    },
+    {
+      "id": "Other",
+      "name": "Otro"
+    },
+    {
+      "id": "Trust Engine",
+      "name": "Trust Engine"
+    }
+  ],
+  "general_expenses_distribution": {
+    "rec4N6MH1i911Xek4": 30,
+    "rec5Znza8LHiphsKm": 20,
+    "recdwNezYAJGhOHb5": 50
+  }
+}

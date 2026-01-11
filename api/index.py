@@ -37,6 +37,11 @@ def require_auth(f):
     """Decorator to require authentication for Flask routes."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        # Skip auth in development mode
+        if os.getenv("APP_ENV") == "development" and os.getenv("SKIP_AUTH", "").lower() == "true":
+            request.current_user = {"email": "dev@localhost", "name": "Developer"}
+            return f(*args, **kwargs)
+
         token = request.cookies.get('auth_token')
         if not token:
             return jsonify({"error": "Not authenticated"}), 401
@@ -263,6 +268,17 @@ def auth_login_page():
 @app.route("/auth/me")
 def auth_me():
     """Get current user info."""
+    # Skip auth in development mode
+    if os.getenv("APP_ENV") == "development" and os.getenv("SKIP_AUTH", "").lower() == "true":
+        return jsonify({
+            "authenticated": True,
+            "user": {
+                "email": "dev@localhost",
+                "name": "Developer",
+                "picture": None,
+            }
+        })
+
     token = request.cookies.get('auth_token')
     if not token:
         return jsonify({"authenticated": False}), 401
@@ -343,6 +359,10 @@ class Airtable:
         encoded_table = quote(table, safe='')
         with httpx.Client(timeout=30) as client:
             r = client.patch(f"{self.base_url}/{encoded_table}/{record_id}", headers=self.headers, json={"fields": fields})
+            if r.status_code == 422:
+                # Airtable 422 usually means invalid field value (e.g., Single Select option doesn't exist)
+                error_detail = r.json() if r.headers.get('content-type', '').startswith('application/json') else r.text
+                raise Exception(f"Airtable 422: {error_detail}. Fields sent: {fields}")
             r.raise_for_status()
             return r.json()
 
@@ -353,6 +373,54 @@ class Airtable:
             # Airtable expects records[] query params
             params = "&".join([f"records[]={rid}" for rid in record_ids])
             r = client.delete(f"{self.base_url}/{encoded_table}?{params}", headers=self.headers)
+            r.raise_for_status()
+            return r.json()
+
+    def create_table(self, name, fields):
+        """Create a new table in the base.
+
+        fields format: [{"name": "Field Name", "type": "singleLineText"}, ...]
+        Types: singleLineText, multilineText, singleSelect, date, number, checkbox,
+               multipleRecordLinks (for linked records)
+        """
+        meta_url = f"https://api.airtable.com/v0/meta/bases/{self.base_id}/tables"
+        with httpx.Client(timeout=30) as client:
+            r = client.post(meta_url, headers=self.headers, json={
+                "name": name,
+                "fields": fields
+            })
+            if r.status_code == 422:
+                error_detail = r.json() if r.headers.get('content-type', '').startswith('application/json') else r.text
+                raise Exception(f"Airtable 422 creating table: {error_detail}")
+            r.raise_for_status()
+            return r.json()
+
+    def create_field(self, table_id, name, field_type, options=None):
+        """Create a new field in a table.
+
+        table_id: The table ID (not name)
+        field_type: singleLineText, date, singleSelect, multipleRecordLinks, etc.
+        options: For singleSelect: {"choices": [{"name": "Option1"}, ...]}
+                 For multipleRecordLinks: {"linkedTableId": "tblXXX"}
+        """
+        meta_url = f"https://api.airtable.com/v0/meta/bases/{self.base_id}/tables/{table_id}/fields"
+        payload = {"name": name, "type": field_type}
+        if options:
+            payload["options"] = options
+
+        with httpx.Client(timeout=30) as client:
+            r = client.post(meta_url, headers=self.headers, json=payload)
+            if r.status_code == 422:
+                error_detail = r.json() if r.headers.get('content-type', '').startswith('application/json') else r.text
+                raise Exception(f"Airtable 422 creating field: {error_detail}")
+            r.raise_for_status()
+            return r.json()
+
+    def get_base_schema(self):
+        """Get the schema of all tables in the base."""
+        meta_url = f"https://api.airtable.com/v0/meta/bases/{self.base_id}/tables"
+        with httpx.Client(timeout=30) as client:
+            r = client.get(meta_url, headers=self.headers)
             r.raise_for_status()
             return r.json()
 
@@ -805,6 +873,11 @@ def index():
     """Serve main app - requires authentication."""
     from flask import send_from_directory
 
+    # Skip auth in development mode
+    if os.getenv("APP_ENV") == "development" and os.getenv("SKIP_AUTH", "").lower() == "true":
+        static_dir = os.path.join(os.path.dirname(__file__), 'static')
+        return send_from_directory(static_dir, 'index.html')
+
     # Check authentication
     token = request.cookies.get('auth_token')
     if not token:
@@ -905,6 +978,9 @@ def api_data():
                     vat_amount = r.get("VAT Amount") or r.get("vat_amount") or r.get("IVA") or 0
                     vat_rate = r.get("VAT Rate") or r.get("vat_rate") or r.get("Tipo IVA") or 0
 
+                    # Status field (for detecting refunds/reversals)
+                    status = r.get("Status") or r.get("status") or "completed"
+
                     transactions.append({
                         "id": r.get("id"),
                         "amount": float(amt) if amt else 0,
@@ -917,7 +993,9 @@ def api_data():
                         "client_id": client_id,
                         "qonto_category": qonto_category,
                         "vat_amount": float(vat_amount) if vat_amount else 0,
-                        "vat_rate": float(vat_rate) if vat_rate else 0
+                        "vat_rate": float(vat_rate) if vat_rate else 0,
+                        "is_excluded": bool(r.get("is_excluded") or r.get("Is Excluded") or False),
+                        "status": status
                     })
             except Exception as e:
                 pass
@@ -1708,6 +1786,95 @@ def api_delete_team_member(member_id):
 
 # ==================== Projects CRUD ====================
 
+@app.route("/api/debug/table-fields/<table>")
+@require_auth
+def api_debug_table_fields(table):
+    """Debug: Get raw Airtable fields for a table (first record)."""
+    try:
+        airtable = Airtable()
+        records = airtable.get_all(table)
+        if records:
+            # Return all field names from first record
+            sample = records[0]
+            return jsonify({
+                "table": table,
+                "record_count": len(records),
+                "fields": list(sample.keys()),
+                "sample_record": sample
+            })
+        return jsonify({"table": table, "record_count": 0, "fields": [], "sample_record": None})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route("/api/debug/airtable-schema")
+@require_auth
+def api_debug_airtable_schema():
+    """Get full Airtable base schema (all tables and fields)."""
+    try:
+        airtable = Airtable()
+        schema = airtable.get_base_schema()
+        return jsonify(schema)
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route("/api/admin/create-offerings-table", methods=["POST"])
+@require_auth
+def api_create_offerings_table():
+    """Create the 'Ofertas G4U' table and link it to Projects."""
+    try:
+        airtable = Airtable()
+
+        # First get the schema to find Projects table ID
+        schema = airtable.get_base_schema()
+        projects_table = None
+        for table in schema.get("tables", []):
+            if table["name"] == "Projects":
+                projects_table = table
+                break
+
+        if not projects_table:
+            return jsonify({"error": "Projects table not found"}), 404
+
+        projects_table_id = projects_table["id"]
+
+        # Create Ofertas G4U table with Name field
+        offerings_table = airtable.create_table("Ofertas G4U", [
+            {"name": "Name", "type": "singleLineText"},
+            {"name": "Descripcion", "type": "multilineText"}
+        ])
+
+        offerings_table_id = offerings_table["id"]
+
+        # Now create Service field in Projects linking to Ofertas G4U
+        service_field = airtable.create_field(
+            projects_table_id,
+            "Service",
+            "multipleRecordLinks",
+            {"linkedTableId": offerings_table_id}
+        )
+
+        # Populate Ofertas G4U with default offerings
+        settings = load_local_settings()
+        offerings = settings.get("service_offerings", [])
+        for offering in offerings:
+            airtable.create("Ofertas G4U", {"Name": offering["name"]})
+
+        return jsonify({
+            "ok": True,
+            "offerings_table_id": offerings_table_id,
+            "service_field_id": service_field.get("id"),
+            "offerings_created": len(offerings)
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
 @app.route("/api/projects")
 @require_auth
 def api_projects():
@@ -1718,16 +1885,19 @@ def api_projects():
             records = airtable.get_all("Projects")
             projects = []
             for r in records:
-                # Client is a text field (name)
+                # Client and Service are text fields, dates are date fields
                 projects.append({
                     "id": r.get("id"),
                     "name": r.get("Name") or r.get("name") or "",
+                    "service": r.get("Service") or r.get("service") or r.get("Oferta G4U") or "",
                     "client": r.get("Client") or r.get("client") or "",
-                    "status": r.get("Status") or r.get("status") or "Active"
+                    "status": r.get("Status") or r.get("status") or "Active",
+                    "start_date": r.get("Start Date") or r.get("start_date") or "",
+                    "end_date": r.get("End Date") or r.get("end_date") or ""
                 })
             return jsonify({"projects": projects})
         except Exception:
-            return jsonify({"projects": [], "note": "Create 'Projects' table in Airtable with Name, Client, Status fields"})
+            return jsonify({"projects": [], "note": "Create 'Projects' table in Airtable with Name, Service, Client, Status fields"})
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
@@ -1735,18 +1905,49 @@ def api_projects():
 @app.route("/api/project", methods=["POST"])
 @require_auth
 def api_create_project():
-    """Create a project."""
+    """Create a project.
+
+    IMPORTANT: Airtable rejects empty strings for certain field types.
+    Only include fields with actual non-empty values.
+    """
     try:
         data = request.json
         airtable = Airtable()
 
-        record = {
-            "Name": data.get("name", ""),
-            "Status": data.get("status", "Active"),
-            "Client": data.get("client", "")  # Text field, not linked record
-        }
+        # Build record with only non-empty values
+        record = {}
 
-        record = {k: v for k, v in record.items() if v}
+        name = (data.get("name") or "").strip()
+        if name:
+            record["Name"] = name
+        else:
+            return jsonify({"error": "El nombre del proyecto es requerido"}), 400
+
+        # Service (Oferta G4U) - Linked record to "Ofertas G4U" table
+        # Frontend sends the record ID from Ofertas G4U
+        service = (data.get("service") or "").strip()
+        if service:
+            # Service is a linked record - send as array with single ID
+            record["Service"] = [service]
+
+        status = (data.get("status") or "").strip()
+        if status:
+            record["Status"] = status
+        else:
+            record["Status"] = "Active"  # Default
+
+        client = (data.get("client") or "").strip()
+        if client:
+            record["Client"] = client
+
+        start_date = (data.get("start_date") or "").strip()
+        if start_date:
+            record["Start Date"] = start_date
+
+        end_date = (data.get("end_date") or "").strip()
+        if end_date:
+            record["End Date"] = end_date
+
         result = airtable.create("Projects", record)
         return jsonify({"ok": True, "id": result.get("id")})
     except Exception as e:
@@ -1756,20 +1957,52 @@ def api_create_project():
 @app.route("/api/project/<project_id>", methods=["PUT"])
 @require_auth
 def api_update_project(project_id):
-    """Update a project."""
+    """Update a project.
+
+    IMPORTANT: Airtable rejects empty strings for certain field types (Single Select, Date).
+    We only include fields that have actual non-empty values.
+    To clear a field, send null (but this is handled separately).
+    """
     try:
         data = request.json
         airtable = Airtable()
 
-        record = {
-            "Name": data.get("name", ""),
-            "Status": data.get("status", "")
-        }
-        # Client is a text field
-        if "client" in data:
-            record["Client"] = data.get("client", "")
+        # Build record only with fields that have actual non-empty values
+        record = {}
 
-        record = {k: v for k, v in record.items() if v is not None}
+        # Name is required
+        name = (data.get("name") or "").strip()
+        if name:
+            record["Name"] = name
+        else:
+            return jsonify({"error": "El nombre del proyecto es requerido"}), 400
+
+        # Status - only add if has value
+        status = (data.get("status") or "").strip()
+        if status:
+            record["Status"] = status
+
+        # Service (Oferta G4U) - Linked record to "Ofertas G4U" table
+        service = (data.get("service") or "").strip()
+        if service:
+            # Service is a linked record - send as array with single ID
+            record["Service"] = [service]
+
+        # Client - text field, only include if has value
+        client = (data.get("client") or "").strip()
+        if client:
+            record["Client"] = client
+        # If empty, don't include - this preserves existing value
+
+        # Date fields - NEVER send empty strings to Date fields
+        start_date = (data.get("start_date") or "").strip()
+        if start_date:
+            record["Start Date"] = start_date
+
+        end_date = (data.get("end_date") or "").strip()
+        if end_date:
+            record["End Date"] = end_date
+
         airtable.update("Projects", project_id, record)
         return jsonify({"ok": True})
     except Exception as e:
@@ -1945,6 +2178,379 @@ def api_delete_category(category_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ==================== Settings/Configuration ====================
+
+# In-memory cache for settings (persisted in Airtable Settings table)
+_settings_cache = {}
+
+import json as json_module
+
+# Local settings file path for fallback
+SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'settings.json')
+
+def load_local_settings():
+    """Load settings from local file."""
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, 'r') as f:
+                return json_module.load(f)
+    except:
+        pass
+    return {}
+
+def save_local_settings(settings):
+    """Save settings to local file."""
+    with open(SETTINGS_FILE, 'w') as f:
+        json_module.dump(settings, f, indent=2)
+
+@app.route("/api/general-expenses-distribution", methods=["GET"])
+@require_auth
+def api_get_general_expenses_distribution():
+    """Get the general expenses distribution configuration."""
+    try:
+        airtable = Airtable()
+        try:
+            records = airtable.get_all("Settings")
+            for r in records:
+                if r.get("Key") == "general_expenses_distribution":
+                    distribution = json_module.loads(r.get("Value") or "{}")
+                    return jsonify({"distribution": distribution})
+            return jsonify({"distribution": {}})
+        except Exception:
+            # Fallback to local file
+            settings = load_local_settings()
+            return jsonify({"distribution": settings.get("general_expenses_distribution", {})})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/general-expenses-distribution", methods=["POST"])
+@require_auth
+def api_save_general_expenses_distribution():
+    """Save the general expenses distribution configuration."""
+    try:
+        data = request.json
+        distribution = data.get("distribution", {})
+
+        value = json_module.dumps(distribution)
+
+        airtable = Airtable()
+
+        # Try to save to Airtable first
+        try:
+            records = airtable.get_all("Settings")
+            existing_id = None
+            for r in records:
+                if r.get("Key") == "general_expenses_distribution":
+                    existing_id = r.get("id")
+                    break
+
+            if existing_id:
+                airtable.update("Settings", existing_id, {"Value": value})
+            else:
+                airtable.create("Settings", {"Key": "general_expenses_distribution", "Value": value})
+
+            return jsonify({"ok": True})
+        except Exception as e:
+            # Fallback to local file
+            settings = load_local_settings()
+            settings["general_expenses_distribution"] = distribution
+            save_local_settings(settings)
+            return jsonify({"ok": True, "note": "Saved to local file (Settings table not found in Airtable)"})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+# ==================== Monthly Distribution ====================
+
+@app.route("/api/monthly-distribution", methods=["GET"])
+@require_auth
+def api_get_monthly_distribution():
+    """Get the monthly general expenses distribution for a specific month.
+
+    Query params:
+    - month: YYYY-MM format (e.g., "2025-01")
+
+    Returns:
+    - distributions: [{project_id, project_name, client_name, percentage}]
+    - general_expenses: total unassigned expenses for that month
+    - active_projects: list of all active projects
+    """
+    try:
+        month = request.args.get("month")
+        if not month:
+            return jsonify({"error": "month parameter required (YYYY-MM format)"}), 400
+
+        # Load all monthly distributions from settings
+        settings = load_local_settings()
+        monthly_distributions = settings.get("monthly_distributions", {})
+        month_data = monthly_distributions.get(month, {})
+
+        # Get all projects to build the distribution list
+        airtable = Airtable()
+        projects_raw = airtable.get_all("Projects")
+
+        # Parse month to get date range for checking project activity
+        year, mon = month.split("-")
+        month_start = f"{year}-{mon}-01"
+        import calendar
+        last_day = calendar.monthrange(int(year), int(mon))[1]
+        month_end = f"{year}-{mon}-{last_day:02d}"
+
+        # Find the "General" project (the bucket for distributable expenses)
+        general_project_id = None
+        all_names = []
+        for p in projects_raw:
+            name = p.get("Name") or p.get("name") or ""
+            all_names.append(name)
+            if name.lower() == "general":
+                general_project_id = p.get("id")
+                break
+
+        # Debug: log all project names if General not found
+        if not general_project_id:
+            print(f"DEBUG: Looking for 'General' project in: {all_names}")
+
+        # Build active projects list (excluding "General" project)
+        # A project is active in a month if:
+        # - Its start_date <= month_end AND (end_date is null OR end_date >= month_start)
+        active_projects = []
+        for p in projects_raw:
+            proj_name = p.get("Name") or p.get("name") or "Sin nombre"
+
+            # Skip the "General" project - it's the source, not a destination
+            if proj_name.lower() == "general":
+                continue
+
+            # Check status
+            status = p.get("Status") or p.get("status") or "active"
+            if status.lower() not in ["active", "activo", ""]:
+                continue
+
+            # Check date range for project activity in this month
+            start_date = p.get("Start Date") or p.get("start_date") or ""
+            end_date = p.get("End Date") or p.get("end_date") or ""
+
+            # If no dates set, consider always active
+            is_active_in_month = True
+            if start_date and start_date > month_end:
+                is_active_in_month = False  # Project starts after this month
+            if end_date and end_date < month_start:
+                is_active_in_month = False  # Project ended before this month
+
+            if is_active_in_month:
+                proj = {
+                    "id": p.get("id"),
+                    "name": proj_name,
+                    "client_name": p.get("Client Name") or p.get("client_name") or p.get("Client") or "",
+                    "start_date": start_date,
+                    "end_date": end_date
+                }
+                active_projects.append(proj)
+
+        # Build distributions list with percentages for this month
+        distributions = []
+        for proj in active_projects:
+            pct = month_data.get(proj["id"], 0)
+            distributions.append({
+                "project_id": proj["id"],
+                "project_name": proj["name"],
+                "client_name": proj["client_name"],
+                "percentage": pct,
+                "start_date": proj.get("start_date", ""),
+                "end_date": proj.get("end_date", "")
+            })
+
+        # Calculate general expenses for this month
+        # "General expenses" = expenses assigned to the "General" project
+        transactions_raw = airtable.get_all("Transactions")
+
+        general_expenses = 0.0
+        for t in transactions_raw:
+            # Check date range - try multiple field names
+            tx_date = (t.get("Settled At") or t.get("Date") or
+                       t.get("settled_at") or t.get("transaction_date") or "")
+            if tx_date < month_start or tx_date > month_end:
+                continue
+
+            # Check if it's an expense (debit)
+            side = t.get("Side") or t.get("side") or ""
+            if side.lower() != "debit":
+                continue
+
+            # Check if excluded
+            is_excluded = t.get("is_excluded") or t.get("Is Excluded") or False
+            if is_excluded:
+                continue
+
+            # Check if assigned to the "General" project
+            # "Project" in Airtable is a linked record (array of IDs)
+            project_field = t.get("Project") or t.get("project_id") or []
+            if isinstance(project_field, list):
+                is_general = general_project_id and general_project_id in project_field
+            else:
+                is_general = general_project_id and project_field == general_project_id
+
+            if is_general:
+                amount = abs(float(t.get("Amount") or t.get("amount") or 0))
+                general_expenses += amount
+
+        return jsonify({
+            "month": month,
+            "distributions": distributions,
+            "general_expenses": round(general_expenses, 2),
+            "active_projects": active_projects,
+            "general_project_id": general_project_id
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route("/api/monthly-distribution", methods=["POST"])
+@require_auth
+def api_save_monthly_distribution():
+    """Save the monthly general expenses distribution for a specific month.
+
+    Body:
+    {
+        "month": "2025-01",
+        "distributions": {"project_id_1": 40, "project_id_2": 60, ...}
+    }
+    """
+    try:
+        data = request.json
+        month = data.get("month")
+        distributions = data.get("distributions", {})
+
+        if not month:
+            return jsonify({"error": "month parameter required"}), 400
+
+        # Validate percentages sum to <= 100
+        total_pct = sum(float(v) for v in distributions.values())
+        if total_pct > 100.01:  # Allow small rounding errors
+            return jsonify({"error": f"Total percentage ({total_pct}%) exceeds 100%"}), 400
+
+        # Load existing settings and update
+        settings = load_local_settings()
+        if "monthly_distributions" not in settings:
+            settings["monthly_distributions"] = {}
+
+        # Clean up zero percentages
+        cleaned = {k: v for k, v in distributions.items() if float(v) > 0}
+        settings["monthly_distributions"][month] = cleaned
+
+        save_local_settings(settings)
+
+        return jsonify({"ok": True, "month": month, "total_percentage": total_pct})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route("/api/monthly-distribution/all", methods=["GET"])
+@require_auth
+def api_get_all_monthly_distributions():
+    """Get all monthly distributions (for loading into frontend).
+
+    Returns all months with their distribution configurations.
+    """
+    try:
+        settings = load_local_settings()
+        monthly_distributions = settings.get("monthly_distributions", {})
+
+        return jsonify({
+            "monthly_distributions": monthly_distributions
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+# ==================== Service Offerings (Ofertas G4U) ====================
+
+@app.route("/api/settings/offerings", methods=["GET"])
+@require_auth
+def api_get_offerings():
+    """Get list of service offerings (Ofertas G4U) from Airtable."""
+    try:
+        airtable = Airtable()
+        # Get offerings from Airtable table "Ofertas G4U"
+        try:
+            records = airtable.get_all("Ofertas G4U")
+            offerings = []
+            for rec in records:
+                # Note: get_all() flattens fields into the record dict
+                name = rec.get("Name", "")
+                if name:  # Only include offerings with a name
+                    offerings.append({
+                        "id": rec.get("id"),  # Airtable record ID for linking
+                        "name": name,
+                        "description": rec.get("Descripcion", "")
+                    })
+            return jsonify({"offerings": offerings, "source": "airtable"})
+        except Exception as airtable_error:
+            # Fallback to local settings if Airtable table doesn't exist
+            settings = load_local_settings()
+            offerings = settings.get("service_offerings", [
+                {"id": "GTM", "name": "GTM (Go-To-Market)"},
+                {"id": "Consulting", "name": "Consulting"},
+                {"id": "Training", "name": "Training"},
+                {"id": "Development", "name": "Development"},
+                {"id": "Marketing", "name": "Marketing"},
+                {"id": "Other", "name": "Otro"}
+            ])
+            return jsonify({"offerings": offerings, "source": "local", "airtable_error": str(airtable_error)})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route("/api/settings/offerings", methods=["POST"])
+@require_auth
+def api_save_offerings():
+    """Save list of service offerings (Ofertas G4U)."""
+    try:
+        data = request.json
+        offerings = data.get("offerings", [])
+
+        # Validate offerings structure
+        for offering in offerings:
+            if not offering.get("id") or not offering.get("name"):
+                return jsonify({"error": "Cada oferta debe tener ID y nombre"}), 400
+
+        # Load current settings
+        settings = load_local_settings()
+
+        # Update offerings
+        settings["service_offerings"] = offerings
+
+        # Save settings
+        save_local_settings(settings)
+
+        return jsonify({"ok": True})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+# ==================== Excluded Transactions ====================
+
+@app.route("/api/excluded-transactions", methods=["GET"])
+@require_auth
+def api_get_excluded_transactions():
+    """Get list of excluded transaction IDs."""
+    try:
+        settings = load_local_settings()
+        excluded = settings.get("excluded_transactions", [])
+        return jsonify({"excluded": excluded})
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
 # ==================== Transaction Updates ====================
 
 @app.route("/api/transaction/<tx_id>", methods=["PUT"])
@@ -1983,6 +2589,18 @@ def api_update_transaction(tx_id):
                 record["VAT Amount"] = round(vat_amount, 2)
             elif vat_rate == 0:
                 record["VAT Amount"] = 0
+        if "is_excluded" in data:
+            # Store excluded transactions locally (not in Airtable)
+            settings = load_local_settings()
+            excluded_txs = settings.get("excluded_transactions", [])
+            if bool(data["is_excluded"]):
+                if tx_id not in excluded_txs:
+                    excluded_txs.append(tx_id)
+            else:
+                excluded_txs = [x for x in excluded_txs if x != tx_id]
+            settings["excluded_transactions"] = excluded_txs
+            save_local_settings(settings)
+            # Don't add to Airtable record - handle separately
 
         if record:
             airtable.update("Transactions", tx_id, record)
@@ -2820,3 +3438,284 @@ def api_qonto_transaction_details(tx_id):
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+# ==================== AI Brain - Financial Simulations ====================
+
+AI_MODEL_CONFIGS = {
+    # Groq (Ultra Fast)
+    "groq-llama3-70b": {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile",
+        "api_key_env": "GROQ_API_KEY",
+        "base_url": "https://api.groq.com/openai/v1"
+    },
+    "groq-mixtral": {
+        "provider": "groq",
+        "model": "mixtral-8x7b-32768",
+        "api_key_env": "GROQ_API_KEY",
+        "base_url": "https://api.groq.com/openai/v1"
+    },
+    # OpenAI
+    "openai-gpt4o": {
+        "provider": "openai",
+        "model": "gpt-4o",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    "openai-gpt4o-mini": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    "openai-o1": {
+        "provider": "openai",
+        "model": "o1",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    "openai-o1-mini": {
+        "provider": "openai",
+        "model": "o1-mini",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    # Anthropic Claude
+    "anthropic-opus": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "base_url": "https://api.anthropic.com/v1"
+    },
+    "anthropic-sonnet": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-20250514",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "base_url": "https://api.anthropic.com/v1"
+    },
+    "anthropic-haiku": {
+        "provider": "anthropic",
+        "model": "claude-3-5-haiku-20241022",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "base_url": "https://api.anthropic.com/v1"
+    },
+    # Google Gemini
+    "gemini-pro": {
+        "provider": "gemini",
+        "model": "gemini-2.0-flash",
+        "api_key_env": "GEMINI_API_KEY",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta"
+    },
+    "gemini-flash": {
+        "provider": "gemini",
+        "model": "gemini-2.0-flash",
+        "api_key_env": "GEMINI_API_KEY",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta"
+    },
+    # xAI Grok
+    "grok-2": {
+        "provider": "xai",
+        "model": "grok-2-latest",
+        "api_key_env": "XAI_API_KEY",
+        "base_url": "https://api.x.ai/v1"
+    }
+}
+
+SYSTEM_PROMPT = """Eres un analista financiero experto para G4U (Growth4U), una consultora de negocios.
+Tu rol es analizar datos financieros y proporcionar insights accionables.
+
+DATOS ACTUALES DEL PERIODO:
+{context}
+
+INSTRUCCIONES:
+1. Responde siempre en español
+2. Se conciso pero completo
+3. Usa numeros formateados con simbolo € y separadores de miles
+4. Cuando hagas proyecciones, muestra rangos (optimista/base/pesimista)
+5. Identifica patrones y anomalias
+6. Da recomendaciones practicas y especificas
+7. Si no tienes suficientes datos para una conclusion, dilo claramente
+
+FORMATO DE RESPUESTA:
+- Usa markdown para estructura
+- Incluye listas y tablas cuando sea util
+- Destaca KPIs importantes con **negrita**"""
+
+def call_ai_api(model_id: str, messages: list, context: str) -> str:
+    """Call the appropriate AI API based on model selection."""
+    config = AI_MODEL_CONFIGS.get(model_id)
+    if not config:
+        return f"Error: Modelo '{model_id}' no configurado"
+
+    api_key = os.getenv(config["api_key_env"])
+    if not api_key:
+        return f"Error: API key no configurada ({config['api_key_env']}). Configurala en variables de entorno."
+
+    provider = config["provider"]
+
+    try:
+        if provider in ["openai", "groq", "xai"]:
+            # OpenAI-compatible API (OpenAI, Groq, xAI)
+            response = httpx.post(
+                f"{config['base_url']}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": config["model"],
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT.format(context=context)},
+                        *messages
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 2000
+                },
+                timeout=60.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
+        elif provider == "anthropic":
+            # Anthropic Claude API
+            response = httpx.post(
+                f"{config['base_url']}/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": config["model"],
+                    "max_tokens": 2000,
+                    "system": SYSTEM_PROMPT.format(context=context),
+                    "messages": messages
+                },
+                timeout=60.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["content"][0]["text"]
+
+        elif provider == "gemini":
+            # Google Gemini API
+            response = httpx.post(
+                f"{config['base_url']}/models/{config['model']}:generateContent?key={api_key}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [
+                        {"role": "user", "parts": [{"text": SYSTEM_PROMPT.format(context=context)}]},
+                        *[{"role": m["role"], "parts": [{"text": m["content"]}]} for m in messages]
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 2000
+                    }
+                },
+                timeout=60.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+
+        else:
+            return f"Error: Proveedor '{provider}' no soportado"
+
+    except httpx.HTTPStatusError as e:
+        return f"Error API ({e.response.status_code}): {e.response.text[:200]}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+@app.route("/api/ai/chat", methods=["POST"])
+@require_auth
+def api_ai_chat():
+    """Send a message to the AI and get a response."""
+    try:
+        data = request.json
+        model_id = data.get("model", "groq-llama3-70b")
+        messages = data.get("messages", [])
+        context = data.get("context", "")
+
+        if not messages:
+            return jsonify({"error": "No messages provided"}), 400
+
+        response = call_ai_api(model_id, messages, context)
+        return jsonify({"response": response})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route("/api/ai/scenario", methods=["POST"])
+@require_auth
+def api_ai_scenario():
+    """Run a predefined AI scenario."""
+    try:
+        data = request.json
+        model_id = data.get("model", "groq-llama3-70b")
+        scenario = data.get("scenario", "")
+        context = data.get("context", "")
+
+        # Predefined scenario prompts
+        scenarios = {
+            "projection": "Analiza los datos financieros y genera una proyeccion para los proximos 3 meses. Incluye ingresos esperados, gastos proyectados y margen estimado. Presenta escenarios optimista, base y pesimista.",
+            "anomalies": "Revisa los datos y detecta cualquier anomalia o gasto inusual. Identifica transacciones que se desvian significativamente del patron normal. Lista los hallazgos por orden de importancia.",
+            "trends": "Analiza las tendencias en ingresos y gastos. Identifica patrones estacionales, crecimiento/decrecimiento, y categorias con mayor variacion. Incluye graficos conceptuales si es util.",
+            "optimization": "Basandote en los gastos actuales, sugiere areas de optimizacion. Prioriza por impacto potencial y facilidad de implementacion. Incluye estimacion de ahorro.",
+            "whatif_revenue": "Simula un escenario donde los ingresos aumentan un 20%. Calcula el impacto en el margen, el punto de equilibrio y recomienda como gestionar el crecimiento.",
+            "whatif_cost": "Simula un escenario donde los costos se reducen un 10%. Identifica que gastos podrian reducirse de forma realista y calcula el impacto en rentabilidad."
+        }
+
+        prompt = scenarios.get(scenario, scenario)
+        if not prompt:
+            return jsonify({"error": "Scenario not found"}), 400
+
+        messages = [{"role": "user", "content": prompt}]
+        response = call_ai_api(model_id, messages, context)
+
+        return jsonify({
+            "scenario": scenario,
+            "response": response
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route("/api/ai/settings", methods=["GET"])
+@require_auth
+def api_ai_settings_get():
+    """Get AI settings (selected model)."""
+    try:
+        settings = load_local_settings()
+        return jsonify({
+            "model": settings.get("ai_model", "groq-llama3-70b"),
+            "available_models": list(AI_MODEL_CONFIGS.keys())
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/ai/settings", methods=["POST"])
+@require_auth
+def api_ai_settings_save():
+    """Save AI settings (selected model)."""
+    try:
+        data = request.json
+        model = data.get("model", "groq-llama3-70b")
+
+        if model not in AI_MODEL_CONFIGS:
+            return jsonify({"error": "Modelo no valido"}), 400
+
+        settings = load_local_settings()
+        settings["ai_model"] = model
+        save_local_settings(settings)
+
+        return jsonify({"ok": True, "model": model})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
