@@ -2203,23 +2203,77 @@ _settings_cache = {}
 
 import json as json_module
 
-# Local settings file path for fallback
+# Local settings file path for fallback (only works in dev, not Vercel)
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'settings.json')
 
 def load_local_settings():
-    """Load settings from local file."""
+    """Load settings from Airtable Settings table, with memory cache fallback."""
+    global _settings_cache
+
     try:
-        if os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE, 'r') as f:
-                return json_module.load(f)
-    except:
-        pass
-    return {}
+        # Try to load from Airtable Settings table
+        airtable = Airtable()
+        records = airtable.get_all("Settings")
+        settings = {}
+        for r in records:
+            key = r.get("Key", "")
+            value = r.get("Value", "{}")
+            if key:
+                try:
+                    settings[key] = json_module.loads(value) if value else {}
+                except:
+                    settings[key] = value
+        _settings_cache = settings
+        return settings
+    except Exception as e:
+        # Fallback to cache if Airtable fails
+        if _settings_cache:
+            return _settings_cache
+        # Last resort: try local file (only works in dev)
+        try:
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, 'r') as f:
+                    return json_module.load(f)
+        except:
+            pass
+        return {}
 
 def save_local_settings(settings):
-    """Save settings to local file."""
-    with open(SETTINGS_FILE, 'w') as f:
-        json_module.dump(settings, f, indent=2)
+    """Save settings to Airtable Settings table."""
+    global _settings_cache
+    _settings_cache = settings
+
+    try:
+        airtable = Airtable()
+
+        # Get existing records to update/create
+        existing = {}
+        try:
+            records = airtable.get_all("Settings")
+            for r in records:
+                key = r.get("Key", "")
+                if key:
+                    existing[key] = r.get("id")
+        except:
+            pass
+
+        # Update or create each setting key
+        for key, value in settings.items():
+            value_str = json_module.dumps(value) if not isinstance(value, str) else value
+
+            if key in existing:
+                # Update existing record
+                airtable.update("Settings", existing[key], {"Value": value_str})
+            else:
+                # Create new record
+                airtable.create("Settings", {"Key": key, "Value": value_str})
+
+        return True
+    except Exception as e:
+        # In serverless (Vercel), we can't write to local files
+        # But we keep the in-memory cache updated
+        print(f"Warning: Could not save to Airtable Settings: {e}")
+        return False
 
 @app.route("/api/general-expenses-distribution", methods=["GET"])
 @require_auth

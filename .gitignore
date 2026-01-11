@@ -64,3 +64,5 @@ reports/output/
 # OS
 .DS_Store
 Thumbs.db
+.mcp.json
+mcp_config
