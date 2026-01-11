@@ -4090,14 +4090,18 @@
             }
             // Destroy any chart instances
             aiChartInstances.forEach(function(chart) {
-                if (chart) chart.destroy();
+                if (chart) {
+                    try { chart.destroy(); } catch(e) {}
+                }
             });
             aiChartInstances = [];
+            aiChartCounter = 0; // Reset counter for fresh canvas IDs
         }
 
         // ==================== AI Response Rendering (tables, charts, text) ====================
 
         var aiChartInstances = [];
+        var aiChartCounter = 0; // Global counter for unique canvas IDs
 
         function renderUnifiedAIResponse(text) {
             var html = '';
@@ -4107,7 +4111,6 @@
             // Find all markdown tables and replace them with styled HTML tables + optional charts
             var tableRegex = /\|(.+)\|\n\|[-:| ]+\|\n((?:\|.+\|\n?)+)/g;
             var tableMatch;
-            var tableIndex = 0;
 
             while ((tableMatch = tableRegex.exec(text)) !== null) {
                 // Add text before table
@@ -4122,8 +4125,9 @@
                     return row.split('|').map(function(c) { return c.trim(); }).filter(Boolean);
                 }).filter(function(r) { return r.length > 0; });
 
-                segments.push({ type: 'table', headers: headers, rows: rows, index: tableIndex });
-                tableIndex++;
+                // Use global counter for unique chart IDs across all responses
+                segments.push({ type: 'table', headers: headers, rows: rows, index: aiChartCounter });
+                aiChartCounter++;
                 lastIndex = tableMatch.index + tableMatch[0].length;
             }
 
@@ -4220,12 +4224,41 @@
         }
 
         function initializeInlineCharts() {
+            // First destroy ALL existing chart instances we're tracking
+            aiChartInstances.forEach(function(chart) {
+                if (chart) {
+                    try { chart.destroy(); } catch(e) { console.log('Chart destroy error:', e); }
+                }
+            });
+            aiChartInstances = [];
+
             var canvases = document.querySelectorAll('[id^="ai-inline-chart-"]');
             canvases.forEach(function(canvas) {
-                var headers = JSON.parse(canvas.getAttribute('data-headers') || '[]');
-                var rows = JSON.parse(canvas.getAttribute('data-rows') || '[]');
+                // Skip if already initialized
+                if (canvas.getAttribute('data-initialized') === 'true') return;
+
+                var headers, rows;
+                try {
+                    headers = JSON.parse(canvas.getAttribute('data-headers') || '[]');
+                    rows = JSON.parse(canvas.getAttribute('data-rows') || '[]');
+                } catch(e) {
+                    console.log('Error parsing chart data:', e);
+                    return;
+                }
 
                 if (headers.length < 2 || rows.length < 1) return;
+
+                // Destroy any existing chart on this canvas (Chart.js 3+ method)
+                try {
+                    var existingChart = Chart.getChart(canvas);
+                    if (existingChart) {
+                        existingChart.destroy();
+                    }
+                } catch(e) {
+                    // Chart.getChart may not exist in older versions, try clearing canvas
+                    var ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
 
                 var labels = rows.map(function(r) { return r[0] || ''; });
                 var datasets = [];
@@ -4248,29 +4281,34 @@
                     });
                 }
 
-                var ctx = canvas.getContext('2d');
-                var chart = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels: labels, datasets: datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top', labels: { boxWidth: 12, padding: 15 } }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function(v) {
-                                        return v >= 1000 ? '€' + (v/1000).toFixed(0) + 'k' : '€' + v;
+                try {
+                    var ctx = canvas.getContext('2d');
+                    var chart = new Chart(ctx, {
+                        type: 'bar',
+                        data: { labels: labels, datasets: datasets },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'top', labels: { boxWidth: 12, padding: 15 } }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: function(v) {
+                                            return v >= 1000 ? '€' + (v/1000).toFixed(0) + 'k' : '€' + v;
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                });
-                aiChartInstances.push(chart);
+                    });
+                    canvas.setAttribute('data-initialized', 'true');
+                    aiChartInstances.push(chart);
+                } catch(e) {
+                    console.error('Error creating chart:', e);
+                }
             });
         }
 
