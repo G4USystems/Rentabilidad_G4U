@@ -286,7 +286,7 @@
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
                 <div class="header">
-                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.1 · Actualizado: 11 Ene 2026, 19:30</span></h1>
+                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.1 · Actualizado: 11 Ene 2026, 19:45</span></h1>
                     <div class="header-actions">
                         <span id="status-indicator"></span>
                         <span id="last-sync" class="text-muted text-sm"></span>
@@ -2251,12 +2251,15 @@
                 } else {
                     var key, keyType, keyValue;
                     if (expView === 'g4u_category') {
-                        // Categoría G4U (assigned category) - field is "category" which contains the ID
-                        var catId = t.category || t.category_id || '';
-                        var cat = categories.find(function(c) { return c.id === catId; });
-                        key = cat ? cat.name : 'Sin Categoría G4U';
+                        // Categoría G4U - buscar desde allocations primero, luego campo directo
+                        var txAllocs = transactionAllocations.filter(function(a) { return a.transaction_id === t.id; });
+                        var allocCat = txAllocs.length > 0 ? txAllocs[0].category : null;
+                        var catName = allocCat || t.category || t.category_id || '';
+                        // Si es un ID, buscar el nombre
+                        var cat = categories.find(function(c) { return c.id === catName || c.name === catName; });
+                        key = cat ? cat.name : (catName || 'Sin Categoría G4U');
                         keyType = 'category';
-                        keyValue = catId;
+                        keyValue = cat ? cat.id : catName;
                     } else if (expView === 'qonto_category') {
                         // Categoría Qonto
                         key = t.qonto_category || 'Sin categoria Qonto';
