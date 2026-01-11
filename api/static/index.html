@@ -2153,7 +2153,9 @@
 
         function renderKPIs() {
             var income = 0, expenses = 0;
-            filteredTransactions.forEach(function(t) {
+            // Filter out excluded transactions from KPI calculations
+            var activeTransactions = filteredTransactions.filter(function(t) { return !t.is_excluded; });
+            activeTransactions.forEach(function(t) {
                 var amt = parseFloat(t.amount) || 0;
                 if (t.side === 'credit') income += amt;
                 else expenses += amt;
@@ -2180,7 +2182,7 @@
             var activeProjects = projects.filter(function(p) { return p.status === 'Active'; });
             document.getElementById('kpi-clients').textContent = activeClients.length;
             document.getElementById('kpi-projects').textContent = activeProjects.length;
-            document.getElementById('kpi-transactions').textContent = filteredTransactions.length;
+            document.getElementById('kpi-transactions').textContent = activeTransactions.length + (filteredTransactions.length - activeTransactions.length > 0 ? ' (' + (filteredTransactions.length - activeTransactions.length) + ' excl.)' : '');
             document.getElementById('kpi-team').textContent = teamMembers.length;
         }
 
@@ -2188,7 +2190,9 @@
             var expensesByCategory = {};
             var incomeByCategory = {};
 
-            filteredTransactions.forEach(function(t) {
+            // Filter out excluded transactions from charts
+            var activeTransactions = filteredTransactions.filter(function(t) { return !t.is_excluded; });
+            activeTransactions.forEach(function(t) {
                 var amt = parseFloat(t.amount) || 0;
                 var cat = t.qonto_category || 'Sin categoria';
                 if (t.side === 'credit') {
@@ -2254,7 +2258,9 @@
             var expKeyData = {}; // Store metadata for click navigation
             var incByCounterparty = {};
 
-            filteredTransactions.forEach(function(t) {
+            // Filter out excluded transactions from tops
+            var activeTransactions = filteredTransactions.filter(function(t) { return !t.is_excluded; });
+            activeTransactions.forEach(function(t) {
                 var amt = parseFloat(t.amount) || 0;
                 if (t.side === 'credit') {
                     var name = t.counterparty_name || 'Otros';
@@ -3859,8 +3865,9 @@
         }
 
         function getFinancialContext() {
-            // Build context from current data
+            // Build context from current data (excluding excluded transactions)
             var context = 'DATOS FINANCIEROS ACTUALES:\n\n';
+            var activeTx = transactions.filter(function(t) { return !t.is_excluded; });
 
             // Summary
             context += 'RESUMEN:\n';
@@ -3872,7 +3879,7 @@
             // By category
             context += 'GASTOS POR CATEGORIA:\n';
             var catSummary = {};
-            transactions.filter(function(t) { return t.side === 'debit'; }).forEach(function(t) {
+            activeTx.filter(function(t) { return t.side === 'debit'; }).forEach(function(t) {
                 var cat = t.category || 'Sin categoria';
                 catSummary[cat] = (catSummary[cat] || 0) + Math.abs(t.amount);
             });
@@ -3884,7 +3891,7 @@
             context += '\nINGRESOS/GASTOS POR PROYECTO:\n';
             projects.forEach(function(p) {
                 var pIncome = 0, pExpense = 0;
-                transactions.forEach(function(t) {
+                activeTx.forEach(function(t) {
                     if (t.project_id === p.id || t.project_name === p.name) {
                         if (t.side === 'credit') pIncome += t.amount;
                         else pExpense += Math.abs(t.amount);
