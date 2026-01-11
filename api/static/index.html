@@ -286,7 +286,7 @@
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
                 <div class="header">
-                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.4 · Actualizado: 11 Ene 2026, 21:30</span></h1>
+                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.5 · Actualizado: 11 Ene 2026, 22:00</span></h1>
                     <div class="header-actions">
                         <span id="status-indicator"></span>
                         <span id="last-sync" class="text-muted text-sm"></span>
@@ -1649,6 +1649,8 @@
         var sortField = 'settled_at';
         var sortDirection = 'desc';
         var qontoBalance = 0;
+        var totalIncome = 0;  // Global for AI Brain context
+        var totalExpenses = 0;  // Global for AI Brain context
         var expensesChart = null;
         var incomeChart = null;
         var projectsChart = null;
@@ -2166,6 +2168,10 @@
             });
             var net = income - expenses;
             var margin = income > 0 ? (net / income * 100) : 0;
+
+            // Update global vars for AI Brain context
+            totalIncome = income;
+            totalExpenses = expenses;
 
             // Main KPIs
             document.getElementById('kpi-balance').textContent = fmt(qontoBalance);
