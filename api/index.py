@@ -3529,7 +3529,33 @@ AI_MODEL_CONFIGS = {
         "base_url": "https://api.groq.com/openai/v1"
     },
 
-    # ==================== OpenAI - General Models ====================
+    # ==================== OpenAI - GPT-5 Series (Latest) ====================
+    "openai-gpt52": {
+        "provider": "openai",
+        "model": "gpt-5.2",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    "openai-gpt51": {
+        "provider": "openai",
+        "model": "gpt-5.1",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    "openai-gpt51-codex": {
+        "provider": "openai",
+        "model": "gpt-5.1-codex",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    "openai-gpt5": {
+        "provider": "openai",
+        "model": "gpt-5",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+
+    # ==================== OpenAI - GPT-4 Series ====================
     "openai-gpt4o": {
         "provider": "openai",
         "model": "gpt-4o",
