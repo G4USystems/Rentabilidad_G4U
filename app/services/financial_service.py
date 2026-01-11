@@ -43,22 +43,33 @@ class FinancialService:
         end_date: date,
         project_id: Optional[int] = None,
         client_name: Optional[str] = None,
+        exclude_vat: bool = False,
     ) -> Decimal:
         """
         Get total revenue for period.
 
         If project_id or client_name is specified, uses allocations when they exist,
         falling back to direct transaction.project_id when no allocations exist.
+
+        Args:
+            exclude_vat: If True, subtract VAT from amounts (show net amounts)
         """
         if project_id or client_name:
             return await self._get_allocated_amount(
                 start_date, end_date, TransactionSide.CREDIT,
                 project_id=project_id, client_name=client_name,
-                category_filter="revenue"
+                category_filter="revenue",
+                exclude_vat=exclude_vat
             )
 
         # No project/client filter - standard query
-        query = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        # Use amount - vat_amount if exclude_vat is True
+        if exclude_vat:
+            amount_expr = Transaction.amount - func.coalesce(Transaction.vat_amount, 0)
+        else:
+            amount_expr = Transaction.amount
+
+        query = select(func.coalesce(func.sum(amount_expr), 0)).where(
             and_(
                 Transaction.side == TransactionSide.CREDIT,
                 Transaction.transaction_date >= start_date,
@@ -82,21 +93,32 @@ class FinancialService:
         end_date: date,
         project_id: Optional[int] = None,
         client_name: Optional[str] = None,
+        exclude_vat: bool = False,
     ) -> Decimal:
         """
         Get total expenses for period.
 
         If project_id or client_name is specified, uses allocations when they exist,
         falling back to direct transaction.project_id when no allocations exist.
+
+        Args:
+            exclude_vat: If True, subtract VAT from amounts (show net amounts)
         """
         if project_id or client_name:
             return await self._get_allocated_amount(
                 start_date, end_date, TransactionSide.DEBIT,
-                project_id=project_id, client_name=client_name
+                project_id=project_id, client_name=client_name,
+                exclude_vat=exclude_vat
             )
 
         # No project/client filter - standard query
-        query = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        # Use amount - vat_amount if exclude_vat is True
+        if exclude_vat:
+            amount_expr = Transaction.amount - func.coalesce(Transaction.vat_amount, 0)
+        else:
+            amount_expr = Transaction.amount
+
+        query = select(func.coalesce(func.sum(amount_expr), 0)).where(
             and_(
                 Transaction.side == TransactionSide.DEBIT,
                 Transaction.transaction_date >= start_date,
@@ -116,6 +138,7 @@ class FinancialService:
         project_id: Optional[int] = None,
         client_name: Optional[str] = None,
         category_filter: Optional[str] = None,
+        exclude_vat: bool = False,
     ) -> Decimal:
         """
         Get amounts considering allocations for project/client filtering.
@@ -124,10 +147,24 @@ class FinancialService:
         1. Sum amount_allocated from allocations matching project_id/client_name
         2. For transactions without allocations, use full amount if they match
            the project_id (fallback behavior)
+
+        Args:
+            exclude_vat: If True, calculate net amounts by subtracting VAT proportionally
         """
         # Part 1: Sum from allocations
+        # When exclude_vat is True, we need to calculate the net portion of the allocation
+        # Net allocation = allocation.amount_allocated * (1 - vat_amount/amount)
+        if exclude_vat:
+            # Calculate net allocation: amount_allocated * (amount - vat_amount) / amount
+            # This is equivalent to: amount_allocated - (amount_allocated * vat_amount / amount)
+            vat_ratio = func.coalesce(Transaction.vat_amount, 0) / Transaction.amount
+            net_amount_expr = TransactionAllocation.amount_allocated * (1 - vat_ratio)
+            alloc_sum_expr = func.coalesce(func.sum(net_amount_expr), 0)
+        else:
+            alloc_sum_expr = func.coalesce(func.sum(TransactionAllocation.amount_allocated), 0)
+
         alloc_query = (
-            select(func.coalesce(func.sum(TransactionAllocation.amount_allocated), 0))
+            select(alloc_sum_expr)
             .join(Transaction, TransactionAllocation.transaction_id == Transaction.id)
             .where(
                 and_(
@@ -169,7 +206,13 @@ class FinancialService:
                 .distinct()
             )
 
-            fallback_query = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            # Use net amount if exclude_vat
+            if exclude_vat:
+                amount_expr = Transaction.amount - func.coalesce(Transaction.vat_amount, 0)
+            else:
+                amount_expr = Transaction.amount
+
+            fallback_query = select(func.coalesce(func.sum(amount_expr), 0)).where(
                 and_(
                     Transaction.project_id == project_id,
                     Transaction.transaction_date >= start_date,

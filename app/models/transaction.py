@@ -187,6 +187,21 @@ class Transaction(Base):
             return self.amount
         return -self.amount
 
+    @property
+    def amount_net_vat(self) -> Decimal:
+        """Get amount without VAT (net amount)."""
+        if self.vat_amount is not None:
+            return self.amount - self.vat_amount
+        return self.amount
+
+    @property
+    def signed_amount_net_vat(self) -> Decimal:
+        """Get net amount with sign (positive for income, negative for expense)."""
+        net = self.amount_net_vat
+        if self.is_income:
+            return net
+        return -net
+
     def __repr__(self) -> str:
         return (
             f"<Transaction(id={self.id}, "
