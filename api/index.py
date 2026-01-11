@@ -3691,6 +3691,8 @@ def call_ai_api(model_id: str, messages: list, context: str) -> str:
     try:
         if provider in ["openai", "groq", "xai"]:
             # OpenAI-compatible API (OpenAI, Groq, xAI)
+            # Groq is ultra-fast (1-3s), others need more time but must fit within Vercel's 60s limit
+            timeout_seconds = 15.0 if provider == "groq" else 50.0
             response = httpx.post(
                 f"{config['base_url']}/chat/completions",
                 headers={
@@ -3706,7 +3708,7 @@ def call_ai_api(model_id: str, messages: list, context: str) -> str:
                     "temperature": 0.7,
                     "max_tokens": 2000
                 },
-                timeout=90.0
+                timeout=timeout_seconds
             )
             response.raise_for_status()
             data = response.json()
@@ -3735,9 +3737,9 @@ def call_ai_api(model_id: str, messages: list, context: str) -> str:
                 json={
                     "model": config["model"],
                     "messages": combined_messages,
-                    "max_completion_tokens": 4000
+                    "max_completion_tokens": 2000  # Reduced to fit Vercel timeout
                 },
-                timeout=120.0  # Reasoning models take longer
+                timeout=55.0  # Reasoning models take longer but must fit within Vercel's 60s limit
             )
             response.raise_for_status()
             data = response.json()
@@ -3754,11 +3756,11 @@ def call_ai_api(model_id: str, messages: list, context: str) -> str:
                 },
                 json={
                     "model": config["model"],
-                    "max_tokens": 4096,
+                    "max_tokens": 2000,  # Reduced to fit Vercel timeout
                     "system": SYSTEM_PROMPT.format(context=context),
                     "messages": messages
                 },
-                timeout=90.0
+                timeout=50.0  # Must fit within Vercel's 60s limit
             )
             response.raise_for_status()
             data = response.json()
@@ -3787,10 +3789,10 @@ def call_ai_api(model_id: str, messages: list, context: str) -> str:
                     "contents": gemini_contents,
                     "generationConfig": {
                         "temperature": 0.7,
-                        "maxOutputTokens": 4096
+                        "maxOutputTokens": 2000  # Reduced to fit Vercel timeout
                     }
                 },
-                timeout=90.0
+                timeout=50.0  # Must fit within Vercel's 60s limit
             )
             response.raise_for_status()
             data = response.json()
@@ -3803,7 +3805,7 @@ def call_ai_api(model_id: str, messages: list, context: str) -> str:
         error_text = e.response.text[:500] if e.response.text else "No response body"
         return f"Error API ({e.response.status_code}): {error_text}"
     except httpx.TimeoutException:
-        return "Error: La solicitud excedio el tiempo limite. Intenta con un modelo mas rapido como Groq."
+        return "Error: La solicitud excedio el tiempo limite (50s). Recomendacion: Usa Groq (Llama 3 70B) que es ultra-rapido y gratuito."
     except Exception as e:
         return f"Error: {str(e)}"
 
