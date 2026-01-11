@@ -3923,7 +3923,8 @@
                 aiChatHistory = aiChatHistory.slice(-20);
             }
 
-            fetch('/api/ai/chat', {
+            // Use Supabase Edge Function for AI (150s timeout vs Vercel's 10s)
+            fetch('https://zslfbaktftdjsrsxmqgb.supabase.co/functions/v1/ai-chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -3995,7 +3996,8 @@
 
             var context = getFinancialContext();
 
-            fetch('/api/ai/scenario', {
+            // Use Supabase Edge Function for AI scenarios (150s timeout)
+            fetch('https://zslfbaktftdjsrsxmqgb.supabase.co/functions/v1/ai-chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
