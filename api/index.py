@@ -20,6 +20,11 @@ app = Flask(__name__)
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
 app.secret_key = SECRET_KEY
 
+# Session configuration for OAuth state management
+app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Required for OAuth redirects
+
 # ==================== OAuth Configuration ====================
 
 oauth = OAuth(app)
