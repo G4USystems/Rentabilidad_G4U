@@ -31,6 +31,22 @@ google = oauth.register(
     client_kwargs={'scope': 'openid email profile'},
 )
 
+# ==================== Airtable Helpers ====================
+
+def _extract_linked_or_string(record: dict, field_names: list) -> str:
+    """Extract value from a field that may be a linked record (array) or a plain string.
+
+    Airtable linked records come as arrays of record IDs.
+    This helper extracts the first ID if it's an array, or returns the string value.
+    """
+    for name in field_names:
+        val = record.get(name)
+        if val:
+            if isinstance(val, list):
+                return val[0] if val else ""
+            return val
+    return ""
+
 # ==================== Auth Helpers ====================
 
 def require_auth(f):
@@ -988,8 +1004,10 @@ def api_data():
                         "label": label,
                         "counterparty_name": counterparty,
                         "settled_at": date,
-                        "category": r.get("Category") or r.get("category") or r.get("Categoria") or "",
-                        "project_id": r.get("Project") or r.get("project") or r.get("Proyecto") or "",
+                        # Category may be a linked record (array of IDs) or a string
+                        "category": _extract_linked_or_string(r, ["Category", "category", "Categoria"]),
+                        # Project may be a linked record (array of IDs) or a string
+                        "project_id": _extract_linked_or_string(r, ["Project", "project", "Proyecto"]),
                         "client_id": client_id,
                         "qonto_category": qonto_category,
                         "vat_amount": float(vat_amount) if vat_amount else 0,
@@ -2729,7 +2747,7 @@ def api_transaction_allocations():
                 "transaction_id": tx_id,
                 "project_id": proj_id,
                 "client_id": client_id,
-                "category": r.get("Category") or "",
+                "category": _extract_linked_or_string(r, ["Category"]),
                 "percentage": (float(r.get("Percentage") or 0) * 100) if (float(r.get("Percentage") or 0) <= 1) else float(r.get("Percentage") or 0)
             })
         return jsonify({"allocations": allocations})
@@ -2760,7 +2778,7 @@ def api_transaction_allocations_by_tx(transaction_id):
                 "transaction_id": tx_id,
                 "project_id": proj_id,
                 "client_id": client_id,
-                "category": r.get("Category") or "",
+                "category": _extract_linked_or_string(r, ["Category"]),
                 "percentage": (float(r.get("Percentage") or 0) * 100) if (float(r.get("Percentage") or 0) <= 1) else float(r.get("Percentage") or 0)
             })
         return jsonify({"allocations": allocations})
