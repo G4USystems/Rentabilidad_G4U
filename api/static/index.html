@@ -286,7 +286,7 @@
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
                 <div class="header">
-                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.6 · Actualizado: 11 Ene 2026, 23:30</span></h1>
+                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.7 · Actualizado: 12 Ene 2026, 00:15</span></h1>
                     <div class="header-actions">
                         <span id="status-indicator"></span>
                         <span id="last-sync" class="text-muted text-sm"></span>
@@ -1001,7 +1001,10 @@
                 <div class="card" style="margin-bottom:20px;">
                     <div class="card-header">
                         Chat con AI
-                        <button class="btn btn-sm btn-outline" onclick="clearAIChat()" style="margin-left:auto;">Limpiar</button>
+                        <div style="margin-left:auto;display:flex;gap:8px;">
+                            <button class="btn btn-sm btn-outline" onclick="showAIHistory()" title="Ver historial">🕐 Historial</button>
+                            <button class="btn btn-sm btn-outline" onclick="clearAIChat()">Limpiar</button>
+                        </div>
                     </div>
                     <div class="card-body" style="padding:0;">
                         <div id="ai-chat-messages" style="height:300px;overflow-y:auto;padding:16px;background:#f8fafc;">
@@ -1059,6 +1062,25 @@
             </div>
 
         </main>
+    </div>
+
+    <!-- AI History Modal -->
+    <div class="modal-overlay" id="modal-ai-history">
+        <div class="modal" style="max-width:500px;">
+            <div class="modal-header">
+                <h3>Historial de Conversaciones</h3>
+                <button class="modal-close" onclick="closeModal('ai-history')">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:0;max-height:400px;overflow-y:auto;">
+                <div id="ai-history-list">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;">
+                <button class="btn btn-sm" style="color:#ef4444;" onclick="clearAIHistory()">Eliminar todo</button>
+                <button class="btn btn-outline" onclick="closeModal('ai-history')">Cerrar</button>
+            </div>
+        </div>
     </div>
 
     <!-- Add Transaction Modal -->
@@ -3948,6 +3970,10 @@
                     var response = data.response || 'Sin respuesta';
                     aiChatHistory.push({role: 'assistant', content: response});
                     addChatMessage('assistant', formatAIResponse(response));
+                    // Update visualization panel
+                    updateAIVisualization(response);
+                    // Save to history
+                    saveAIChatToHistory();
                 }
                 input.disabled = false;
                 input.focus();
@@ -4072,7 +4098,13 @@
                 if (data.error) {
                     addChatMessage('assistant', 'Error: ' + data.error);
                 } else {
-                    addChatMessage('assistant', formatAIResponse(data.response || 'Sin respuesta'));
+                    var response = data.response || 'Sin respuesta';
+                    aiChatHistory.push({role: 'assistant', content: response});
+                    addChatMessage('assistant', formatAIResponse(response));
+                    // Update visualization panel
+                    updateAIVisualization(response);
+                    // Save to history
+                    saveAIChatToHistory();
                 }
             }).catch(function(e) {
                 removeLoadingMessages();
@@ -4085,6 +4117,395 @@
             var container = document.getElementById('ai-chat-messages');
             if (container) {
                 container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px;">Inicia una conversacion o selecciona un escenario</div>';
+            }
+            // Clear visualization too
+            clearAIVisualization();
+        }
+
+        // ==================== AI Visualization ====================
+
+        var aiVisualizationData = null;
+        var aiProjectionChart = null;
+        var currentAIView = 'text';
+
+        function showAIView(view) {
+            currentAIView = view;
+            var chartContainer = document.getElementById('ai-chart-container');
+            var tableContainer = document.getElementById('ai-table-container');
+            var textContainer = document.getElementById('ai-text-container');
+
+            // Hide all
+            if (chartContainer) chartContainer.style.display = 'none';
+            if (tableContainer) tableContainer.style.display = 'none';
+            if (textContainer) textContainer.style.display = 'none';
+
+            // Show selected
+            if (view === 'chart' && chartContainer) {
+                chartContainer.style.display = 'block';
+                if (aiVisualizationData && aiVisualizationData.chartData) {
+                    renderAIChart(aiVisualizationData.chartData);
+                }
+            } else if (view === 'table' && tableContainer) {
+                tableContainer.style.display = 'block';
+                if (aiVisualizationData && aiVisualizationData.tableData) {
+                    renderAITable(aiVisualizationData.tableData);
+                }
+            } else if (view === 'text' && textContainer) {
+                textContainer.style.display = 'block';
+            }
+
+            // Update button states
+            var buttons = document.querySelectorAll('#ai-visualization button, .card-header button');
+            buttons.forEach(function(btn) {
+                if (btn.onclick && btn.onclick.toString().includes('showAIView')) {
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-outline');
+                }
+            });
+        }
+
+        function clearAIVisualization() {
+            aiVisualizationData = null;
+            var textOutput = document.getElementById('ai-text-output');
+            if (textOutput) {
+                textOutput.innerHTML = 'Selecciona un escenario o haz una pregunta para ver los resultados aqui.';
+            }
+            var tableBody = document.getElementById('ai-table-body');
+            if (tableBody) tableBody.innerHTML = '';
+            if (aiProjectionChart) {
+                aiProjectionChart.destroy();
+                aiProjectionChart = null;
+            }
+        }
+
+        function updateAIVisualization(response) {
+            // Parse response for structured data
+            aiVisualizationData = parseAIDataForVisualization(response);
+
+            // Update text view
+            var textOutput = document.getElementById('ai-text-output');
+            if (textOutput) {
+                textOutput.innerHTML = formatAIResponse(response);
+                textOutput.style.textAlign = 'left';
+                textOutput.style.color = 'var(--text)';
+            }
+
+            // If we found structured data, render it
+            if (aiVisualizationData.tableData && aiVisualizationData.tableData.length > 0) {
+                renderAITable(aiVisualizationData.tableData);
+            }
+            if (aiVisualizationData.chartData && aiVisualizationData.chartData.labels) {
+                renderAIChart(aiVisualizationData.chartData);
+            }
+        }
+
+        function parseAIDataForVisualization(text) {
+            var result = {
+                tableData: [],
+                chartData: null,
+                metrics: {}
+            };
+
+            // Extract markdown tables
+            var tableRegex = /\|(.+)\|\n\|[-:| ]+\|\n((?:\|.+\|\n?)+)/g;
+            var tableMatch;
+            while ((tableMatch = tableRegex.exec(text)) !== null) {
+                var headers = tableMatch[1].split('|').map(function(h) { return h.trim(); }).filter(Boolean);
+                var rows = tableMatch[2].trim().split('\n');
+
+                rows.forEach(function(row) {
+                    var cells = row.split('|').map(function(c) { return c.trim(); }).filter(Boolean);
+                    if (cells.length >= 2) {
+                        var rowData = {};
+                        headers.forEach(function(h, i) {
+                            rowData[h] = cells[i] || '';
+                        });
+                        result.tableData.push(rowData);
+                    }
+                });
+            }
+
+            // Extract numeric values for charts
+            var numericPatterns = [
+                /Ingresos[:\s]+([€$]?[\d.,]+)/gi,
+                /Gastos[:\s]+([€$]?[\d.,]+)/gi,
+                /Balance[:\s]+([€$]?[\d.,]+)/gi,
+                /Margen[:\s]+([-\d.,]+%?)/gi,
+                /Actual[:\s]+([€$]?[\d.,]+)/gi,
+                /Proyectado[:\s]+([€$]?[\d.,]+)/gi
+            ];
+
+            var labels = [];
+            var values = [];
+
+            // Try to build chart data from table
+            if (result.tableData.length > 0) {
+                var firstRow = result.tableData[0];
+                var keys = Object.keys(firstRow);
+
+                // Find numeric columns
+                keys.forEach(function(key) {
+                    if (key && key !== '' && key !== '---') {
+                        var hasNumeric = result.tableData.some(function(row) {
+                            var val = row[key];
+                            return val && /[\d.,]+/.test(val.replace(/[€$%]/g, ''));
+                        });
+                        if (hasNumeric) {
+                            labels.push(key);
+                        }
+                    }
+                });
+
+                // Build datasets from rows
+                if (labels.length > 1) {
+                    var datasets = [];
+                    var chartLabels = [];
+
+                    result.tableData.forEach(function(row, idx) {
+                        var firstKey = Object.keys(row)[0];
+                        var rowLabel = row[firstKey] || 'Fila ' + (idx + 1);
+                        if (rowLabel && rowLabel !== '---' && !/^[-]+$/.test(rowLabel)) {
+                            chartLabels.push(rowLabel);
+                        }
+                    });
+
+                    // Create dataset for each numeric column
+                    labels.slice(1).forEach(function(label, colIdx) {
+                        var data = [];
+                        result.tableData.forEach(function(row) {
+                            var val = row[label] || '0';
+                            var numVal = parseFloat(val.replace(/[€$%,]/g, '').replace(',', '.')) || 0;
+                            data.push(numVal);
+                        });
+
+                        var colors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+                        datasets.push({
+                            label: label,
+                            data: data,
+                            backgroundColor: colors[colIdx % colors.length] + '40',
+                            borderColor: colors[colIdx % colors.length],
+                            borderWidth: 2
+                        });
+                    });
+
+                    if (chartLabels.length > 0 && datasets.length > 0) {
+                        result.chartData = {
+                            labels: chartLabels,
+                            datasets: datasets
+                        };
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        function renderAIChart(chartData) {
+            var container = document.getElementById('ai-chart-container');
+            var canvas = document.getElementById('ai-projection-chart');
+            if (!container || !canvas || !chartData) return;
+
+            container.style.display = 'block';
+
+            // Destroy existing chart
+            if (aiProjectionChart) {
+                aiProjectionChart.destroy();
+            }
+
+            var ctx = canvas.getContext('2d');
+            aiProjectionChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Analisis AI'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '€' + value.toLocaleString('es-ES');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderAITable(tableData) {
+            var container = document.getElementById('ai-table-container');
+            var tbody = document.getElementById('ai-table-body');
+            var thead = document.querySelector('#ai-results-table thead tr');
+            if (!container || !tbody || !tableData || tableData.length === 0) return;
+
+            // Get all unique keys from data
+            var allKeys = [];
+            tableData.forEach(function(row) {
+                Object.keys(row).forEach(function(key) {
+                    if (allKeys.indexOf(key) === -1 && key && key !== '---') {
+                        allKeys.push(key);
+                    }
+                });
+            });
+
+            // Update header
+            if (thead) {
+                thead.innerHTML = allKeys.map(function(key) {
+                    return '<th>' + key + '</th>';
+                }).join('');
+            }
+
+            // Render rows
+            tbody.innerHTML = tableData.map(function(row) {
+                return '<tr>' + allKeys.map(function(key) {
+                    var val = row[key] || '';
+                    // Highlight negative values in red
+                    var style = '';
+                    if (val && val.toString().includes('-') && /\d/.test(val)) {
+                        style = 'color:#ef4444;font-weight:500;';
+                    } else if (val && /^\+?\d/.test(val.replace(/[€$]/g, ''))) {
+                        style = 'color:#22c55e;font-weight:500;';
+                    }
+                    return '<td style="' + style + '">' + val + '</td>';
+                }).join('') + '</tr>';
+            }).join('');
+
+            container.style.display = 'block';
+        }
+
+        // ==================== AI Chat History (localStorage, 3 days) ====================
+
+        var AI_HISTORY_KEY = 'tiogilito_ai_history';
+        var AI_HISTORY_DAYS = 3;
+
+        function saveAIChatToHistory() {
+            if (aiChatHistory.length === 0) return;
+
+            var history = getAIChatHistory();
+            var now = new Date();
+            var sessionId = 'session_' + now.toISOString().split('T')[0] + '_' + now.getHours();
+
+            // Find or create today's session
+            var existingIdx = history.findIndex(function(h) { return h.id === sessionId; });
+            var session = {
+                id: sessionId,
+                timestamp: now.toISOString(),
+                date: now.toLocaleDateString('es-ES', {day: 'numeric', month: 'short', year: 'numeric'}),
+                time: now.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'}),
+                messages: aiChatHistory.slice(),
+                preview: aiChatHistory[0] ? aiChatHistory[0].content.substring(0, 50) + '...' : ''
+            };
+
+            if (existingIdx >= 0) {
+                history[existingIdx] = session;
+            } else {
+                history.unshift(session);
+            }
+
+            // Clean old entries (older than 3 days)
+            var cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - AI_HISTORY_DAYS);
+            history = history.filter(function(h) {
+                return new Date(h.timestamp) > cutoff;
+            });
+
+            // Keep max 20 sessions
+            history = history.slice(0, 20);
+
+            try {
+                localStorage.setItem(AI_HISTORY_KEY, JSON.stringify(history));
+            } catch (e) {
+                console.warn('Could not save AI history:', e);
+            }
+        }
+
+        function getAIChatHistory() {
+            try {
+                var stored = localStorage.getItem(AI_HISTORY_KEY);
+                if (stored) {
+                    var history = JSON.parse(stored);
+                    // Clean old entries
+                    var cutoff = new Date();
+                    cutoff.setDate(cutoff.getDate() - AI_HISTORY_DAYS);
+                    return history.filter(function(h) {
+                        return new Date(h.timestamp) > cutoff;
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not load AI history:', e);
+            }
+            return [];
+        }
+
+        function loadAIChatSession(sessionId) {
+            var history = getAIChatHistory();
+            var session = history.find(function(h) { return h.id === sessionId; });
+            if (session && session.messages) {
+                aiChatHistory = session.messages.slice();
+                renderAIChatFromHistory();
+                closeModal('ai-history');
+            }
+        }
+
+        function renderAIChatFromHistory() {
+            var container = document.getElementById('ai-chat-messages');
+            if (!container) return;
+
+            container.innerHTML = '';
+            aiChatHistory.forEach(function(msg) {
+                if (msg.role === 'user') {
+                    addChatMessage('user', msg.content);
+                } else {
+                    addChatMessage('assistant', formatAIResponse(msg.content));
+                }
+            });
+
+            // Update visualization with last assistant message
+            var lastAssistant = aiChatHistory.filter(function(m) { return m.role === 'assistant'; }).pop();
+            if (lastAssistant) {
+                updateAIVisualization(lastAssistant.content);
+            }
+        }
+
+        function showAIHistory() {
+            var history = getAIChatHistory();
+            var modal = document.getElementById('modal-ai-history');
+            var list = document.getElementById('ai-history-list');
+
+            if (!modal || !list) return;
+
+            if (history.length === 0) {
+                list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px;">No hay conversaciones guardadas</div>';
+            } else {
+                list.innerHTML = history.map(function(session) {
+                    var msgCount = session.messages ? session.messages.length : 0;
+                    return '<div class="history-item" onclick="loadAIChatSession(\'' + session.id + '\')" style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background=\'var(--hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+                        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                        '<span style="font-weight:500;">' + session.date + ' - ' + session.time + '</span>' +
+                        '<span style="color:var(--text-muted);font-size:12px;">' + msgCount + ' mensajes</span>' +
+                        '</div>' +
+                        '<div style="color:var(--text-muted);font-size:13px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (session.preview || 'Sin preview') + '</div>' +
+                        '</div>';
+                }).join('');
+            }
+
+            openModal('ai-history');
+        }
+
+        function clearAIHistory() {
+            if (confirm('¿Eliminar todo el historial de conversaciones?')) {
+                localStorage.removeItem(AI_HISTORY_KEY);
+                closeModal('ai-history');
             }
         }
 
