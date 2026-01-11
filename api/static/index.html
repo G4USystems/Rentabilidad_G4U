@@ -286,7 +286,7 @@
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
                 <div class="header">
-                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.7 · Actualizado: 12 Ene 2026, 00:15</span></h1>
+                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.8 · Actualizado: 12 Ene 2026, 00:45</span></h1>
                     <div class="header-actions">
                         <span id="status-indicator"></span>
                         <span id="last-sync" class="text-muted text-sm"></span>
@@ -1030,31 +1030,18 @@
                     </div>
                 </div>
 
-                <!-- Visualization Area -->
+                <!-- Unified Visualization Area -->
                 <div class="card">
                     <div class="card-header">
-                        Visualizacion
-                        <div style="margin-left:auto;display:flex;gap:8px;">
-                            <button class="btn btn-sm btn-outline" onclick="showAIView('chart')">Grafico</button>
-                            <button class="btn btn-sm btn-outline" onclick="showAIView('table')">Tabla</button>
-                            <button class="btn btn-sm btn-outline" onclick="showAIView('text')">Texto</button>
+                        Respuesta AI
+                        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                            <span id="ai-response-meta" style="font-size:12px;color:var(--text-muted);"></span>
                         </div>
                     </div>
-                    <div class="card-body">
-                        <div id="ai-visualization" style="min-height:300px;">
-                            <div id="ai-chart-container" style="display:none;">
-                                <canvas id="ai-projection-chart"></canvas>
-                            </div>
-                            <div id="ai-table-container" style="display:none;">
-                                <table id="ai-results-table">
-                                    <thead><tr><th>Metrica</th><th>Actual</th><th>Proyectado</th><th>Variacion</th></tr></thead>
-                                    <tbody id="ai-table-body"></tbody>
-                                </table>
-                            </div>
-                            <div id="ai-text-container">
-                                <div id="ai-text-output" style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:var(--text-muted);padding:20px;text-align:center;">
-                                    Selecciona un escenario o haz una pregunta para ver los resultados aqui.
-                                </div>
+                    <div class="card-body" style="padding:0;">
+                        <div id="ai-unified-output" style="min-height:300px;max-height:500px;overflow-y:auto;padding:20px;">
+                            <div style="text-align:center;color:var(--text-muted);padding:40px;">
+                                Selecciona un escenario o haz una pregunta para ver los resultados aqui.
                             </div>
                         </div>
                     </div>
@@ -3968,10 +3955,11 @@
                     addChatMessage('assistant', 'Error: ' + data.error);
                 } else {
                     var response = data.response || 'Sin respuesta';
+                    var duration = data.duration_ms || 0;
                     aiChatHistory.push({role: 'assistant', content: response});
                     addChatMessage('assistant', formatAIResponse(response));
-                    // Update visualization panel
-                    updateAIVisualization(response);
+                    // Update unified visualization panel
+                    updateAIVisualization(response, duration);
                     // Save to history
                     saveAIChatToHistory();
                 }
@@ -4099,10 +4087,11 @@
                     addChatMessage('assistant', 'Error: ' + data.error);
                 } else {
                     var response = data.response || 'Sin respuesta';
+                    var duration = data.duration_ms || 0;
                     aiChatHistory.push({role: 'assistant', content: response});
                     addChatMessage('assistant', formatAIResponse(response));
-                    // Update visualization panel
-                    updateAIVisualization(response);
+                    // Update unified visualization panel
+                    updateAIVisualization(response, duration);
                     // Save to history
                     saveAIChatToHistory();
                 }
@@ -4122,265 +4111,223 @@
             clearAIVisualization();
         }
 
-        // ==================== AI Visualization ====================
+        // ==================== Unified AI Visualization ====================
 
-        var aiVisualizationData = null;
-        var aiProjectionChart = null;
-        var currentAIView = 'text';
-
-        function showAIView(view) {
-            currentAIView = view;
-            var chartContainer = document.getElementById('ai-chart-container');
-            var tableContainer = document.getElementById('ai-table-container');
-            var textContainer = document.getElementById('ai-text-container');
-
-            // Hide all
-            if (chartContainer) chartContainer.style.display = 'none';
-            if (tableContainer) tableContainer.style.display = 'none';
-            if (textContainer) textContainer.style.display = 'none';
-
-            // Show selected
-            if (view === 'chart' && chartContainer) {
-                chartContainer.style.display = 'block';
-                if (aiVisualizationData && aiVisualizationData.chartData) {
-                    renderAIChart(aiVisualizationData.chartData);
-                }
-            } else if (view === 'table' && tableContainer) {
-                tableContainer.style.display = 'block';
-                if (aiVisualizationData && aiVisualizationData.tableData) {
-                    renderAITable(aiVisualizationData.tableData);
-                }
-            } else if (view === 'text' && textContainer) {
-                textContainer.style.display = 'block';
-            }
-
-            // Update button states
-            var buttons = document.querySelectorAll('#ai-visualization button, .card-header button');
-            buttons.forEach(function(btn) {
-                if (btn.onclick && btn.onclick.toString().includes('showAIView')) {
-                    btn.classList.remove('btn-primary');
-                    btn.classList.add('btn-outline');
-                }
-            });
-        }
+        var aiChartInstances = [];
 
         function clearAIVisualization() {
-            aiVisualizationData = null;
-            var textOutput = document.getElementById('ai-text-output');
-            if (textOutput) {
-                textOutput.innerHTML = 'Selecciona un escenario o haz una pregunta para ver los resultados aqui.';
+            var output = document.getElementById('ai-unified-output');
+            if (output) {
+                output.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px;">Selecciona un escenario o haz una pregunta para ver los resultados aqui.</div>';
             }
-            var tableBody = document.getElementById('ai-table-body');
-            if (tableBody) tableBody.innerHTML = '';
-            if (aiProjectionChart) {
-                aiProjectionChart.destroy();
-                aiProjectionChart = null;
-            }
+            var meta = document.getElementById('ai-response-meta');
+            if (meta) meta.textContent = '';
+            // Destroy all chart instances
+            aiChartInstances.forEach(function(chart) {
+                if (chart) chart.destroy();
+            });
+            aiChartInstances = [];
         }
 
-        function updateAIVisualization(response) {
-            // Parse response for structured data
-            aiVisualizationData = parseAIDataForVisualization(response);
+        function updateAIVisualization(response, duration) {
+            var output = document.getElementById('ai-unified-output');
+            var meta = document.getElementById('ai-response-meta');
+            if (!output) return;
 
-            // Update text view
-            var textOutput = document.getElementById('ai-text-output');
-            if (textOutput) {
-                textOutput.innerHTML = formatAIResponse(response);
-                textOutput.style.textAlign = 'left';
-                textOutput.style.color = 'var(--text)';
+            // Destroy previous charts
+            aiChartInstances.forEach(function(chart) {
+                if (chart) chart.destroy();
+            });
+            aiChartInstances = [];
+
+            // Render unified response with all formats inline
+            output.innerHTML = renderUnifiedAIResponse(response);
+
+            // Update metadata
+            if (meta && duration) {
+                meta.textContent = (duration / 1000).toFixed(1) + 's';
             }
 
-            // If we found structured data, render it
-            if (aiVisualizationData.tableData && aiVisualizationData.tableData.length > 0) {
-                renderAITable(aiVisualizationData.tableData);
-            }
-            if (aiVisualizationData.chartData && aiVisualizationData.chartData.labels) {
-                renderAIChart(aiVisualizationData.chartData);
-            }
+            // Initialize any charts that were created
+            initializeInlineCharts();
+
+            // Scroll to top
+            output.scrollTop = 0;
         }
 
-        function parseAIDataForVisualization(text) {
-            var result = {
-                tableData: [],
-                chartData: null,
-                metrics: {}
-            };
+        function renderUnifiedAIResponse(text) {
+            var html = '';
+            var segments = [];
+            var lastIndex = 0;
 
-            // Extract markdown tables
+            // Find all markdown tables and replace them with styled HTML tables + optional charts
             var tableRegex = /\|(.+)\|\n\|[-:| ]+\|\n((?:\|.+\|\n?)+)/g;
             var tableMatch;
+            var tableIndex = 0;
+
             while ((tableMatch = tableRegex.exec(text)) !== null) {
-                var headers = tableMatch[1].split('|').map(function(h) { return h.trim(); }).filter(Boolean);
-                var rows = tableMatch[2].trim().split('\n');
-
-                rows.forEach(function(row) {
-                    var cells = row.split('|').map(function(c) { return c.trim(); }).filter(Boolean);
-                    if (cells.length >= 2) {
-                        var rowData = {};
-                        headers.forEach(function(h, i) {
-                            rowData[h] = cells[i] || '';
-                        });
-                        result.tableData.push(rowData);
-                    }
-                });
-            }
-
-            // Extract numeric values for charts
-            var numericPatterns = [
-                /Ingresos[:\s]+([€$]?[\d.,]+)/gi,
-                /Gastos[:\s]+([€$]?[\d.,]+)/gi,
-                /Balance[:\s]+([€$]?[\d.,]+)/gi,
-                /Margen[:\s]+([-\d.,]+%?)/gi,
-                /Actual[:\s]+([€$]?[\d.,]+)/gi,
-                /Proyectado[:\s]+([€$]?[\d.,]+)/gi
-            ];
-
-            var labels = [];
-            var values = [];
-
-            // Try to build chart data from table
-            if (result.tableData.length > 0) {
-                var firstRow = result.tableData[0];
-                var keys = Object.keys(firstRow);
-
-                // Find numeric columns
-                keys.forEach(function(key) {
-                    if (key && key !== '' && key !== '---') {
-                        var hasNumeric = result.tableData.some(function(row) {
-                            var val = row[key];
-                            return val && /[\d.,]+/.test(val.replace(/[€$%]/g, ''));
-                        });
-                        if (hasNumeric) {
-                            labels.push(key);
-                        }
-                    }
-                });
-
-                // Build datasets from rows
-                if (labels.length > 1) {
-                    var datasets = [];
-                    var chartLabels = [];
-
-                    result.tableData.forEach(function(row, idx) {
-                        var firstKey = Object.keys(row)[0];
-                        var rowLabel = row[firstKey] || 'Fila ' + (idx + 1);
-                        if (rowLabel && rowLabel !== '---' && !/^[-]+$/.test(rowLabel)) {
-                            chartLabels.push(rowLabel);
-                        }
-                    });
-
-                    // Create dataset for each numeric column
-                    labels.slice(1).forEach(function(label, colIdx) {
-                        var data = [];
-                        result.tableData.forEach(function(row) {
-                            var val = row[label] || '0';
-                            var numVal = parseFloat(val.replace(/[€$%,]/g, '').replace(',', '.')) || 0;
-                            data.push(numVal);
-                        });
-
-                        var colors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
-                        datasets.push({
-                            label: label,
-                            data: data,
-                            backgroundColor: colors[colIdx % colors.length] + '40',
-                            borderColor: colors[colIdx % colors.length],
-                            borderWidth: 2
-                        });
-                    });
-
-                    if (chartLabels.length > 0 && datasets.length > 0) {
-                        result.chartData = {
-                            labels: chartLabels,
-                            datasets: datasets
-                        };
-                    }
+                // Add text before table
+                if (tableMatch.index > lastIndex) {
+                    var beforeText = text.substring(lastIndex, tableMatch.index);
+                    segments.push({ type: 'text', content: beforeText });
                 }
+
+                // Parse table
+                var headers = tableMatch[1].split('|').map(function(h) { return h.trim(); }).filter(Boolean);
+                var rows = tableMatch[2].trim().split('\n').map(function(row) {
+                    return row.split('|').map(function(c) { return c.trim(); }).filter(Boolean);
+                }).filter(function(r) { return r.length > 0; });
+
+                segments.push({ type: 'table', headers: headers, rows: rows, index: tableIndex });
+                tableIndex++;
+                lastIndex = tableMatch.index + tableMatch[0].length;
             }
 
-            return result;
+            // Add remaining text
+            if (lastIndex < text.length) {
+                segments.push({ type: 'text', content: text.substring(lastIndex) });
+            }
+
+            // Render segments
+            segments.forEach(function(seg) {
+                if (seg.type === 'text') {
+                    html += formatAIResponseText(seg.content);
+                } else if (seg.type === 'table') {
+                    html += renderInlineTable(seg.headers, seg.rows, seg.index);
+                }
+            });
+
+            return html;
         }
 
-        function renderAIChart(chartData) {
-            var container = document.getElementById('ai-chart-container');
-            var canvas = document.getElementById('ai-projection-chart');
-            if (!container || !canvas || !chartData) return;
+        function formatAIResponseText(text) {
+            // Headers
+            text = text.replace(/^### (.+)$/gm, '<h4 style="margin:20px 0 12px;color:var(--primary);font-size:16px;">$1</h4>');
+            text = text.replace(/^## (.+)$/gm, '<h3 style="margin:24px 0 12px;color:var(--primary);font-size:18px;">$1</h3>');
+            text = text.replace(/^# (.+)$/gm, '<h2 style="margin:24px 0 12px;color:var(--primary);font-size:20px;">$1</h2>');
 
-            container.style.display = 'block';
+            // Bold and italic
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
-            // Destroy existing chart
-            if (aiProjectionChart) {
-                aiProjectionChart.destroy();
+            // Code blocks
+            text = text.replace(/```([\s\S]*?)```/g, '<pre style="background:#1e293b;color:#e2e8f0;padding:12px;border-radius:8px;overflow-x:auto;margin:12px 0;font-size:13px;">$1</pre>');
+            text = text.replace(/`([^`]+)`/g, '<code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:13px;">$1</code>');
+
+            // Lists
+            text = text.replace(/^- (.+)$/gm, '<div style="margin:6px 0 6px 20px;display:flex;"><span style="margin-right:8px;">•</span><span>$1</span></div>');
+            text = text.replace(/^(\d+)\. (.+)$/gm, '<div style="margin:6px 0 6px 20px;display:flex;"><span style="margin-right:8px;min-width:20px;">$1.</span><span>$2</span></div>');
+
+            // Paragraphs (double newlines)
+            text = text.replace(/\n\n/g, '</p><p style="margin:12px 0;">');
+
+            // Single newlines to <br>
+            text = text.replace(/\n/g, '<br>');
+
+            // Wrap in paragraph
+            if (text.trim()) {
+                text = '<p style="margin:12px 0;line-height:1.7;">' + text + '</p>';
             }
 
-            var ctx = canvas.getContext('2d');
-            aiProjectionChart = new Chart(ctx, {
-                type: 'bar',
-                data: chartData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            position: 'top',
+            return text;
+        }
+
+        function renderInlineTable(headers, rows, tableIndex) {
+            var html = '<div style="margin:20px 0;overflow-x:auto;">';
+
+            // Table
+            html += '<table style="width:100%;border-collapse:collapse;font-size:14px;background:var(--card-bg);border-radius:8px;overflow:hidden;">';
+            html += '<thead><tr>';
+            headers.forEach(function(h) {
+                html += '<th style="padding:12px 16px;background:var(--primary);color:white;text-align:left;font-weight:600;">' + h + '</th>';
+            });
+            html += '</tr></thead><tbody>';
+
+            rows.forEach(function(row, ridx) {
+                html += '<tr style="border-bottom:1px solid var(--border);' + (ridx % 2 ? 'background:#f8fafc;' : '') + '">';
+                row.forEach(function(cell, cidx) {
+                    var style = 'padding:10px 16px;';
+                    // Color code numeric values
+                    if (cell && /^-/.test(cell) && /\d/.test(cell)) {
+                        style += 'color:#ef4444;font-weight:500;';
+                    } else if (cell && /^\+?\d/.test(cell.replace(/[€$]/g, '')) && cidx > 0) {
+                        style += 'color:#22c55e;font-weight:500;';
+                    }
+                    html += '<td style="' + style + '">' + cell + '</td>';
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+
+            // Check if we should add a chart (if table has numeric data)
+            var hasNumericData = rows.some(function(row) {
+                return row.some(function(cell, idx) {
+                    return idx > 0 && /[\d.,]+/.test(cell.replace(/[€$%+-]/g, ''));
+                });
+            });
+
+            if (hasNumericData && rows.length >= 2 && headers.length >= 2) {
+                var chartId = 'ai-inline-chart-' + tableIndex;
+                html += '<div style="margin-top:16px;height:200px;"><canvas id="' + chartId + '" data-headers=\'' + JSON.stringify(headers) + '\' data-rows=\'' + JSON.stringify(rows) + '\'></canvas></div>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function initializeInlineCharts() {
+            var canvases = document.querySelectorAll('[id^="ai-inline-chart-"]');
+            canvases.forEach(function(canvas) {
+                var headers = JSON.parse(canvas.getAttribute('data-headers') || '[]');
+                var rows = JSON.parse(canvas.getAttribute('data-rows') || '[]');
+
+                if (headers.length < 2 || rows.length < 1) return;
+
+                var labels = rows.map(function(r) { return r[0] || ''; });
+                var datasets = [];
+                var colors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+
+                // Create dataset for each numeric column
+                for (var i = 1; i < headers.length; i++) {
+                    var data = rows.map(function(row) {
+                        var val = row[i] || '0';
+                        return parseFloat(val.replace(/[€$%,]/g, '').replace(',', '.')) || 0;
+                    });
+
+                    datasets.push({
+                        label: headers[i],
+                        data: data,
+                        backgroundColor: colors[(i - 1) % colors.length] + '60',
+                        borderColor: colors[(i - 1) % colors.length],
+                        borderWidth: 2,
+                        borderRadius: 4
+                    });
+                }
+
+                var ctx = canvas.getContext('2d');
+                var chart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: labels, datasets: datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top', labels: { boxWidth: 12, padding: 15 } }
                         },
-                        title: {
-                            display: true,
-                            text: 'Analisis AI'
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return '€' + value.toLocaleString('es-ES');
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(v) {
+                                        return v >= 1000 ? '€' + (v/1000).toFixed(0) + 'k' : '€' + v;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            });
-        }
-
-        function renderAITable(tableData) {
-            var container = document.getElementById('ai-table-container');
-            var tbody = document.getElementById('ai-table-body');
-            var thead = document.querySelector('#ai-results-table thead tr');
-            if (!container || !tbody || !tableData || tableData.length === 0) return;
-
-            // Get all unique keys from data
-            var allKeys = [];
-            tableData.forEach(function(row) {
-                Object.keys(row).forEach(function(key) {
-                    if (allKeys.indexOf(key) === -1 && key && key !== '---') {
-                        allKeys.push(key);
-                    }
                 });
+                aiChartInstances.push(chart);
             });
-
-            // Update header
-            if (thead) {
-                thead.innerHTML = allKeys.map(function(key) {
-                    return '<th>' + key + '</th>';
-                }).join('');
-            }
-
-            // Render rows
-            tbody.innerHTML = tableData.map(function(row) {
-                return '<tr>' + allKeys.map(function(key) {
-                    var val = row[key] || '';
-                    // Highlight negative values in red
-                    var style = '';
-                    if (val && val.toString().includes('-') && /\d/.test(val)) {
-                        style = 'color:#ef4444;font-weight:500;';
-                    } else if (val && /^\+?\d/.test(val.replace(/[€$]/g, ''))) {
-                        style = 'color:#22c55e;font-weight:500;';
-                    }
-                    return '<td style="' + style + '">' + val + '</td>';
-                }).join('') + '</tr>';
-            }).join('');
-
-            container.style.display = 'block';
         }
 
         // ==================== AI Chat History (localStorage, 3 days) ====================
