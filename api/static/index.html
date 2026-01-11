@@ -286,7 +286,7 @@
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
                 <div class="header">
-                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.5 · Actualizado: 11 Ene 2026, 22:00</span></h1>
+                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.6 · Actualizado: 11 Ene 2026, 23:30</span></h1>
                     <div class="header-actions">
                         <span id="status-indicator"></span>
                         <span id="last-sync" class="text-muted text-sm"></span>
@@ -3939,9 +3939,8 @@
                     context: context
                 })
             }).then(function(r) { return r.json(); }).then(function(data) {
-                // Remove loading message
-                var loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
+                // Remove ALL loading messages (more robust)
+                removeLoadingMessages();
 
                 if (data.error) {
                     addChatMessage('assistant', 'Error: ' + data.error);
@@ -3953,8 +3952,7 @@
                 input.disabled = false;
                 input.focus();
             }).catch(function(e) {
-                var loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
+                removeLoadingMessages();
                 addChatMessage('assistant', 'Error de conexion: ' + e.message);
                 input.disabled = false;
             });
@@ -3964,10 +3962,10 @@
             var container = document.getElementById('ai-chat-messages');
             if (!container) return null;
 
-            var id = 'msg-' + Date.now();
+            var id = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
             var div = document.createElement('div');
             div.id = id;
-            div.className = 'chat-message ' + role;
+            div.className = 'chat-message ' + role + (isLoading ? ' loading-message' : '');
             div.style.cssText = 'padding:12px 16px;margin:8px 0;border-radius:12px;max-width:85%;' +
                 (role === 'user' ? 'background:var(--primary);color:white;margin-left:auto;' : 'background:var(--card-bg);border:1px solid var(--border);');
 
@@ -3984,13 +3982,70 @@
             return id;
         }
 
+        function removeLoadingMessages() {
+            var loadingMsgs = document.querySelectorAll('.loading-message');
+            loadingMsgs.forEach(function(el) { el.remove(); });
+        }
+
         function formatAIResponse(text) {
             // Convert markdown-style formatting to HTML
-            return text
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/\n/g, '<br>')
-                .replace(/```([\s\S]*?)```/g, '<pre style="background:#1a1a2e;padding:10px;border-radius:6px;overflow-x:auto;">$1</pre>');
+
+            // First, handle code blocks (preserve them)
+            var codeBlocks = [];
+            text = text.replace(/```([\s\S]*?)```/g, function(match, code) {
+                codeBlocks.push(code);
+                return '%%CODE_BLOCK_' + (codeBlocks.length - 1) + '%%';
+            });
+
+            // Handle markdown tables
+            text = text.replace(/(?:^|\n)(\|.+\|)\n(\|[-:| ]+\|)\n((?:\|.+\|\n?)+)/g, function(match, header, separator, body) {
+                var headers = header.split('|').filter(function(c) { return c.trim(); });
+                var rows = body.trim().split('\n');
+
+                var html = '<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:14px;">';
+                html += '<thead><tr>';
+                headers.forEach(function(h) {
+                    html += '<th style="border:1px solid var(--border);padding:8px 12px;background:var(--primary);color:white;text-align:left;">' + h.trim() + '</th>';
+                });
+                html += '</tr></thead><tbody>';
+
+                rows.forEach(function(row) {
+                    var cells = row.split('|').filter(function(c) { return c.trim() !== ''; });
+                    if (cells.length > 0) {
+                        html += '<tr>';
+                        cells.forEach(function(cell) {
+                            html += '<td style="border:1px solid var(--border);padding:8px 12px;">' + cell.trim() + '</td>';
+                        });
+                        html += '</tr>';
+                    }
+                });
+
+                html += '</tbody></table>';
+                return html;
+            });
+
+            // Bold and italic
+            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+            // Headers
+            text = text.replace(/^### (.+)$/gm, '<h4 style="margin:16px 0 8px;color:var(--primary);">$1</h4>');
+            text = text.replace(/^## (.+)$/gm, '<h3 style="margin:16px 0 8px;color:var(--primary);">$1</h3>');
+            text = text.replace(/^# (.+)$/gm, '<h2 style="margin:16px 0 8px;color:var(--primary);">$1</h2>');
+
+            // Lists
+            text = text.replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:20px;">$1</li>');
+            text = text.replace(/^(\d+)\. (.+)$/gm, '<li style="margin:4px 0;margin-left:20px;">$2</li>');
+
+            // Line breaks (but not inside tables which are already HTML)
+            text = text.replace(/\n/g, '<br>');
+
+            // Restore code blocks
+            codeBlocks.forEach(function(code, i) {
+                text = text.replace('%%CODE_BLOCK_' + i + '%%', '<pre style="background:#1a1a2e;padding:10px;border-radius:6px;overflow-x:auto;margin:8px 0;">' + code + '</pre>');
+            });
+
+            return text;
         }
 
         function runAIScenario(scenario) {
@@ -4012,8 +4067,7 @@
                     context: context
                 })
             }).then(function(r) { return r.json(); }).then(function(data) {
-                var loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
+                removeLoadingMessages();
 
                 if (data.error) {
                     addChatMessage('assistant', 'Error: ' + data.error);
@@ -4021,8 +4075,7 @@
                     addChatMessage('assistant', formatAIResponse(data.response || 'Sin respuesta'));
                 }
             }).catch(function(e) {
-                var loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.remove();
+                removeLoadingMessages();
                 addChatMessage('assistant', 'Error: ' + e.message);
             });
         }
