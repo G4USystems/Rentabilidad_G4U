@@ -2254,8 +2254,8 @@ def save_local_settings(settings):
                 key = r.get("Key", "")
                 if key:
                     existing[key] = r.get("id")
-        except:
-            pass
+        except Exception as e:
+            print(f"Warning: Could not fetch existing settings: {e}")
 
         # Update or create each setting key
         for key, value in settings.items():
@@ -3515,7 +3515,7 @@ def api_qonto_transaction_details(tx_id):
 # ==================== AI Brain - Financial Simulations ====================
 
 AI_MODEL_CONFIGS = {
-    # Groq (Ultra Fast)
+    # ==================== Groq (Ultra Fast, Free Tier) ====================
     "groq-llama3-70b": {
         "provider": "groq",
         "model": "llama-3.3-70b-versatile",
@@ -3528,7 +3528,8 @@ AI_MODEL_CONFIGS = {
         "api_key_env": "GROQ_API_KEY",
         "base_url": "https://api.groq.com/openai/v1"
     },
-    # OpenAI
+
+    # ==================== OpenAI - General Models ====================
     "openai-gpt4o": {
         "provider": "openai",
         "model": "gpt-4o",
@@ -3541,51 +3542,86 @@ AI_MODEL_CONFIGS = {
         "api_key_env": "OPENAI_API_KEY",
         "base_url": "https://api.openai.com/v1"
     },
-    "openai-o1": {
+    "openai-gpt41": {
         "provider": "openai",
-        "model": "o1",
+        "model": "gpt-4.1",
         "api_key_env": "OPENAI_API_KEY",
         "base_url": "https://api.openai.com/v1"
     },
-    "openai-o1-mini": {
+    "openai-gpt41-mini": {
         "provider": "openai",
-        "model": "o1-mini",
+        "model": "gpt-4.1-mini",
         "api_key_env": "OPENAI_API_KEY",
         "base_url": "https://api.openai.com/v1"
     },
-    # Anthropic Claude
+
+    # ==================== OpenAI - Reasoning Models ====================
+    "openai-o3": {
+        "provider": "openai_reasoning",
+        "model": "o3",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    "openai-o3-mini": {
+        "provider": "openai_reasoning",
+        "model": "o3-mini",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+    "openai-o4-mini": {
+        "provider": "openai_reasoning",
+        "model": "o4-mini",
+        "api_key_env": "OPENAI_API_KEY",
+        "base_url": "https://api.openai.com/v1"
+    },
+
+    # ==================== Anthropic Claude ====================
     "anthropic-opus": {
         "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-opus-4-5-20251101",
         "api_key_env": "ANTHROPIC_API_KEY",
         "base_url": "https://api.anthropic.com/v1"
     },
     "anthropic-sonnet": {
         "provider": "anthropic",
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-sonnet-4-5-20250929",
         "api_key_env": "ANTHROPIC_API_KEY",
         "base_url": "https://api.anthropic.com/v1"
     },
     "anthropic-haiku": {
         "provider": "anthropic",
-        "model": "claude-3-5-haiku-20241022",
+        "model": "claude-haiku-4-5-20251001",
         "api_key_env": "ANTHROPIC_API_KEY",
         "base_url": "https://api.anthropic.com/v1"
     },
-    # Google Gemini
-    "gemini-pro": {
+
+    # ==================== Google Gemini ====================
+    "gemini-3-pro": {
         "provider": "gemini",
-        "model": "gemini-2.0-flash",
+        "model": "gemini-3-pro-preview",
         "api_key_env": "GEMINI_API_KEY",
         "base_url": "https://generativelanguage.googleapis.com/v1beta"
     },
-    "gemini-flash": {
+    "gemini-3-flash": {
         "provider": "gemini",
-        "model": "gemini-2.0-flash",
+        "model": "gemini-3-flash",
         "api_key_env": "GEMINI_API_KEY",
         "base_url": "https://generativelanguage.googleapis.com/v1beta"
     },
-    # xAI Grok
+    "gemini-25-pro": {
+        "provider": "gemini",
+        "model": "gemini-2.5-pro",
+        "api_key_env": "GEMINI_API_KEY",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta"
+    },
+    "gemini-25-flash": {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "api_key_env": "GEMINI_API_KEY",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta"
+    },
+
+    # ==================== xAI Grok ====================
     "grok-2": {
         "provider": "xai",
         "model": "grok-2-latest",
@@ -3644,7 +3680,38 @@ def call_ai_api(model_id: str, messages: list, context: str) -> str:
                     "temperature": 0.7,
                     "max_tokens": 2000
                 },
-                timeout=60.0
+                timeout=90.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
+        elif provider == "openai_reasoning":
+            # OpenAI Reasoning Models (o3, o4-mini) - different format, no system message
+            # Combine system prompt with first user message
+            system_content = SYSTEM_PROMPT.format(context=context)
+            combined_messages = []
+            for i, m in enumerate(messages):
+                if i == 0 and m["role"] == "user":
+                    combined_messages.append({
+                        "role": "user",
+                        "content": f"{system_content}\n\n---\n\nUSER REQUEST:\n{m['content']}"
+                    })
+                else:
+                    combined_messages.append(m)
+
+            response = httpx.post(
+                f"{config['base_url']}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": config["model"],
+                    "messages": combined_messages,
+                    "max_completion_tokens": 4000
+                },
+                timeout=120.0  # Reasoning models take longer
             )
             response.raise_for_status()
             data = response.json()
@@ -3661,32 +3728,43 @@ def call_ai_api(model_id: str, messages: list, context: str) -> str:
                 },
                 json={
                     "model": config["model"],
-                    "max_tokens": 2000,
+                    "max_tokens": 4096,
                     "system": SYSTEM_PROMPT.format(context=context),
                     "messages": messages
                 },
-                timeout=60.0
+                timeout=90.0
             )
             response.raise_for_status()
             data = response.json()
             return data["content"][0]["text"]
 
         elif provider == "gemini":
-            # Google Gemini API
+            # Google Gemini API - role must be "user" or "model"
+            system_content = SYSTEM_PROMPT.format(context=context)
+            gemini_contents = []
+
+            # First message includes system prompt
+            for i, m in enumerate(messages):
+                role = "model" if m["role"] == "assistant" else "user"
+                content = m["content"]
+                if i == 0:
+                    content = f"{system_content}\n\n---\n\n{content}"
+                gemini_contents.append({
+                    "role": role,
+                    "parts": [{"text": content}]
+                })
+
             response = httpx.post(
                 f"{config['base_url']}/models/{config['model']}:generateContent?key={api_key}",
                 headers={"Content-Type": "application/json"},
                 json={
-                    "contents": [
-                        {"role": "user", "parts": [{"text": SYSTEM_PROMPT.format(context=context)}]},
-                        *[{"role": m["role"], "parts": [{"text": m["content"]}]} for m in messages]
-                    ],
+                    "contents": gemini_contents,
                     "generationConfig": {
                         "temperature": 0.7,
-                        "maxOutputTokens": 2000
+                        "maxOutputTokens": 4096
                     }
                 },
-                timeout=60.0
+                timeout=90.0
             )
             response.raise_for_status()
             data = response.json()
@@ -3696,7 +3774,10 @@ def call_ai_api(model_id: str, messages: list, context: str) -> str:
             return f"Error: Proveedor '{provider}' no soportado"
 
     except httpx.HTTPStatusError as e:
-        return f"Error API ({e.response.status_code}): {e.response.text[:200]}"
+        error_text = e.response.text[:500] if e.response.text else "No response body"
+        return f"Error API ({e.response.status_code}): {error_text}"
+    except httpx.TimeoutException:
+        return "Error: La solicitud excedio el tiempo limite. Intenta con un modelo mas rapido como Groq."
     except Exception as e:
         return f"Error: {str(e)}"
 

@@ -286,7 +286,7 @@
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
                 <div class="header">
-                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.2 · Actualizado: 11 Ene 2026, 20:15</span></h1>
+                    <h1>Dashboard <span style="font-size: 0.4em; font-weight: normal; color: #888; margin-left: 10px;">v2.3 · Actualizado: 11 Ene 2026, 20:30</span></h1>
                     <div class="header-actions">
                         <span id="status-indicator"></span>
                         <span id="last-sync" class="text-muted text-sm"></span>
@@ -930,24 +930,31 @@
                     <h1>AI Brain - Simulaciones Financieras</h1>
                     <div class="header-actions">
                         <select id="ai-model-selector" onchange="saveAIModel()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);">
-                            <optgroup label="Groq (Ultra Rapido)">
+                            <optgroup label="Groq (Ultra Rapido, Gratis)">
                                 <option value="groq-llama3-70b">Llama 3 70B</option>
                                 <option value="groq-mixtral">Mixtral 8x7B</option>
                             </optgroup>
-                            <optgroup label="OpenAI">
+                            <optgroup label="OpenAI - General">
                                 <option value="openai-gpt4o">GPT-4o (Recomendado)</option>
                                 <option value="openai-gpt4o-mini">GPT-4o Mini (Economico)</option>
-                                <option value="openai-o1">o1 (Razonamiento)</option>
-                                <option value="openai-o1-mini">o1 Mini</option>
+                                <option value="openai-gpt41">GPT-4.1 (Ultimo)</option>
+                                <option value="openai-gpt41-mini">GPT-4.1 Mini</option>
                             </optgroup>
-                            <optgroup label="Anthropic Claude">
-                                <option value="anthropic-opus">Claude Opus (Premium)</option>
-                                <option value="anthropic-sonnet">Claude Sonnet (Balanceado)</option>
-                                <option value="anthropic-haiku">Claude Haiku (Rapido)</option>
+                            <optgroup label="OpenAI - Razonamiento">
+                                <option value="openai-o3">o3 (Razonamiento Avanzado)</option>
+                                <option value="openai-o3-mini">o3 Mini</option>
+                                <option value="openai-o4-mini">o4 Mini (Nuevo)</option>
+                            </optgroup>
+                            <optgroup label="Anthropic Claude 4.5">
+                                <option value="anthropic-opus">Claude Opus 4.5 (Premium)</option>
+                                <option value="anthropic-sonnet">Claude Sonnet 4.5 (Balanceado)</option>
+                                <option value="anthropic-haiku">Claude Haiku 4.5 (Rapido)</option>
                             </optgroup>
                             <optgroup label="Google Gemini">
-                                <option value="gemini-pro">Gemini 2.0 Pro</option>
-                                <option value="gemini-flash">Gemini 2.0 Flash</option>
+                                <option value="gemini-3-pro">Gemini 3 Pro (Ultimo)</option>
+                                <option value="gemini-3-flash">Gemini 3 Flash</option>
+                                <option value="gemini-25-pro">Gemini 2.5 Pro</option>
+                                <option value="gemini-25-flash">Gemini 2.5 Flash</option>
                             </optgroup>
                             <optgroup label="xAI Grok">
                                 <option value="grok-2">Grok 2</option>
@@ -3904,8 +3911,11 @@
             // Get financial context
             var context = getFinancialContext();
 
-            // Add to history
+            // Add to history (limit to last 20 messages to avoid token overflow)
             aiChatHistory.push({role: 'user', content: message});
+            if (aiChatHistory.length > 20) {
+                aiChatHistory = aiChatHistory.slice(-20);
+            }
 
             fetch('/api/ai/chat', {
                 method: 'POST',
@@ -3947,7 +3957,14 @@
             div.className = 'chat-message ' + role;
             div.style.cssText = 'padding:12px 16px;margin:8px 0;border-radius:12px;max-width:85%;' +
                 (role === 'user' ? 'background:var(--primary);color:white;margin-left:auto;' : 'background:var(--card-bg);border:1px solid var(--border);');
-            div.innerHTML = content;
+
+            // Security: Escape user input to prevent XSS
+            if (role === 'user' && !isLoading) {
+                div.textContent = content;
+            } else {
+                div.innerHTML = content;
+            }
+
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
 
@@ -5213,6 +5230,7 @@
         // Status check (fast, independent)
         checkStatus();
         loadQontoOrgAuto();
+        loadAISettings();
     </script>
 </body>
 </html>
